@@ -4,9 +4,17 @@
  * geht entweder sofort durch oder wandert in die Warteschlange und wird
  * nachgereicht, sobald wieder Empfang da ist. Auf der Baustelle ist
  * kein Netz der Normalfall, nicht die Ausnahme.
+ *
+ * Namen der Ersteller werden bewusst nicht ueber eine eingebettete
+ * Abfrage geholt. Zwischen eintraege.ersteller_id und profile.id gibt
+ * es keinen Fremdschluessel, den PostgREST sieht, der zeigt auf
+ * auth.users. Eine Einbettung scheitert deshalb. Stattdessen wird die
+ * Namensliste einmal geladen und lokal zugeordnet.
  */
 
-const BASIS_KONTROLLPUNKTE = [
+/* Startvorlage fuer ein neues Projekt. Danach ist die Liste je Projekt
+   frei editierbar, es gibt keinen festen Sockel mehr. */
+const STANDARD_KONTROLLPUNKTE = [
   'Gerüste (Zustand, Verankerung)',
   'Bauzaun / Absperrungen intakt',
   'Baustellensignalisation vorhanden',
@@ -36,6 +44,7 @@ function gebaeudeText(eintrag) {
 
 const CACHE_PROJEKTE = 'bj_cache_projekte';
 const CACHE_EINTRAEGE = 'bj_cache_eintraege';   // { [projektId]: Eintrag[] }
+const CACHE_NAMEN = 'bj_cache_namen';           // { [userId]: Name }
 const QUEUE = 'bj_queue';
 
 /* --- lokaler Spiegel ---------------------------------------------------- */
@@ -45,6 +54,31 @@ function lies(key, fallback) {
 }
 function schreib(key, wert) {
   try { localStorage.setItem(key, JSON.stringify(wert)); } catch { /* Speicher voll, egal */ }
+}
+
+/* Fehler aus Supabase nicht verschlucken. Ein stiller Rueckfall auf den
+   leeren Cache sieht aus wie "keine Daten" und kostet Stunden Suche. */
+function meckern(wo, error) {
+  if (error) console.error(`[Baujournal] ${wo}:`, error.message || error);
+  return error;
+}
+
+/* --- Namen der Teammitglieder ------------------------------------------- */
+
+let namenKarte = null;
+
+async function namen() {
+  if (namenKarte) return namenKarte;
+  if (navigator.onLine) {
+    const { data, error } = await sb.from('profile').select('id,name');
+    if (!meckern('Profile laden', error) && data) {
+      namenKarte = Object.fromEntries(data.map(p => [p.id, p.name]));
+      schreib(CACHE_NAMEN, namenKarte);
+      return namenKarte;
+    }
+  }
+  namenKarte = lies(CACHE_NAMEN, {});
+  return namenKarte;
 }
 
 /* --- Warteschlange ------------------------------------------------------ */
@@ -75,18 +109,21 @@ async function syncWarteschlange() {
     while (q.length) {
       const auftrag = q[0];
       try {
+        let error = null;
         if (auftrag.typ === 'eintrag') {
-          const { error } = await sb.from('eintraege').insert(auftrag.payload);
-          if (error) throw error;
+          ({ error } = await sb.from('eintraege').insert(auftrag.payload));
         } else if (auftrag.typ === 'korrektur') {
-          const { error } = await sb.rpc('korrigiere_eintrag', auftrag.payload);
-          if (error) throw error;
+          ({ error } = await sb.rpc('korrigiere_eintrag', auftrag.payload));
         } else if (auftrag.typ === 'projekt') {
-          const { error } = await sb.from('projekte').insert(auftrag.payload);
-          if (error) throw error;
+          ({ error } = await sb.from('projekte').insert(auftrag.payload));
+        } else if (auftrag.typ === 'loeschen') {
+          ({ error } = await sb.rpc('loesche_eintrag', auftrag.payload));
+        } else if (auftrag.typ === 'wiederherstellen') {
+          ({ error } = await sb.rpc('stelle_eintrag_wieder_her', auftrag.payload));
         }
+        if (error) throw error;
       } catch (e) {
-        console.warn('Sync gestoppt:', e.message || e);
+        console.warn('[Baujournal] Sync gestoppt:', e.message || e);
         break;
       }
       q = warteschlange().filter(a => a.id !== auftrag.id);
@@ -104,15 +141,20 @@ async function syncWarteschlange() {
 async function ladeProjekte() {
   if (!navigator.onLine) return { daten: lies(CACHE_PROJEKTE, []), ausCache: true };
 
+  // geloescht_am wird mitgeladen und hier gefiltert, statt den
+  // eingebetteten Datensatz serverseitig zu filtern. Das haelt die
+  // Abfrage einfach und das Ergebnis vorhersagbar.
   const { data, error } = await sb
     .from('projekte')
-    .select('*, eintraege(datum)')
+    .select('*, eintraege(datum, geloescht_am)')
     .order('name', { ascending: true });
-  if (error) return { daten: lies(CACHE_PROJEKTE, []), ausCache: true, fehler: error.message };
+  if (meckern('Projekte laden', error)) {
+    return { daten: lies(CACHE_PROJEKTE, []), ausCache: true, fehler: error.message };
+  }
 
   const daten = (data || []).map(p => {
-    const daten_ = (p.eintraege || []).map(e => e.datum).sort();
     const { eintraege, ...rest } = p;
+    const daten_ = (eintraege || []).filter(e => !e.geloescht_am).map(e => e.datum).sort();
     return { ...rest, letzter_eintrag: daten_.length ? daten_[daten_.length - 1] : null };
   });
   schreib(CACHE_PROJEKTE, daten);
@@ -123,10 +165,23 @@ function projektAusCache(id) {
   return lies(CACHE_PROJEKTE, []).find(p => p.id === id) || null;
 }
 
+/* Legt ein einzelnes Projekt in den Spiegel. Ohne das waere ein gerade
+   online angelegtes oder geaendertes Projekt offline unbekannt, bis
+   jemand zufaellig die Uebersicht aufruft. */
+function cacheProjektSetzen(projekt) {
+  const cache = lies(CACHE_PROJEKTE, []);
+  const i = cache.findIndex(p => p.id === projekt.id);
+  const vorher = i >= 0 ? cache[i] : {};
+  const neu = { letzter_eintrag: null, ...vorher, ...projekt };
+  if (i >= 0) cache[i] = neu; else cache.push(neu);
+  schreib(CACHE_PROJEKTE, cache);
+}
+
 async function ladeProjekt(id) {
   if (!navigator.onLine) return projektAusCache(id);
   const { data, error } = await sb.from('projekte').select('*').eq('id', id).maybeSingle();
-  if (error || !data) return projektAusCache(id);
+  if (meckern('Projekt laden', error) || !data) return projektAusCache(id);
+  cacheProjektSetzen(data);
   return data;
 }
 
@@ -135,6 +190,7 @@ async function speichereProjekt(felder, id = null) {
     if (!navigator.onLine) throw new Error('Projektangaben lassen sich nur online ändern');
     const { data, error } = await sb.from('projekte').update(felder).eq('id', id).select().single();
     if (error) throw error;
+    cacheProjektSetzen(data);
     return data;
   }
 
@@ -142,13 +198,12 @@ async function speichereProjekt(felder, id = null) {
   const neu = { ...felder, id: crypto.randomUUID(), erstellt_von: s.user.id };
   if (!navigator.onLine) {
     einreihen({ typ: 'projekt', payload: neu });
-    const cache = lies(CACHE_PROJEKTE, []);
-    cache.push({ ...neu, archiviert: false, letzter_eintrag: null, _lokal: true });
-    schreib(CACHE_PROJEKTE, cache);
+    cacheProjektSetzen({ ...neu, archiviert: false, _lokal: true });
     return neu;
   }
   const { data, error } = await sb.from('projekte').insert(neu).select().single();
   if (error) throw error;
+  cacheProjektSetzen(data);
   return data;
 }
 
@@ -158,11 +213,27 @@ function eintraegeAusCache(projektId) {
   return lies(CACHE_EINTRAEGE, {})[projektId] || [];
 }
 
-async function ladeEintraege(projektId) {
+function sortEintraege(a, b) {
+  const d = String(b.datum).localeCompare(String(a.datum));
+  return d !== 0 ? d : String(b.erstellt_am || '').localeCompare(String(a.erstellt_am || ''));
+}
+
+/* Aendert einen Eintrag im lokalen Spiegel, damit die Liste ohne Netz
+   sofort stimmt und nicht erst nach dem naechsten Sync. */
+function cacheEintragAendern(id, patch) {
+  const cache = lies(CACHE_EINTRAEGE, {});
+  for (const pid of Object.keys(cache)) {
+    const i = (cache[pid] || []).findIndex(e => e.id === id);
+    if (i >= 0) { cache[pid][i] = { ...cache[pid][i], ...patch }; schreib(CACHE_EINTRAEGE, cache); return; }
+  }
+}
+
+/* geloescht = false liefert die normale Liste, true den Papierkorb. */
+async function ladeEintraege(projektId, { geloescht = false } = {}) {
+  const ich = profilLokal();
   // Wartende Eintraege kennen nur die ersteller_id. Den Namen liefert der
   // lokale Profilspiegel, sonst stuende im Verlauf "Unbekannt".
-  const ich = profilLokal();
-  const lokale = warteschlange()
+  const lokale = geloescht ? [] : warteschlange()
     .filter(a => a.typ === 'eintrag' && a.payload.projekt_id === projektId)
     .map(a => ({
       ...a.payload,
@@ -170,37 +241,56 @@ async function ladeEintraege(projektId) {
       _offen: true
     }));
 
-  if (!navigator.onLine) {
-    return [...lokale, ...eintraegeAusCache(projektId)].sort(sortEintraege);
-  }
+  const ausCache = () => [
+    ...lokale,
+    ...eintraegeAusCache(projektId).filter(e => geloescht ? !!e.geloescht_am : !e.geloescht_am)
+  ].sort(sortEintraege);
 
-  const { data, error } = await sb
-    .from('eintraege')
-    .select('*, profile:ersteller_id(name)')
-    .eq('projekt_id', projektId)
+  if (!navigator.onLine) return ausCache();
+
+  let frage = sb.from('eintraege').select('*').eq('projekt_id', projektId);
+  frage = geloescht ? frage.not('geloescht_am', 'is', null) : frage.is('geloescht_am', null);
+
+  const { data, error } = await frage
     .order('datum', { ascending: false })
     .order('erstellt_am', { ascending: false });
-  if (error) return [...lokale, ...eintraegeAusCache(projektId)].sort(sortEintraege);
+  if (meckern('Einträge laden', error)) return ausCache();
 
-  const daten = (data || []).map(e => ({ ...e, ersteller_name: e.profile?.name || null }));
+  const wer = await namen();
+  const daten = (data || []).map(e => ({
+    ...e,
+    ersteller_name: wer[e.ersteller_id] || null,
+    geloescht_name: e.geloescht_von ? (wer[e.geloescht_von] || null) : null
+  }));
+
+  // Der Spiegel haelt beide Zustaende, damit der Papierkorb auch offline
+  // etwas anzeigt. Deshalb nur die jeweilige Haelfte ersetzen.
   const cache = lies(CACHE_EINTRAEGE, {});
-  cache[projektId] = daten;
+  const andere = (cache[projektId] || []).filter(e => geloescht ? !e.geloescht_am : !!e.geloescht_am);
+  cache[projektId] = [...daten, ...andere];
   schreib(CACHE_EINTRAEGE, cache);
-  return [...lokale, ...daten].sort(sortEintraege);
-}
 
-function sortEintraege(a, b) {
-  const d = String(b.datum).localeCompare(String(a.datum));
-  return d !== 0 ? d : String(b.erstellt_am || '').localeCompare(String(a.erstellt_am || ''));
+  return [...lokale, ...daten].sort(sortEintraege);
 }
 
 async function ladeEintrag(id) {
   if (navigator.onLine) {
-    const { data } = await sb
+    // projekte ist ueber einen echten Fremdschluessel eingebettet, das
+    // laeuft. Der Name kommt aus der Namensliste.
+    const { data, error } = await sb
       .from('eintraege')
-      .select('*, profile:ersteller_id(name), projekte:projekt_id(*)')
+      .select('*, projekte:projekt_id(*)')
       .eq('id', id).maybeSingle();
-    if (data) return { ...data, ersteller_name: data.profile?.name || null, projekt: data.projekte };
+    meckern('Eintrag laden', error);
+    if (data) {
+      const wer = await namen();
+      return {
+        ...data,
+        ersteller_name: wer[data.ersteller_id] || null,
+        geloescht_name: data.geloescht_von ? (wer[data.geloescht_von] || null) : null,
+        projekt: data.projekte
+      };
+    }
   }
   const alle = lies(CACHE_EINTRAEGE, {});
   for (const pid of Object.keys(alle)) {
@@ -222,12 +312,14 @@ async function ladeEintrag(id) {
 
 async function ladeKorrekturen(eintragId) {
   if (!navigator.onLine) return [];
-  const { data } = await sb
+  const { data, error } = await sb
     .from('eintraege_korrekturen')
-    .select('*, profile:geaendert_von(name)')
+    .select('*')
     .eq('eintrag_id', eintragId)
     .order('geaendert_am', { ascending: false });
-  return (data || []).map(k => ({ ...k, geaendert_name: k.profile?.name || null }));
+  if (meckern('Korrekturen laden', error)) return [];
+  const wer = await namen();
+  return (data || []).map(k => ({ ...k, geaendert_name: wer[k.geaendert_von] || null }));
 }
 
 /* Speichert einen neuen Eintrag. Ohne Netz wandert er in die
@@ -248,7 +340,7 @@ async function speichereEintrag(felder) {
   }
 
   const { data, error } = await sb.from('eintraege').insert(eintrag).select().single();
-  if (error) {
+  if (meckern('Eintrag speichern', error)) {
     einreihen({ typ: 'eintrag', payload: eintrag });
     return { eintrag: { ...eintrag, ersteller_name: p?.name, _offen: true }, wartet: true, fehler: error.message };
   }
@@ -267,23 +359,61 @@ async function korrigiereEintrag(id, neu, log) {
     return { geaendert: log.length, wartet: true };
   }
   const { error } = await sb.rpc('korrigiere_eintrag', payload);
-  if (error) {
+  if (meckern('Korrektur speichern', error)) {
     einreihen({ typ: 'korrektur', payload });
     return { geaendert: log.length, wartet: true, fehler: error.message };
   }
   return { geaendert: log.length, wartet: false };
 }
 
+/* --- Papierkorb --------------------------------------------------------- */
+
+/* In den Papierkorb legen und zurueckholen. Beides setzt nur zwei Felder,
+   es wird nie eine Zeile geloescht. Auf eintraege gibt es weiterhin
+   bewusst keine delete-Policy. */
+async function loescheEintrag(id) {
+  const s = await session();
+  const patch = { geloescht_am: new Date().toISOString(), geloescht_von: s.user.id };
+  if (!navigator.onLine) {
+    einreihen({ typ: 'loeschen', payload: { p_id: id } });
+    cacheEintragAendern(id, patch);
+    return { wartet: true };
+  }
+  const { error } = await sb.rpc('loesche_eintrag', { p_id: id });
+  if (meckern('Eintrag löschen', error)) {
+    einreihen({ typ: 'loeschen', payload: { p_id: id } });
+    cacheEintragAendern(id, patch);
+    return { wartet: true, fehler: error.message };
+  }
+  cacheEintragAendern(id, patch);
+  return { wartet: false };
+}
+
+async function stelleEintragWiederHer(id) {
+  const patch = { geloescht_am: null, geloescht_von: null, geloescht_name: null };
+  if (!navigator.onLine) {
+    einreihen({ typ: 'wiederherstellen', payload: { p_id: id } });
+    cacheEintragAendern(id, patch);
+    return { wartet: true };
+  }
+  const { error } = await sb.rpc('stelle_eintrag_wieder_her', { p_id: id });
+  if (meckern('Eintrag wiederherstellen', error)) {
+    einreihen({ typ: 'wiederherstellen', payload: { p_id: id } });
+    cacheEintragAendern(id, patch);
+    return { wartet: true, fehler: error.message };
+  }
+  cacheEintragAendern(id, patch);
+  return { wartet: false };
+}
+
 /* --- Checkliste --------------------------------------------------------- */
 
-/* Baut die Punkteliste eines Projekts: erst die Basis, dann die
-   projektspezifischen Ergaenzungen. */
+/* Die Punkteliste eines Projekts als frische, unausgefuellte Kopie.
+   Seit die Liste je Projekt frei editierbar ist, gibt es keine
+   Unterscheidung zwischen Basis und Zusatz mehr. */
 function kontrollpunkte(projekt) {
-  const zusatz = Array.isArray(projekt?.zusatz_kontrollpunkte) ? projekt.zusatz_kontrollpunkte : [];
-  return [
-    ...BASIS_KONTROLLPUNKTE.map(label => ({ label, ok: false, projektspezifisch: false })),
-    ...zusatz.map(label => ({ label: String(label), ok: false, projektspezifisch: true }))
-  ];
+  const liste = Array.isArray(projekt?.kontrollpunkte) ? projekt.kontrollpunkte : [];
+  return liste.map(label => ({ label: String(label), ok: false }));
 }
 
 function kontrollStand(kontrolle) {
@@ -292,5 +422,5 @@ function kontrollStand(kontrolle) {
 }
 
 addEventListener('online', () => syncWarteschlange().then(r => {
-  if (r.erledigt) toast(`${r.erledigt} ${r.erledigt === 1 ? 'Eintrag' : 'Einträge'} nachgetragen`);
+  if (r.erledigt) toast(`${r.erledigt} ${r.erledigt === 1 ? 'Änderung' : 'Änderungen'} nachgetragen`);
 }));
