@@ -156,6 +156,10 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   body{ max-width:none; margin-inline:0; }
 
   .tr-sidebar{
+    /* box-sizing ist in dieser App nicht global gesetzt. Ohne das hier
+       wäre die Leiste 260px plus Polster breit und läge über dem
+       Inhalt, der nur um 260px eingerückt ist. */
+    box-sizing:border-box;
     display:flex; flex-direction:column; gap:4px;
     position:fixed; inset:0 auto 0 0; width:260px; z-index:40;
     background:var(--navy); padding:24px 16px;
@@ -193,6 +197,7 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
 
   /* Die weisse Kopfzeile der neuen Bereiche. */
   .tr-kopf{
+    box-sizing:border-box;
     display:flex; align-items:center; justify-content:space-between; gap:16px;
     height:72px; padding:0 32px;
     background:var(--card); border-bottom:1px solid var(--border);
@@ -203,10 +208,6 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   /* Die mobile Kopfzeile eines Bereichs entfällt, sobald die Seitenleiste
      da ist. Sie trägt dieselbe Information wie Seitenleiste und Kopfzeile. */
   .tr-inhalt .nur-mobil{ display:none !important; }
-
-  /* Solange ein Screen noch nicht auf Desktop umgestellt ist, bleibt er
-     eine Handyspalte im Inhaltsbereich. Wird pro Screen entfernt. */
-  .tr-inhalt .screen.noch-mobil{ max-width:430px; margin-inline:auto; }
 }
 
 @media (max-width:1023px){
@@ -231,3 +232,99 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .br-knopf:hover{ background:#e3e8ea; }
+
+/* ========================================================================
+   Das Baujournal auf grossen Bildschirmen
+   ------------------------------------------------------------------------
+   Inhaltlich ändert sich nichts. Die navy Kopfzeile wird zur weissen
+   Kopfzeile der App, die Aktionsleiste wandert dort hinein (siehe
+   js/shell.js, sie wird als Knoten verschoben, damit alle Ereignisse und
+   IDs erhalten bleiben), und die gestapelten Karten verteilen sich auf
+   die vorhandene Breite.
+
+   Die vielen !important sind kein Übermut: die Screens tragen ihre Masse
+   seit dem Design-Prototyp inline, und inline schlägt jede Klasse. Sie
+   stehen alle in diesem einen Block und gelten nur ab 1024px.
+   ======================================================================== */
+
+@media (min-width:1024px){
+  .tr-inhalt .screen{ max-width:none; margin-inline:0; }
+
+  /* --- Kopfzeile --- */
+  .tr-inhalt .topbar{
+    background:var(--card) !important;
+    border-bottom:1px solid var(--border);
+    min-height:72px;
+    padding-top:0 !important; padding-bottom:0 !important;
+    padding-left:calc(40px + env(safe-area-inset-left)) !important;
+    padding-right:calc(40px + env(safe-area-inset-right)) !important;
+    gap:16px !important;
+  }
+  .tr-inhalt .topbar .bj-h1{ color:var(--text) !important; font-size:19px !important; font-weight:800 !important; }
+  .tr-inhalt .topbar .bj-sub{ color:var(--text-dim) !important; font-size:13px !important; }
+  .tr-inhalt .topbar .bj-ikon{
+    width:38px !important; height:38px !important;
+    background:var(--bg) !important; border-radius:10px !important;
+  }
+  .tr-inhalt .topbar .bj-ikon svg{ stroke:var(--navy); }
+  .tr-inhalt .topbar .bj-ikon:hover{ background:#e3e8ea !important; }
+
+  /* --- Aktionsleiste, jetzt in der Kopfzeile --- */
+  .topbar .actionbar{
+    position:static !important;
+    padding:0 !important; background:none !important;
+    display:flex !important; gap:10px; flex-shrink:0; margin-left:auto;
+  }
+  .topbar .actionbar > *{
+    height:42px !important; width:auto !important; flex:0 0 auto !important;
+    padding-inline:20px !important; box-shadow:none !important;
+    font-size:14px !important; border-radius:11px !important;
+  }
+  .topbar .actionbar > button[aria-label]{ padding-inline:0 !important; width:42px !important; }
+
+  /* --- Inhaltsflächen --- */
+  .tr-inhalt .scroll,
+  .tr-inhalt #inhalt,
+  .tr-inhalt #form{
+    padding:26px calc(40px + env(safe-area-inset-right)) 40px calc(40px + env(safe-area-inset-left)) !important;
+    max-width:1280px;
+  }
+
+  /* Listen als Raster statt als schmale Spalte */
+  #liste.raster{
+    display:grid !important;
+    grid-template-columns:repeat(auto-fill, minmax(330px, 1fr));
+    gap:16px !important;
+    align-items:start;
+  }
+
+  /* Gestapelte Karten auf zwei Spalten verteilen. Jede Karte bleibt am
+     Stück, column-count gleicht die Höhen von selbst aus. */
+  .zweispaltig{
+    display:block !important;
+    column-count:2; column-gap:20px;
+  }
+  .zweispaltig > *{ break-inside:avoid; margin-bottom:16px; }
+  .zweispaltig > *:last-child{ margin-bottom:0; }
+
+  /* Screens, die in der Breite nichts gewinnen, bleiben schmal und
+     rücken in die Mitte statt sich über 1280px zu ziehen. */
+  .tr-inhalt .scroll.schmal{ max-width:860px; }
+
+  /* Ein Primärknopf, der auf dem Handy die ganze Breite füllt, wirkt auf
+     dem Desktop überdehnt. Er nimmt dort nur noch seinen Inhalt ein. */
+  .tr-inhalt .scroll > a.btn-primary{
+    align-self:flex-start; padding-inline:30px !important;
+  }
+
+  /* Blöcke ausserhalb des Scrollbereichs, etwa Überschrift und Suche der
+     Projektübersicht, bekommen denselben Seitenabstand. */
+  .tr-inhalt .bj-flaeche{
+    padding-left:calc(40px + env(safe-area-inset-left)) !important;
+    padding-right:calc(40px + env(safe-area-inset-right)) !important;
+    max-width:1280px;
+  }
+
+  /* #liste ist auf dem Handy eine Flex-Spalte, als Raster muss das weg. */
+  #liste.raster{ flex-direction:unset !important; }
+}

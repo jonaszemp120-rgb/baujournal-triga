@@ -73,6 +73,24 @@ function seitenleiste(aktiv) {
   document.body.insertAdjacentHTML('afterbegin', seitenleiste(aktiv));
   document.body.appendChild(inhalt);
 
+  /* Ab 1024px gehört die Aktionsleiste in die Kopfzeile. Verschoben wird
+     der Knoten selbst, nicht sein Inhalt: so überleben alle Ereignisse,
+     IDs und das spätere Neuzeichnen durch die Screens. */
+  const leiste = inhalt.querySelector('.actionbar');
+  if (leiste) {
+    const kopf = inhalt.querySelector('.topbar');
+    const heimat = leiste.parentElement;
+    const nachbar = leiste.nextElementSibling;
+    const breit = matchMedia('(min-width:1024px)');
+    const einsortieren = () => {
+      if (!kopf) return;
+      if (breit.matches) kopf.appendChild(leiste);
+      else heimat.insertBefore(leiste, nachbar);
+    };
+    einsortieren();
+    breit.addEventListener('change', einsortieren);
+  }
+
   const konto = document.querySelector('.tr-konto');
   const zeichne = p => {
     konto.querySelector('.kreis').textContent = initialen(p?.name);
