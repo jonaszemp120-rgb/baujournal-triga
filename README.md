@@ -61,6 +61,12 @@ Schon getippter Text wird nie überschrieben.
 Absturz, einem Tab-Wechsel oder einem leeren Akku liegt beim nächsten Öffnen
 alles wieder da.
 
+**Randabstände auf dem Gerät.** Kopfzeile und Aktionsleiste rechnen
+`env(safe-area-inset-*)` ein, damit auf iPhones nichts unter die abgerundete
+Displayecke oder den Home-Indicator rutscht. Diese Abstände stehen in
+`css/app.css` und dürfen im Markup nicht durch ein `padding`-Kürzel
+überschrieben werden, sonst fallen sie lautlos wieder weg.
+
 **Offline.** Der Service Worker legt die ganze App in den Cache, sie öffnet also
 auch ohne Netz. Ein Eintrag, der ohne Empfang gespeichert wird, landet in einer
 lokalen Warteschlange, erscheint sofort im Verlauf mit dem Vermerk *wartet* und
@@ -86,9 +92,14 @@ Projekte, Einträge und Korrekturen bewusst keine delete-Policy.
 ## Aufbau
 
 ```
-index.html projekte.html projekt.html journal.html eintrag.html
+index.html projekte.html projekt-start.html projekt.html
+journal.html eintrag.html papierkorb.html
 css/app.css          Schrift, Farben, Zustände. Die Screens tragen ihre
                      Masse weiterhin inline, so wie im Design-Prototyp.
+                     Die Abstände der angehefteten Leisten stehen bewusst
+                     hier, nicht inline: ein inline gesetztes padding
+                     würde die Safe-Area wieder überschreiben.
+js/logo.js           die einzige Logoquelle
 js/config.js         Supabase-URL und anon key
 js/app.js            Client, Session, Datumsformate, Kontozeile
 js/store.js          Datenzugriff, lokaler Spiegel, Offline-Warteschlange
@@ -140,19 +151,33 @@ zugeordnet, siehe `js/store.js`.
 den Client, der Schutz kommt von RLS. Der `service_role` key darf nie ins Repo,
 der umgeht RLS vollständig.
 
-## Marke und Icons
+## Logo
 
-Die TRIGA-Marke liegt als Vektor in `assets/triga-mark-light.svg` (Klammer
-weiss, für Navy-Flächen) und `assets/triga-mark-navy.svg` (für helle Flächen).
-Im Login und in den Kopfzeilen steht sie als Inline-SVG, das Wort TRIGA daneben
-ist normaler Text in Archivo. Durchgehend Marken-Rot `#b20000`, auch im Icon,
-bewusst kein zweiter Rot-Ton.
+Es gibt genau eine Logoquelle: `assets/triga-logo.png`, die vollständige
+Wortbildmarke für dunkle Flächen. Wer das Logo braucht, schreibt
+`<div data-logo="34"></div>` ins Markup, die Zahl ist die Höhe in Pixeln.
+`js/logo.js` setzt es ein. Kein Zeichen allein, kein Schriftzug allein, keine
+zweite Variante.
 
-Die PWA-Icons entstehen aus derselben Geometrie:
+Erzeugt wird die Datei aus der Originaldatei `assets/triga-logo-master.jpg`:
 
 ```
 python3 tools/build_icons.py    # braucht pillow
 ```
+
+Das Original ist ein CMYK-JPEG. CMYK-JPEG rendert in Browsern unzuverlässig,
+auf iOS teilweise mit falschen Farben, und JPEG setzt an den harten Kanten des
+Schriftzugs Artefakte. Daraus entsteht deshalb ein RGB-PNG mit 16-Farben-Palette,
+sichtbar identisch und ein Viertel so gross. Hintergrund, Rot und Weiss der
+Originaldatei stimmen exakt mit der Palette der App überein (`#00233f`,
+`#b20000`, `#ffffff`), das Logo fügt sich daher nahtlos in die Navy-Flächen ein.
+
+Dasselbe Skript schneidet aus derselben Datei die App-Icons. Die zeigen als
+einzige Stelle nur das Zeichen ohne Schriftzug: auf 180 × 180 Pixeln wäre
+«BAUMANAGEMENT» nicht mehr lesbar und das Logo fiele zu einem grauen Strich
+zusammen.
+
+Im PDF-Export wird dieselbe Datei eingebettet, siehe `js/export.js`.
 
 ## Entwickeln
 

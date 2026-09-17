@@ -1,85 +1,128 @@
 #!/usr/bin/env python3
-"""Erzeugt die TRIGA-Marke als SVG und die PWA-Icons als PNG.
+"""Erzeugt alle Logo-Dateien der App aus der offiziellen Logodatei.
 
-Aufruf:  python3 tools/build_icons.py
+Aufruf:  python3 tools/build_icons.py     (braucht pillow)
 
-Die Geometrie ist der pixelgenaue Vektor-Nachbau der Originalmarke,
-viewBox 0 0 320 296: drei rote Balken links, die Klammer rechts.
-Durchgehend Marken-Rot #b20000, bewusst kein zweiter Rot-Ton.
-Die Klammer gibt es in Navy (heller Hintergrund) und Weiss (Navy-Flaeche).
+Quelle ist assets/triga-logo-master.jpg, die Originaldatei fuer dunkle
+Flaechen. Sie liegt als CMYK-JPEG vor. CMYK-JPEG rendert in Browsern
+unzuverlaessig, auf iOS teilweise mit falschen Farben, und JPEG setzt an
+den harten Kanten des Schriftzugs Artefakte. Deshalb entsteht daraus
+ein RGB-PNG, das die App verwendet.
 
-Alle Pfade bestehen ausschliesslich aus Geraden, deshalb genuegt Pillow
-zum Rastern, es braucht keinen SVG-Renderer.
+Hintergrund, Rot und Weiss der Datei stimmen exakt mit der Palette der
+App ueberein (#00233f, #b20000, #ffffff), der Hintergrund bleibt
+deshalb erhalten und fuegt sich nahtlos in die Navy-Flaechen ein.
+
+Ergebnis:
+  assets/triga-logo.png        die Wortbildmarke, einzige Logoquelle der App
+  assets/icon-{180,192,512}.png  App-Icons, dazu maskable und Favicon
+
+Die App-Icons zeigen bewusst nur das Zeichen ohne Schriftzug. Auf
+180 x 180 Pixeln waere "BAUMANAGEMENT" nicht mehr lesbar und das Logo
+fiele zu einem grauen Strich zusammen. In der App selbst wird das
+Zeichen nirgends allein verwendet.
 """
 import os
+from PIL import Image
 
-NAVY = "#00233f"
-RED = "#b20000"
-WHITE = "#ffffff"
-
-VB_W, VB_H = 320, 296
-
-RED_BARS = [
-    [(10, 223), (10, 255), (141, 285), (139, 253)],
-    [(10, 130), (10, 161), (141, 161), (140, 130)],
-    [(141, 10), (12, 40), (10, 72), (140, 42)],
-]
-BRACKET = [
-    (182, 10), (182, 42), (251, 54), (251, 129), (182, 131), (182, 161),
-    (251, 162), (251, 241), (182, 254), (182, 285), (282, 268), (283, 28),
-]
-
-MARK_SCALE = 0.62        # Anteil der Icon-Breite, den die Marke einnimmt
+NAVY = (0, 35, 63)
+MARK_ANTEIL = 0.62      # Anteil der Icon-Breite, den das Zeichen einnimmt
+LOGO_HOEHE = 248        # Hoehe des ausgelieferten PNG, reicht fuer 3x-Displays
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, "assets")
+MASTER = os.path.join(ASSETS, "triga-logo-master.jpg")
 
 
-def _d(poly):
-    head = f"M{poly[0][0]},{poly[0][1]}"
-    rest = " ".join(f"L{x},{y}" for x, y in poly[1:])
-    return f"{head} {rest} Z"
+def ist_navy(c, tol=14):
+    return all(abs(c[i] - NAVY[i]) <= tol for i in range(3))
 
 
-def write_svg(path, bracket_fill):
-    paths = "\n".join(f'  <path fill="{RED}" d="{_d(b)}"/>' for b in RED_BARS)
-    paths += f'\n  <path fill="{bracket_fill}" d="{_d(BRACKET)}"/>'
-    svg = (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VB_W} {VB_H}" '
-        f'role="img" aria-label="TRIGA">\n{paths}\n</svg>\n'
-    )
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(svg)
-    return path
+def inhalt_bbox(im, x0=None, x1=None):
+    """Umschliessendes Rechteck alles Nicht-Hintergrunds. Der aeusserste
+    Bildrand bleibt aussen vor, dort sitzen JPEG-Artefakte."""
+    w, h = im.size
+    px = im.load()
+    x0 = 2 if x0 is None else x0
+    x1 = w - 3 if x1 is None else x1
+    xs = [x for x in range(x0, x1 + 1) if any(not ist_navy(px[x, y]) for y in range(2, h - 2))]
+    ys = [y for y in range(2, h - 2) if any(not ist_navy(px[x, y]) for x in range(x0, x1 + 1))]
+    return (xs[0], ys[0], xs[-1] + 1, ys[-1] + 1)
 
 
-def write_png(path, size, scale=MARK_SCALE, bg=NAVY, bracket=WHITE):
-    from PIL import Image, ImageDraw
-    ss = 4
-    n = size * ss
-    img = Image.new("RGBA", (n, n), bg if bg else (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    k = n * scale / VB_W
-    ox = (n - VB_W * k) / 2.0
-    oy = (n - VB_H * k) / 2.0
-    tf = lambda poly: [(x * k + ox, y * k + oy) for x, y in poly]
-    for bar in RED_BARS:
-        d.polygon(tf(bar), fill=RED)
-    d.polygon(tf(BRACKET), fill=bracket)
-    img.resize((size, size), Image.LANCZOS).save(path)
-    return path
+def spaltenbloecke(im, luecke=40):
+    """Zusammenhaengende Inhaltsbereiche von links nach rechts. Trennt
+    das Zeichen vom Schriftzug."""
+    w, h = im.size
+    px = im.load()
+    voll = [any(not ist_navy(px[x, y]) for y in range(2, h - 2)) for x in range(2, w - 2)]
+    bloecke, start = [], None
+    for i, f in enumerate(voll):
+        if f and start is None:
+            start = i
+        elif not f and start is not None:
+            bloecke.append((start + 2, i + 1))
+            start = None
+    if start is not None:
+        bloecke.append((start + 2, w - 3))
+    zusammen = []
+    for a, b in bloecke:
+        if zusammen and a - zusammen[-1][1] < luecke:
+            zusammen[-1] = (zusammen[-1][0], b)
+        else:
+            zusammen.append((a, b))
+    return zusammen
+
+
+def logo_png(im):
+    """Die Wortbildmarke, eng beschnitten. Die Bildhoehe entspricht damit
+    der Hoehe des Zeichens, height im CSS wirkt direkt darauf."""
+    box = inhalt_bbox(im)
+    eng = im.crop(box)
+    breite = round(eng.width * LOGO_HOEHE / eng.height)
+    eng = eng.resize((breite, LOGO_HOEHE), Image.LANCZOS)
+    # Das Bild kennt drei Farben plus die weichen Kanten dazwischen. Als
+    # Palettenbild ist es ein Viertel so gross, sichtbar identisch. Es
+    # wird auf jeder Seite geladen und steckt in jedem PDF, das lohnt.
+    eng = eng.quantize(colors=16, method=Image.Quantize.MEDIANCUT,
+                       dither=Image.Dither.NONE)
+    pfad = os.path.join(ASSETS, "triga-logo.png")
+    eng.save(pfad, optimize=True)
+    return pfad, eng.size
+
+
+def icons(im):
+    """Das Zeichen aus derselben Datei, mittig auf ein Navy-Quadrat."""
+    bloecke = spaltenbloecke(im)
+    # Der erste Block sind die roten Balken, der zweite die Klammer.
+    # Zusammen ergeben sie das Zeichen, der Rest ist der Schriftzug.
+    zeichen_x = (bloecke[0][0], bloecke[1][1])
+    box = inhalt_bbox(im, *[zeichen_x[0], zeichen_x[1] - 1])
+    mark = im.crop(box)
+
+    raus = []
+    for groesse, anteil, name in [(180, MARK_ANTEIL, "icon-180.png"),
+                                  (192, MARK_ANTEIL, "icon-192.png"),
+                                  (512, MARK_ANTEIL, "icon-512.png"),
+                                  (1024, MARK_ANTEIL, "icon-1024.png"),
+                                  (512, 0.46, "icon-maskable-512.png"),
+                                  (32, MARK_ANTEIL, "favicon-32.png")]:
+        ss = 4
+        n = groesse * ss
+        leinwand = Image.new("RGB", (n, n), NAVY)
+        breite = round(n * anteil)
+        hoehe = round(breite * mark.height / mark.width)
+        skaliert = mark.resize((breite, hoehe), Image.LANCZOS)
+        leinwand.paste(skaliert, ((n - breite) // 2, (n - hoehe) // 2))
+        pfad = os.path.join(ASSETS, name)
+        leinwand.resize((groesse, groesse), Image.LANCZOS).save(pfad, optimize=True)
+        raus.append(pfad)
+    return raus
 
 
 if __name__ == "__main__":
-    os.makedirs(ASSETS, exist_ok=True)
-    out = [
-        write_svg(os.path.join(ASSETS, "triga-mark-light.svg"), WHITE),
-        write_svg(os.path.join(ASSETS, "triga-mark-navy.svg"), NAVY),
-    ]
-    for size in (180, 192, 512, 1024):
-        out.append(write_png(os.path.join(ASSETS, f"icon-{size}.png"), size))
-    # maskable: mehr Luft, damit Androids Zuschnitt die Marke nicht anschneidet
-    out.append(write_png(os.path.join(ASSETS, "icon-maskable-512.png"), 512, scale=0.46))
-    out.append(write_png(os.path.join(ASSETS, "favicon-32.png"), 32))
-    for p in out:
+    im = Image.open(MASTER).convert("RGB")
+    pfad, groesse = logo_png(im)
+    print(f"{os.path.relpath(pfad, ROOT)}  {groesse[0]}x{groesse[1]}")
+    for p in icons(im):
         print(os.path.relpath(p, ROOT))

@@ -17,25 +17,22 @@ function ladeSkript(pfad) {
   return _geladen[pfad];
 }
 
-/* Die Marke als Vektor, dieselben Pfade wie im SVG. */
-const MARKE = [
-  { fill: [178, 0, 0], p: [[10, 223], [10, 255], [141, 285], [139, 253]] },
-  { fill: [178, 0, 0], p: [[10, 130], [10, 161], [141, 161], [140, 130]] },
-  { fill: [178, 0, 0], p: [[141, 10], [12, 40], [10, 72], [140, 42]] },
-  { fill: [255, 255, 255], p: [[182, 10], [182, 42], [251, 54], [251, 129], [182, 131], [182, 161], [251, 162], [251, 241], [182, 254], [182, 285], [282, 268], [283, 28]] }
-];
-
-function markeZeichnen(doc, x, y, hoehe) {
-  const k = hoehe / 296;
-  for (const teil of MARKE) {
-    doc.setFillColor(...teil.fill);
-    const [sx, sy] = teil.p[0];
-    const segmente = teil.p.slice(1).map((pt, i) => {
-      const vor = teil.p[i];
-      return [(pt[0] - vor[0]) * k, (pt[1] - vor[1]) * k];
-    });
-    doc.lines(segmente, x + sx * k, y + sy * k, [1, 1], 'F', true);
-  }
+/* Das Logo ins PDF, dieselbe Datei wie am Bildschirm. Wird einmal
+   geladen und als Datenstrom eingebettet. Der Service Worker hat sie im
+   Cache, der Export funktioniert deshalb auch ohne Empfang. */
+let _logoDaten = null;
+async function logoDatenUrl() {
+  if (_logoDaten) return _logoDaten;
+  const antwort = await fetch(LOGO_BILD);
+  if (!antwort.ok) throw new Error('Logo nicht gefunden');
+  const blob = await antwort.blob();
+  _logoDaten = await new Promise((ok, fehler) => {
+    const leser = new FileReader();
+    leser.onload = () => ok(leser.result);
+    leser.onerror = () => fehler(new Error('Logo nicht lesbar'));
+    leser.readAsDataURL(blob);
+  });
+  return _logoDaten;
 }
 
 /* Die eingebaute Helvetica von jsPDF deckt nur WinAnsi ab und
@@ -89,21 +86,27 @@ async function exportPDF(eintraege, projekt) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
+  // Ohne Logo lieber ein Dokument ohne Logo als gar keins.
+  let logo = null, logoBreite = 0;
+  const LOGO_H = 12;
+  try {
+    logo = await logoDatenUrl();
+    const masse = doc.getImageProperties(logo);
+    logoBreite = LOGO_H * masse.width / masse.height;
+  } catch (e) {
+    console.warn('[Baujournal] Logo fürs PDF nicht verfügbar:', e.message);
+  }
+
   const L = 18, R = 192, BREITE = R - L;
   let y = 0;
 
   const kopf = () => {
     doc.setFillColor(0, 35, 63);
     doc.rect(0, 0, 210, 26, 'F');
-    markeZeichnen(doc, L, 6, 14);
+    if (logo) doc.addImage(logo, 'PNG', L, (26 - LOGO_H) / 2, logoBreite, LOGO_H);
     doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'normal').setFontSize(13);
-    doc.text('TRIGA', L + 18, 13.5);
     doc.setFont('helvetica', 'bold').setFontSize(13);
-    doc.text('Baujournal', R, 13.5, { align: 'right' });
-    doc.setFont('helvetica', 'normal').setFontSize(8.5);
-    doc.setTextColor(180, 196, 208);
-    doc.text('TRIGA Baumanagement AG', R, 19, { align: 'right' });
+    doc.text('Baujournal', R, 15, { align: 'right' });
     y = 38;
   };
 

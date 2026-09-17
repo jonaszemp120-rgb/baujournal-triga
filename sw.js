@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'baujournal-v4';
+const VERSION = 'baujournal-v6';
 
 const DATEIEN = [
   './',
@@ -19,6 +19,7 @@ const DATEIEN = [
   'manifest.json',
   'css/app.css',
   'js/config.js',
+  'js/logo.js',
   'js/app.js',
   'js/store.js',
   'js/projekte.js',
@@ -35,12 +36,11 @@ const DATEIEN = [
   'vendor/jspdf-2.5.2.umd.min.js',
   'vendor/docx-9.5.1.iife.js',
   'assets/favicon-32.png',
+  'assets/triga-logo.png',
   'assets/icon-180.png',
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/icon-maskable-512.png',
-  'assets/triga-mark-light.svg',
-  'assets/triga-mark-navy.svg',
   'assets/fonts/archivo-latin-400-normal.woff2',
   'assets/fonts/archivo-latin-500-normal.woff2',
   'assets/fonts/archivo-latin-600-normal.woff2',
