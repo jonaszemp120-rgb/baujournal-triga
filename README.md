@@ -14,9 +14,14 @@ Datei, speichert, fertig.
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
+| `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
 | `projekt.html` | Projekt anlegen und bearbeiten. Ohne `?id=` neu, mit `?id=` bestehend. |
-| `journal.html` | Das eigentliche Formular für den Rundgang, darunter der Verlauf. |
-| `eintrag.html` | Ein einzelner Eintrag: lesen, korrigieren, als PDF oder Word exportieren. |
+| `journal.html` | Das Formular für den Rundgang. |
+| `eintrag.html` | Ein einzelner Eintrag: lesen, korrigieren, exportieren, löschen. |
+| `papierkorb.html` | Die gelöschten Einträge eines Projekts, mit Wiederherstellen. |
+
+Der Weg durch die App: Übersicht → Projekt-Startseite → entweder ein neues
+Baujournal oder ein bestehender Eintrag.
 
 ## Was die App kann
 
@@ -25,11 +30,21 @@ Bauleiter kommt aus dem angemeldeten Konto. Wetter und Temperatur als
 antippbare Chips, darunter die Checkliste, vier Freitextfelder und der
 Fotos-Hinweis.
 
-**Checkliste pro Projekt.** Zehn Basispunkte gelten überall, jedes Projekt kann
-beliebig viele eigene ergänzen. Die ergänzten tragen im Formular das Label
-*Projektspezifisch*. Die Punkte werden bei jedem Eintrag mitgespeichert, nicht
-nur referenziert. Ändert jemand später die Checkliste eines Projekts, bleiben
-alte Einträge deshalb genau so stehen, wie sie erfasst wurden.
+**Checkliste pro Projekt.** Jedes Projekt führt seine eigene Liste. Ein neues
+Projekt startet mit den zehn üblichen Punkten, danach lässt sich jeder davon
+umbenennen, entfernen oder ergänzen. Einen festen Sockel gibt es nicht.
+
+Die Punkte werden bei jedem Eintrag als Momentaufnahme mitgespeichert, Text und
+Status, nicht als Verweis auf die Projektvorlage. Wer später die Vorlage ändert,
+ändert damit keinen einzigen bestehenden Eintrag. Für ein Journal, das im
+Streitfall als Beweismittel dient, ist das der entscheidende Punkt.
+
+**Papierkorb statt Löschen.** Ein Eintrag lässt sich aus den Listen nehmen, aber
+nie wirklich löschen. `loesche_eintrag` setzt nur `geloescht_am` und
+`geloescht_von`, `stelle_eintrag_wieder_her` setzt beides zurück. Der Papierkorb
+eines Projekts zeigt, was wann von wem entfernt wurde, und holt es auf Knopfdruck
+zurück. Ein endgültiges Löschen gibt es weder im Bildschirm noch in der
+Datenbank: auf `eintraege` existiert bewusst keine delete-Policy.
 
 **Gebäude und Bauteile.** Ein Projekt kann beliebig viele Baukörper führen,
 gepflegt wie die Kontrollpunkte. Sind welche eingetragen, erscheint im Formular
@@ -77,7 +92,10 @@ css/app.css          Schrift, Farben, Zustände. Die Screens tragen ihre
 js/config.js         Supabase-URL und anon key
 js/app.js            Client, Session, Datumsformate, Kontozeile
 js/store.js          Datenzugriff, lokaler Spiegel, Offline-Warteschlange
-js/projekte.js js/projekt.js js/journal.js js/eintrag.js
+js/projekte.js js/projekt.js js/projekt-start.js
+js/journal.js js/eintrag.js js/papierkorb.js
+js/verlauf.js        Eintragszeile und Filter, geteilt von Startseite
+                     und Papierkorb
 js/export.js         PDF und Word
 vendor/              supabase-js, jsPDF, docx, lokal statt vom CDN
 assets/              Marke als SVG, PWA-Icons, Archivo als woff2
@@ -93,10 +111,11 @@ App ohne Netz vollständig und lädt nichts von fremden Servern nach.
 
 Supabase-Projekt `baujournal-triga`, Region `eu-central-1`.
 
-- `projekte` — Stammdaten, `zusatz_kontrollpunkte` und `gebaeude` als
-  JSON-Listen, `archiviert`
+- `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
+  `archiviert`
 - `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
-  Punkteliste, `betrifft_gebaeude` als JSON-Liste
+  Punkteliste, `betrifft_gebaeude` als JSON-Liste, `geloescht_am` und
+  `geloescht_von` für den Papierkorb
 - `eintraege_korrekturen` — das Korrekturprotokoll, nur lesen und anhängen
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
@@ -108,7 +127,14 @@ keine.
 
 Die Korrektur läuft über die Datenbankfunktion `korrigiere_eintrag`. Die
 schreibt Protokoll und neue Werte in derselben Transaktion, entweder beides oder
-nichts, und läuft als `security invoker`, damit RLS greift.
+nichts, und läuft als `security invoker`, damit RLS greift. Ebenso
+`loesche_eintrag` und `stelle_eintrag_wieder_her`.
+
+Ein Fallstrick beim Abfragen: zwischen `eintraege.ersteller_id` und `profile.id`
+gibt es keinen Fremdschlüssel, den PostgREST sieht, der zeigt auf `auth.users`.
+Eine eingebettete Abfrage wie `select('*, profile:ersteller_id(name)')`
+scheitert deshalb. Die Namen werden stattdessen einmal geladen und im Client
+zugeordnet, siehe `js/store.js`.
 
 `js/config.js` enthält URL und anon key. Beides ist öffentlich und gehört so in
 den Client, der Schutz kommt von RLS. Der `service_role` key darf nie ins Repo,

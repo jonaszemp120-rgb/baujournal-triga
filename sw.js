@@ -5,15 +5,17 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'baujournal-v2';
+const VERSION = 'baujournal-v4';
 
 const DATEIEN = [
   './',
   'index.html',
   'projekte.html',
   'projekt.html',
+  'projekt-start.html',
   'journal.html',
   'eintrag.html',
+  'papierkorb.html',
   'manifest.json',
   'css/app.css',
   'js/config.js',
@@ -21,8 +23,11 @@ const DATEIEN = [
   'js/store.js',
   'js/projekte.js',
   'js/projekt.js',
+  'js/projekt-start.js',
   'js/journal.js',
   'js/eintrag.js',
+  'js/papierkorb.js',
+  'js/verlauf.js',
   'js/export.js',
   'vendor/supabase-js-2.58.0.js',
   // Die beiden Export-Bibliotheken werden erst bei Bedarf geladen, landen
