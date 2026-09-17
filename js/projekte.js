@@ -20,7 +20,7 @@
   function kachel(p) {
     const offenerEintrag = p._lokal ? ' · noch nicht übertragen' : '';
     return `
-    <a href="journal.html?projekt=${encodeURIComponent(p.id)}" class="pressable" style="display:block; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 16px; box-shadow:0 1px 2px rgba(10,20,30,0.04);">
+    <a href="projekt-start.html?projekt=${encodeURIComponent(p.id)}" class="pressable" style="display:block; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 16px; box-shadow:0 1px 2px rgba(10,20,30,0.04);">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="min-width:0;">
           <div style="font-size:15.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.name)}</div>

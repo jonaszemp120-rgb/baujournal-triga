@@ -50,10 +50,7 @@
     return punkte.map((p, i) => `
       <div class="kp" data-i="${i}" data-ok="${p.ok ? 1 : 0}"${klickbar ? ' role="checkbox" tabindex="0" aria-checked="' + !!p.ok + '"' : ''}>
         <div class="box">${HAKEN}</div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;">
-          <div class="label" style="overflow-wrap:anywhere;">${esc(p.label)}</div>
-          ${p.projektspezifisch ? '<div style="font-size:10px; font-weight:700; letter-spacing:.03em; color:#b20000; background:rgba(178,0,0,0.08); border-radius:999px; padding:3px 8px; text-transform:uppercase; flex-shrink:0;">Projektspezifisch</div>' : ''}
-        </div>
+        <div class="label" style="overflow-wrap:anywhere; min-width:0;">${esc(p.label)}</div>
       </div>`).join('');
   }
 
@@ -91,8 +88,60 @@
     ];
 
     if (korrekturen.length) teile.push(korrekturKarte());
+    teile.push(papierkorbKarte());
+
     inhalt.dataset.modus = 'lesen';
     inhalt.innerHTML = teile.join('');
+
+    $('#weg')?.addEventListener('click', inPapierkorb);
+    $('#zurueckholen')?.addEventListener('click', wiederherstellen);
+  }
+
+  /* Löschen ist bewusst zurückhaltend: unten, in Grau, ausserhalb der
+     Aktionsleiste mit Export. In der Datenbank passiert dabei kein
+     delete, der Eintrag bekommt nur einen Zeitstempel. */
+  function papierkorbKarte() {
+    if (eintrag._offen) return '';
+
+    if (eintrag.geloescht_am) {
+      const wer = eintrag.geloescht_name || 'Unbekannt';
+      const wann = new Date(eintrag.geloescht_am).toLocaleString('de-CH');
+      return `<div class="karte" style="background:rgba(178,0,0,0.05); border-color:rgba(178,0,0,0.2);">
+        <div class="kartentitel">Im Papierkorb</div>
+        <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:14px;">Gelöscht von ${esc(wer)} · ${esc(wann)}</div>
+        <button id="zurueckholen" type="button" class="pressable" style="width:100%; height:46px; border-radius:12px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:14px;">Wiederherstellen</button>
+      </div>`;
+    }
+
+    return `<button id="weg" type="button" class="pressable" style="width:100%; height:46px; border-radius:12px; background:transparent; border:1.5px solid var(--border); color:var(--text-dim); font-weight:600; font-size:13.5px; display:flex; align-items:center; justify-content:center; gap:8px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5c6a70" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      Eintrag löschen
+    </button>`;
+  }
+
+  function inPapierkorb() {
+    const s = sheet(`
+      <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:8px;">Eintrag in den Papierkorb verschieben?</div>
+      <div style="font-size:13.5px; color:var(--text-dim); line-height:1.55; margin-bottom:20px;">Kann wiederhergestellt werden. Gelöscht wird nichts.</div>
+      <button id="ja" class="btn-primary pressable" style="width:100%; height:50px; border:none; border-radius:14px; background:var(--red); color:#fff; font-weight:700; font-size:15px; margin-bottom:10px;">In den Papierkorb</button>
+      <button id="nein" class="pressable" style="width:100%; height:50px; border-radius:14px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Abbrechen</button>
+    `);
+    $('#nein', s.el).addEventListener('click', s.schliessen);
+    $('#ja', s.el).addEventListener('click', async () => {
+      s.schliessen();
+      const r = await loescheEintrag(eintrag.id);
+      toast(r.wartet ? 'Offline erfasst, wird später übertragen' : 'In den Papierkorb verschoben');
+      setTimeout(() => location.replace(`projekt-start.html?projekt=${encodeURIComponent(eintrag.projekt_id)}`), 700);
+    });
+  }
+
+  async function wiederherstellen() {
+    const r = await stelleEintragWiederHer(eintrag.id);
+    eintrag.geloescht_am = null;
+    eintrag.geloescht_von = null;
+    eintrag.geloescht_name = null;
+    zeichneLesen();
+    toast(r.wartet ? 'Offline erfasst, wird später übertragen' : 'Eintrag wiederhergestellt');
   }
 
   function korrekturKarte() {
@@ -372,7 +421,7 @@
   if (!eintrag) { toast('Eintrag nicht gefunden', true); setTimeout(() => location.replace('projekte.html'), 1400); return; }
 
   projekt = eintrag.projekt || await ladeProjekt(eintrag.projekt_id);
-  $('#zurueck').href = `journal.html?projekt=${encodeURIComponent(eintrag.projekt_id)}`;
+  $('#zurueck').href = `projekt-start.html?projekt=${encodeURIComponent(eintrag.projekt_id)}`;
   $('#k-titel').textContent = `Rundgang ${fmtDatum(eintrag.datum)}`;
   $('#k-sub').textContent = projekt?.name || '';
   document.title = `${fmtDatum(eintrag.datum)} · Baujournal`;

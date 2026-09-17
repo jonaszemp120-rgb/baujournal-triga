@@ -10,7 +10,6 @@
 
   const ENTWURF = `bj_entwurf_${projektId}`;
   const HAKEN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
-  const PFEIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5a8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>';
 
   let projekt = null;
   let punkte = [];
@@ -20,6 +19,7 @@
   /* --- Kopfzeile und Netzstatus ---------------------------------------- */
 
   $('#p-edit').href = `projekt.html?id=${encodeURIComponent(projektId)}`;
+  $('#zurueck').href = `projekt-start.html?projekt=${encodeURIComponent(projektId)}`;
 
   beiStatuswechsel(() => {
     const on = istOnline();
@@ -103,10 +103,7 @@
     $('#kontrolle').innerHTML = punkte.map((p, i) => `
       <div class="kp" data-i="${i}" data-ok="${p.ok ? 1 : 0}" role="checkbox" aria-checked="${!!p.ok}" tabindex="0">
         <div class="box">${HAKEN}</div>
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0;">
-          <div class="label" style="overflow-wrap:anywhere;">${esc(p.label)}</div>
-          ${p.projektspezifisch ? '<div style="font-size:10px; font-weight:700; letter-spacing:0.03em; color:#b20000; background:rgba(178,0,0,0.08); border-radius:999px; padding:3px 8px; text-transform:uppercase; flex-shrink:0;">Projektspezifisch</div>' : ''}
-        </div>
+        <div class="label" style="overflow-wrap:anywhere; min-width:0;">${esc(p.label)}</div>
       </div>`).join('');
 
     $$('#kontrolle .kp').forEach(el => {
@@ -212,80 +209,15 @@
     .forEach(el => el.addEventListener('input', entwurfSichern));
   $('#f-datum').addEventListener('input', () => { datumAnzeigen(); entwurfSichern(); });
 
-  /* --- Verlauf ---------------------------------------------------------- */
+  /* --- frühere Einträge -------------------------------------------------
 
-  $('#v-filter').addEventListener('click', () => {
-    const zeile = $('#v-suchzeile');
-    zeile.hidden = !zeile.hidden;
-    if (!zeile.hidden) $('#v-suche').focus();
-  });
-  $$('#v-suche, #v-von, #v-bis').forEach(el => el.addEventListener('input', zeichneVerlauf));
-
-  function zeile(e, letzte) {
-    const { erfuellt, total } = kontrollStand(e.kontrolle);
-    const teile = [e.ersteller_name || 'Unbekannt', gebaeudeText(e), e.wetter, e.temperatur,
-                   total ? `Kontrolle ${erfuellt}/${total}` : null].filter(Boolean);
-    const trenner = letzte ? '' : 'border-bottom:1px solid var(--border);';
-    return `
-      <a href="eintrag.html?id=${encodeURIComponent(e.id)}" class="pressable" style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 0; ${trenner}">
-        <div style="min-width:0;">
-          <div style="font-size:14px; font-weight:700; color:var(--text);">${fmtDatum(e.datum)}${e._offen ? ' <span style="font-size:10px; font-weight:700; letter-spacing:.03em; color:#b20000; background:rgba(178,0,0,0.08); border-radius:999px; padding:3px 8px; text-transform:uppercase;">wartet</span>' : ''}</div>
-          <div style="font-size:12px; color:var(--text-dim); margin-top:2px; overflow-wrap:anywhere;">${esc(teile.join(' · '))}</div>
-        </div>
-        ${PFEIL}
-      </a>`;
-  }
-
-  let gefiltert = [];
-
-  function zeichneVerlauf() {
-    const q = ($('#v-suche').value || '').trim().toLowerCase();
-    const von = $('#v-von').value, bis = $('#v-bis').value;
-
-    const sichtbar = eintraege.filter(e => {
-      if (von && String(e.datum) < von) return false;
-      if (bis && String(e.datum) > bis) return false;
-      if (!q) return true;
-      return [e.ersteller_name, e.wetter, e.temperatur, e.firmen, e.fortschritt,
-              e.feststellungen, e.anweisungen, fmtDatum(e.datum), gebaeudeText(e)]
-        .some(f => String(f || '').toLowerCase().includes(q));
-    });
-
-    gefiltert = sichtbar;
-    $('#verlauf').innerHTML = sichtbar.length
-      ? sichtbar.map((e, i) => zeile(e, i === sichtbar.length - 1)).join('')
-      : `<div style="font-size:13px; color:var(--text-dim); padding:6px 0 2px; line-height:1.5;">${
-          q || von || bis ? 'Kein Eintrag passt zum Filter.' : 'Noch kein Eintrag für dieses Projekt.'}</div>`;
-  }
+     Die Liste selbst steht auf der Projekt-Startseite. Hier werden die
+     Einträge nur geladen, damit der Knopf "Angaben von letztem Eintrag
+     übernehmen" weiss, was es zu übernehmen gibt. */
 
   async function ladeVerlauf() {
     eintraege = await ladeEintraege(projektId);
-    zeichneVerlauf();
   }
-
-  /* Export des gefilterten Zeitraums, neuester Eintrag zuerst. Noch nicht
-     uebertragene Eintraege bleiben draussen, die gehoeren nicht in ein
-     Dokument, das aus dem Haus geht. */
-  async function zeitraumExport(art, btn) {
-    const auswahl = gefiltert.filter(e => !e._offen);
-    if (!auswahl.length) return toast('Kein übertragener Eintrag in der Auswahl', true);
-    const alt = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'einen Moment …';
-    try {
-      if (art === 'pdf') await exportPDF(auswahl, projekt);
-      else await exportWord(auswahl, projekt);
-      toast(`${auswahl.length} ${auswahl.length === 1 ? 'Eintrag' : 'Einträge'} exportiert`);
-    } catch (e) {
-      toast(e.message || 'Export hat nicht geklappt', true);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = alt;
-    }
-  }
-
-  $('#v-pdf').addEventListener('click', e => zeitraumExport('pdf', e.currentTarget));
-  $('#v-word').addEventListener('click', e => zeitraumExport('word', e.currentTarget));
 
   /* --- Angaben vom letzten Eintrag -------------------------------------- */
 
@@ -324,24 +256,12 @@
     const r = await speichereEintrag({ ...f, projekt_id: projektId });
 
     localStorage.removeItem(ENTWURF);
-    btn.disabled = false;
-    btn.textContent = 'Eintrag speichern';
     syncAnzeige();
-
-    // Formular fuer den naechsten Rundgang zuruecksetzen.
-    chipSetzen($('#wetter'), null);
-    chipSetzen($('#temperatur'), null);
-    if (hatGebaeude) chipeSetzen($('#betrifft'), []);
-    ['#f-firmen', '#f-fortschritt', '#f-feststellungen', '#f-anweisungen'].forEach(s => $(s).value = '');
-    fotos.dataset.ok = 0;
-    fotos.setAttribute('aria-checked', 'false');
-    punkte.forEach(p => p.ok = false);
-    zeichneKontrolle();
-    $('#f-datum').value = heute();
-    datumAnzeigen();
-
-    await ladeVerlauf();
     toast(r.wartet ? 'Offline gespeichert, wird später übertragen' : 'Eintrag gespeichert');
+
+    // Zurueck auf die Projekt-Startseite, dort steht der frische Eintrag
+    // in der Liste der abgeschlossenen Eintraege.
+    setTimeout(() => location.replace(`projekt-start.html?projekt=${encodeURIComponent(projektId)}`), 700);
   });
 
   /* --- Start ------------------------------------------------------------ */

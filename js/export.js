@@ -71,7 +71,7 @@ function abschnitte(e) {
       ['Temperatur', e.temperatur || '–']
     ] },
     { titel: `Allgemeine Kontrolle (${erfuellt}/${total})`, liste: punkte.map(p =>
-      `${p.ok ? '[x]' : '[ ]'} ${p.label}${p.projektspezifisch ? '  (projektspezifisch)' : ''}`) },
+      `${p.ok ? '[x]' : '[ ]'} ${p.label}`) },
     { titel: 'Firmen / Mannschaft vor Ort', text: e.firmen },
     { titel: 'Baufortschritt', text: e.fortschritt },
     { titel: 'Feststellungen / Mängel', text: e.feststellungen },
