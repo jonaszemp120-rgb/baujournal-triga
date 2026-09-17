@@ -99,6 +99,23 @@
 
   /* --- Dateien ------------------------------------------------------------ */
 
+  /* Der Ablagepfad im Storage ist eine Zufalls-UUID, der sichtbare Name
+     steht allein in der Spalte name. Umbenennen heisst darum: eine Spalte
+     aendern, die Datei selbst bleibt liegen. Auch der Download nimmt den
+     neuen Namen, er kommt aus derselben Spalte. */
+  async function dateiUmbenennen(d) {
+    if (!d) return;
+    const endung = /\.pdf$/i.test(d.name) ? d.name.slice(0, -4) : d.name;
+    const roh = await textFrage({ titel: 'Datei umbenennen', label: 'Name', wert: endung, knopf: 'Speichern' });
+    if (!roh) return;
+    const name = /\.pdf$/i.test(roh) ? roh : `${roh}.pdf`;
+    if (name === d.name) return;
+    const { error } = await sb.from('dateien').update({ name }).eq('id', d.id);
+    if (error) return toast(error.message, true);
+    await allesLaden();
+    toast('Umbenannt');
+  }
+
   async function hochladen(file) {
     if (!offenerOrdner) return;
     if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
@@ -222,6 +239,7 @@
         <span class="meta gross">${esc(groesseText(d.groesse))}</span>
         <span class="knoepfe">
           <button type="button" data-runter="${esc(d.id)}" aria-label="${esc(d.name)} herunterladen">${svg(IK.runter, 14)}</button>
+          <button type="button" data-dum="${esc(d.id)}" aria-label="${esc(d.name)} umbenennen">${svg(IK.stift, 14)}</button>
           <button type="button" class="rot" data-dweg="${esc(d.id)}" aria-label="${esc(d.name)} in den Papierkorb">${svg(IK.eimer, 14)}</button>
         </span>
       </div>`;
@@ -230,6 +248,8 @@
   function knoepfeBinden(wurzel, liste) {
     $$('[data-runter]', wurzel).forEach(b =>
       b.addEventListener('click', () => herunterladen(liste.find(d => d.id === b.dataset.runter))));
+    $$('[data-dum]', wurzel).forEach(b =>
+      b.addEventListener('click', () => dateiUmbenennen(liste.find(d => d.id === b.dataset.dum))));
     $$('[data-dweg]', wurzel).forEach(b =>
       b.addEventListener('click', () => dateiInPapierkorb(liste.find(d => d.id === b.dataset.dweg))));
   }

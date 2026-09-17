@@ -1,34 +1,95 @@
-# Baujournal · TRIGA Baumanagement AG
+# TRIGA App · TRIGA Baumanagement AG
 
-Bautagebuch für die Baustellen der TRIGA Baumanagement AG. Läuft im Browser,
-lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert auch ohne
-Empfang, etwa in der Tiefgarage oder im Rohbau.
+Die interne App der TRIGA Baumanagement AG. Vier Bereiche, ein Login, eine
+Adresse: **Mitarbeiter**, **Baujournal**, **Firmenpool**, **Dokumente**. Läuft
+im Browser, lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert
+im Baujournal auch ohne Empfang, etwa in der Tiefgarage oder im Rohbau.
 
 Kein Build-Schritt, kein Framework. Reines HTML, CSS und JavaScript, das Vercel
 direkt als statische Seiten ausliefert. Wer am Code etwas ändert, öffnet die
 Datei, speichert, fertig.
+
+## Die vier Bereiche
+
+**Mitarbeiter** ist das Adressbuch des Teams, bewusst getrennt von den
+Login-Konten. Telefon und E-Mail sind direkt antippbar. Einen Eintrag hier zu
+löschen berührt kein Konto — die Tabelle kennt `auth.users` gar nicht als
+Person. Konten legt weiterhin nur die Geschäftsleitung im Supabase-Dashboard an.
+
+**Baujournal** ist das Bautagebuch: Projekte, Rundgänge, Checkliste,
+Korrekturprotokoll, Export als PDF und Word. Der Bereich mit dem meisten
+Gewicht, siehe den eigenen Abschnitt weiter unten.
+
+**Firmenpool** sind die Unternehmer, geordnet nach BKP-Kategorie und danach nach
+Ortschaft. Pro Firma Ansprechpersonen, Notizen mit Ampelfarbe, vCard-Export,
+Excel-Export der gefilterten Liste und ein Import mit Spaltenzuordnung. Beim
+Erfassen einer neuen Firma lassen sich Adresse und Nummer über search.ch holen.
+
+**Dokumente** ist eine freie Ordnerablage für PDF, mit Dateiname, Datum und
+hochladender Person.
 
 ## Screens
 
 | Datei | Zweck |
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
+| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den vier Bereichen, mit Zahlen aus der Datenbank. |
+| `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
 | `projekt.html` | Projekt anlegen und bearbeiten. Ohne `?id=` neu, mit `?id=` bestehend. |
 | `journal.html` | Das Formular für den Rundgang. |
 | `eintrag.html` | Ein einzelner Eintrag: lesen, korrigieren, exportieren, löschen. |
 | `papierkorb.html` | Die gelöschten Einträge eines Projekts, mit Wiederherstellen. |
-| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den vier Bereichen. |
-| `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `firmenpool.html` | Unternehmer nach BKP-Kategorie und Ortschaft, mit Ansprechpersonen und Notizen. |
 | `dokumente.html` | Ordner und PDF aus dem Supabase-Storage. |
-| `papierkorb-bereich.html` | Der Papierkorb der drei neuen Bereiche, `?bereich=mitarbeiter\|firmen\|ordner`. |
+| `papierkorb-bereich.html` | Der Papierkorb der drei neuen Bereiche, `?bereich=mitarbeiter`, `firmen` oder `ordner`. |
 
-Der Weg durch die App: Übersicht → Projekt-Startseite → entweder ein neues
-Baujournal oder ein bestehender Eintrag.
+## Durchgängige Prinzipien
 
-## Was die App kann
+Vier Regeln gelten in der ganzen App gleich. Wer etwas Neues dazubaut, hält
+sich daran, sonst fällt es sofort auf.
+
+**Was sich anlegen lässt, lässt sich auch ändern und wieder entfernen.** Keine
+Sackgasse, in der ein Tippfehler für immer stehen bleibt.
+
+| Was | Anlegen | Ändern | Entfernen |
+|---|---|---|---|
+| Projekt | `projekte.html` | `projekt.html?id=` | archivieren, kein Löschen |
+| Kontrollpunkte eines Projekts | `projekt.html` | dort | dort |
+| Gebäude und Bauteile | `projekt.html` | dort | dort |
+| Eintrag | `journal.html` | korrigieren in `eintrag.html`, mit Protokoll | Papierkorb des Projekts |
+| Mitarbeiter | `mitarbeiter.html` | dort | Papierkorb Mitarbeiter |
+| Ordner | `dokumente.html` | umbenennen | Papierkorb Dokumente |
+| Datei | hochladen | umbenennen | Papierkorb Dokumente |
+| BKP-Kategorie | `firmenpool.html` | dort | Papierkorb Firmenpool |
+| Firma | `firmenpool.html` | dort | Papierkorb Firmenpool |
+| Ansprechperson | in der Firma | dort | direkt, ohne Papierkorb |
+| Notiz | in der Firma | dort | direkt, ohne Papierkorb |
+| Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
+
+Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
+der Garantie- und Verjährungsfristen. **Ansprechpersonen und Notizen** hängen an
+genau einer Firma, sind kein eigenständiger Datensatz mit Beweischarakter und
+werden darum direkt gelöscht; eine falsch gelöschte Person ist in Sekunden neu
+erfasst. Die Rückfrage sagt das jeweils auch so.
+
+**Der Papierkorb funktioniert überall gleich.** Löschen setzt `geloescht_am`,
+nichts verschwindet. Jeder Bereich hat seine eigene Papierkorb-Ansicht mit Name,
+Datum, löschender Person und einem Knopf zum Zurückholen. Ein endgültiges
+Löschen gibt es weder auf dem Bildschirm noch über die API: den betroffenen
+Tabellen fehlt schlicht die Delete-Policy.
+
+**Responsive ist keine Zugabe.** Jeder Screen muss auf dem Handy und auf einem
+grossen Bildschirm brauchbar sein. Ab 1024px tritt die permanente Seitenleiste
+dazu und der Inhalt verteilt sich auf die Breite, darunter bleibt es die
+Handyspalte mit Zurück-Pfeil. Das gilt auch für das bestehende Baujournal.
+
+**Nichts kommt von einem fremden Server.** Schrift, Bibliotheken und Logo liegen
+im Repo. Die einzige Ausnahme ist die Serverless-Function zu search.ch, und die
+wird nur auf Klick angefragt.
+
+## Was das Baujournal kann
 
 **Rundgang erfassen.** Datum steht auf heute und lässt sich ändern, der
 Bauleiter kommt aus dem angemeldeten Konto. Wetter und Temperatur als
@@ -48,8 +109,7 @@ Streitfall als Beweismittel dient, ist das der entscheidende Punkt.
 nie wirklich löschen. `loesche_eintrag` setzt nur `geloescht_am` und
 `geloescht_von`, `stelle_eintrag_wieder_her` setzt beides zurück. Der Papierkorb
 eines Projekts zeigt, was wann von wem entfernt wurde, und holt es auf Knopfdruck
-zurück. Ein endgültiges Löschen gibt es weder im Bildschirm noch in der
-Datenbank: auf `eintraege` existiert bewusst keine delete-Policy.
+zurück.
 
 **Gebäude und Bauteile.** Ein Projekt kann beliebig viele Baukörper führen,
 gepflegt wie die Kontrollpunkte. Sind welche eingetragen, erscheint im Formular
@@ -66,17 +126,15 @@ Schon getippter Text wird nie überschrieben.
 Absturz, einem Tab-Wechsel oder einem leeren Akku liegt beim nächsten Öffnen
 alles wieder da.
 
-**Randabstände auf dem Gerät.** Kopfzeile und Aktionsleiste rechnen
-`env(safe-area-inset-*)` ein, damit auf iPhones nichts unter die abgerundete
-Displayecke oder den Home-Indicator rutscht. Diese Abstände stehen in
-`css/app.css` und dürfen im Markup nicht durch ein `padding`-Kürzel
-überschrieben werden, sonst fallen sie lautlos wieder weg.
-
 **Offline.** Der Service Worker legt die ganze App in den Cache, sie öffnet also
 auch ohne Netz. Ein Eintrag, der ohne Empfang gespeichert wird, landet in einer
 lokalen Warteschlange, erscheint sofort im Verlauf mit dem Vermerk *wartet* und
 geht automatisch raus, sobald wieder Verbindung da ist. Die Zahl auf dem Würfel
 neben dem Speichern-Knopf zeigt, wie viel noch offen ist.
+
+Die drei neuen Bereiche zeigen offline den zuletzt geladenen Stand und sagen das
+auch in einer Zeile oben. Geändert wird dort erst wieder mit Verbindung, eine
+zweite Warteschlange wäre mehr Risiko als Nutzen.
 
 **Korrekturen statt Überschreiben.** Ein gespeicherter Eintrag lässt sich
 nachträglich korrigieren, aber nie stillschweigend. Jede Änderung landet als
@@ -89,10 +147,11 @@ Baujournal dient im Streitfall als Beweismittel, ein rückwirkend spurlos
 sich über die Lupe ein Zeitraum filtern und die ganze Auswahl auf einmal
 exportieren. Beides läuft im Browser, nichts geht an einen fremden Server.
 
-**Archivieren statt löschen.** Ein archiviertes Projekt verschwindet aus der
-Hauptübersicht und bleibt über den Archivfilter erreichbar. Gelöscht wird
-nichts, wegen der Garantie- und Verjährungsfristen. Die Datenbank hat für
-Projekte, Einträge und Korrekturen bewusst keine delete-Policy.
+**Randabstände auf dem Gerät.** Kopfzeile und Aktionsleiste rechnen
+`env(safe-area-inset-*)` ein, damit auf iPhones nichts unter die abgerundete
+Displayecke oder den Home-Indicator rutscht. Diese Abstände stehen in
+`css/app.css` und dürfen im Markup nicht durch ein `padding`-Kürzel
+überschrieben werden, sonst fallen sie lautlos wieder weg.
 
 ## Aufbau
 
@@ -104,8 +163,8 @@ mitarbeiter.html firmenpool.html dokumente.html
 papierkorb-bereich.html   ein Papierkorb für alle drei neuen Bereiche,
                           aufgerufen mit ?bereich=…
 css/app.css          Schrift, Farben, Zustände, der gemeinsame Rahmen.
-                     Die Screens tragen ihre Masse weiterhin inline, so
-                     wie im Design-Prototyp. Die Abstände der
+                     Die Baujournal-Screens tragen ihre Masse weiterhin
+                     inline, so wie im Design-Prototyp. Die Abstände der
                      angehefteten Leisten stehen bewusst hier, nicht
                      inline: ein inline gesetztes padding würde die
                      Safe-Area wieder überschreiben.
@@ -134,17 +193,24 @@ supabase/migrations/ das komplette Datenbankschema
 manifest.json sw.js  PWA und Offline-Cache
 ```
 
+Zwei Dinge, an denen man sich sonst die Zähne ausbeisst:
+
 Die Bereichsdateien kapseln sich alle in eine `(() => { … })()`. Klassische
 `<script>`-Tags teilen sich einen einzigen globalen Raum, zwei gleichnamige
 Deklarationen in zwei Dateien sind ein harter SyntaxError und die zweite Datei
 läuft dann gar nicht. Genau das ist einmal passiert.
 
-Alles liegt lokal im Repo, auch Schrift und Bibliotheken. Damit funktioniert die
-App ohne Netz vollständig und lädt nichts von fremden Servern nach.
+`box-sizing` ist nicht global auf `border-box` gesetzt, weil die
+Baujournal-Screens ihre Masse inline tragen. Alles, was für die TRIGA App neu
+dazugekommen ist, trägt eine Klasse mit Präfix (`tr-`, `br-`, `dk-`, `fp-`,
+`pk-`, `st-`), und für genau diese Präfixe steht `border-box` an einer Stelle in
+`css/app.css`. Ohne das läuft jede Zeile mit `width:100%` und seitlichem Polster
+um dieses Polster aus dem Bild.
 
 ## Datenbank
 
-Supabase-Projekt `baujournal-triga`, Region `eu-central-1`.
+Supabase-Projekt `baujournal-triga`, Region `eu-central-1`. Eine Datenbank für
+alle vier Bereiche.
 
 - `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
   `archiviert`
@@ -224,6 +290,19 @@ einzige Stelle nur das Zeichen ohne Schriftzug: auf 180 × 180 Pixeln wäre
 zusammen.
 
 Im PDF-Export wird dieselbe Datei eingebettet, siehe `js/export.js`.
+
+## Test-Banner
+
+Über jedem Startbildschirm steht die rote Zeile «Test-Version — Nutzung noch
+nicht endgültig entschieden.» Sie hängt an einem einzigen Schalter in
+`js/shell.js`:
+
+```js
+const TEST_BANNER = true;
+```
+
+Auf `false` setzen und die Zeile ist überall weg. Kein zweiter Ort, an dem noch
+ein Rest stehen bleibt.
 
 ## Umgebungsvariablen
 
