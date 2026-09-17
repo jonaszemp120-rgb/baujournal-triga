@@ -22,7 +22,7 @@
   /* Welche Bereiche schon eine Tabelle haben. Die Liste wächst mit jedem
      Schritt. Eine Abfrage auf eine Tabelle, die es noch nicht gibt, wäre
      nur eine Fehlermeldung in der Konsole ohne Nutzen. */
-  const TABELLEN_DA = ['projekte', 'mitarbeiter'];
+  const TABELLEN_DA = ['projekte', 'mitarbeiter', 'ordner'];
 
   async function zaehle(tabelle, filter = f => f) {
     if (!istOnline() || !TABELLEN_DA.includes(tabelle)) return null;
