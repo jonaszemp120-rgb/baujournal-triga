@@ -9,27 +9,41 @@
 
   const X = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5a8" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
-  /* Zusaetzliche Kontrollpunkte und Gebaeude verhalten sich gleich:
-     antippbare Liste, Eingabefeld mit Plus, einzeln entfernbar. */
-  function freieListe(listeSel, feldSel, knopfSel) {
+  /* Kontrollpunkte und Gebaeude verhalten sich gleich: antippbare Liste,
+     Eingabefeld mit Plus, einzeln entfernbar. Der Text jeder Zeile laesst
+     sich direkt ueberschreiben, deshalb ein randloses Eingabefeld statt
+     einer festen Beschriftung. */
+  function freieListe(listeSel, feldSel, knopfSel, bezeichnung) {
     const eintraege = [];
     const liste = $(listeSel);
     const feld = $(feldSel);
 
     function zeichne() {
       liste.innerHTML = eintraege.map((label, i) => `
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bg); border-radius:10px; padding:10px 12px;">
-          <span style="font-size:13.5px; color:var(--text); font-weight:500; min-width:0; overflow-wrap:anywhere;">${esc(label)}</span>
-          <button type="button" data-i="${i}" aria-label="Entfernen" style="border:none; background:none; padding:0; display:flex; flex-shrink:0;">${X}</button>
+        <div style="display:flex; align-items:center; gap:10px; background:var(--bg); border-radius:10px; padding:0 12px;">
+          <input type="text" data-i="${i}" value="${esc(label)}" aria-label="${esc(bezeichnung)} ${i + 1}"
+                 style="flex:1; min-width:0; border:none; background:transparent; outline:none; padding:11px 0; font-size:13.5px; color:var(--text); font-weight:500;">
+          <button type="button" data-weg="${i}" aria-label="Entfernen" style="border:none; background:none; padding:0; display:flex; flex-shrink:0;">${X}</button>
         </div>`).join('');
-      $$('button[data-i]', liste).forEach(b =>
-        b.addEventListener('click', () => { eintraege.splice(+b.dataset.i, 1); zeichne(); }));
+
+      $$('input[data-i]', liste).forEach(el => {
+        el.addEventListener('input', () => { eintraege[+el.dataset.i] = el.value; });
+        // Leer zurueckgelassene Zeilen verschwinden, sonst blieben
+        // namenlose Kontrollpunkte in der Checkliste stehen.
+        el.addEventListener('blur', () => {
+          const i = +el.dataset.i;
+          if (!el.value.trim()) { eintraege.splice(i, 1); zeichne(); }
+          else { eintraege[i] = el.value.trim(); el.value = eintraege[i]; }
+        });
+      });
+      $$('button[data-weg]', liste).forEach(b =>
+        b.addEventListener('click', () => { eintraege.splice(+b.dataset.weg, 1); zeichne(); }));
     }
 
     function hinzu() {
       const wert = feld.value.trim();
       if (!wert) return;
-      if (eintraege.some(z => z.toLowerCase() === wert.toLowerCase())) { feld.value = ''; return; }
+      if (eintraege.some(z => z.trim().toLowerCase() === wert.toLowerCase())) { feld.value = ''; return; }
       eintraege.push(wert);
       feld.value = '';
       zeichne();
@@ -43,13 +57,17 @@
 
     return {
       hinzu,
-      werte: () => [...eintraege],
+      werte: () => eintraege.map(z => String(z).trim()).filter(Boolean),
       setzen(neue) { eintraege.length = 0; eintraege.push(...neue.map(String)); zeichne(); }
     };
   }
 
-  const zusatz = freieListe('#kp-liste', '#kp-neu', '#kp-add');
-  const gebaeude = freieListe('#geb-liste', '#geb-neu', '#geb-add');
+  const punkte = freieListe('#kp-liste', '#kp-neu', '#kp-add', 'Kontrollpunkt');
+  const gebaeude = freieListe('#geb-liste', '#geb-neu', '#geb-add', 'Gebäude');
+
+  // Ein neues Projekt startet mit den ueblichen zehn Punkten. Sie sind
+  // ab hier ganz normale Zeilen und lassen sich aendern oder entfernen.
+  if (!bearbeiten) punkte.setzen(STANDARD_KONTROLLPUNKTE);
 
   /* Archiv-Schalter */
   const schalter = $('#f-archiviert');
@@ -65,7 +83,7 @@
   if (bearbeiten) {
     $('#kopftitel').textContent = 'Projekt bearbeiten';
     $('#speichern').textContent = 'Änderungen speichern';
-    $('#zurueck').href = `journal.html?projekt=${encodeURIComponent(id)}`;
+    $('#zurueck').href = `projekt-start.html?projekt=${encodeURIComponent(id)}`;
     $('#archiv-karte').hidden = false;
 
     const p = await ladeProjekt(id);
@@ -77,7 +95,7 @@
     $('#f-nr').value = p.projekt_nr || '';
     $('#f-notizen').value = p.notizen || '';
     schalter.checked = !!p.archiviert;
-    zusatz.setzen(Array.isArray(p.zusatz_kontrollpunkte) ? p.zusatz_kontrollpunkte : []);
+    punkte.setzen(Array.isArray(p.kontrollpunkte) ? p.kontrollpunkte : []);
     gebaeude.setzen(Array.isArray(p.gebaeude) ? p.gebaeude : []);
     zeichneSchalter();
   }
@@ -89,7 +107,7 @@
 
     // Was noch unbestaetigt im Eingabefeld steht, zaehlt mit, sonst geht
     // es beim Speichern verloren.
-    zusatz.hinzu();
+    punkte.hinzu();
     gebaeude.hinzu();
 
     const felder = {
@@ -99,7 +117,7 @@
       parzelle: $('#f-parzelle').value.trim() || null,
       projekt_nr: $('#f-nr').value.trim() || null,
       notizen: $('#f-notizen').value.trim() || null,
-      zusatz_kontrollpunkte: zusatz.werte(),
+      kontrollpunkte: punkte.werte(),
       gebaeude: gebaeude.werte(),
       archiviert: schalter.checked
     };
@@ -117,7 +135,7 @@
     try {
       const p = await speichereProjekt(felder, bearbeiten ? id : null);
       toast(bearbeiten ? 'Projekt gespeichert' : 'Projekt erstellt');
-      location.replace(`journal.html?projekt=${encodeURIComponent(p.id)}`);
+      location.replace(`projekt-start.html?projekt=${encodeURIComponent(p.id)}`);
     } catch (e) {
       fehler.textContent = e.message || 'Speichern hat nicht geklappt.';
       fehler.hidden = false;
