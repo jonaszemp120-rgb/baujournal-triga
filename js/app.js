@@ -156,13 +156,9 @@ function sheet(inhalt) {
 /* Der Kreis oben rechts zeigt die Initialen und oeffnet Name und Abmelden.
    Im Prototyp ist das nur ein Kreis, die App braucht aber einen Weg
    heraus und einen Weg, den Anzeigenamen zu setzen. */
-function kontoKreis(el) {
-  const zeichne = p => { el.textContent = initialen(p?.name); };
-  profil().then(zeichne);
-  document.addEventListener('profil', e => zeichne(e.detail));
-  el.addEventListener('click', async () => {
-    const p = await profil();
-    const s = sheet(`
+async function kontoSheet() {
+  const p = await profil();
+  const s = sheet(`
       <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red);margin-bottom:14px;">Konto</div>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
         <label style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);">Anzeigename</label>
@@ -171,20 +167,27 @@ function kontoKreis(el) {
       </div>
       <button id="k-save" class="btn-primary pressable" style="width:100%;height:50px;border:none;border-radius:14px;background:var(--red);color:#fff;font-weight:700;font-size:15px;margin-bottom:10px;">Name speichern</button>
       <button id="k-out" class="pressable" style="width:100%;height:50px;border-radius:14px;background:var(--card);border:1.5px solid var(--border);color:var(--navy);font-weight:700;font-size:15px;">Abmelden</button>
-    `);
-    $('#k-save', s.el).addEventListener('click', async () => {
-      const name = $('#k-name', s.el).value.trim();
-      if (!name) return;
-      if (!istOnline()) return toast('Name laesst sich nur online aendern', true);
-      const { error } = await sb.from('profile').update({ name }).eq('id', p.id);
-      if (error) return toast(error.message, true);
-      localStorage.setItem(PROFIL_KEY, JSON.stringify({ ...p, name }));
-      document.dispatchEvent(new CustomEvent('profil', { detail: { ...p, name } }));
-      s.schliessen();
-      toast('Name gespeichert');
-    });
-    $('#k-out', s.el).addEventListener('click', abmelden);
+  `);
+  $('#k-save', s.el).addEventListener('click', async () => {
+    const name = $('#k-name', s.el).value.trim();
+    if (!name) return;
+    if (!istOnline()) return toast('Name lässt sich nur online ändern', true);
+    const { error } = await sb.from('profile').update({ name }).eq('id', p.id);
+    if (error) return toast(error.message, true);
+    localStorage.setItem(PROFIL_KEY, JSON.stringify({ ...p, name }));
+    document.dispatchEvent(new CustomEvent('profil', { detail: { ...p, name } }));
+    s.schliessen();
+    toast('Name gespeichert');
   });
+  $('#k-out', s.el).addEventListener('click', abmelden);
+}
+
+/* Der Kreis mit den Initialen, oben rechts in der mobilen Kopfzeile. */
+function kontoKreis(el) {
+  const zeichne = p => { el.textContent = initialen(p?.name); };
+  profil().then(zeichne);
+  document.addEventListener('profil', e => zeichne(e.detail));
+  el.addEventListener('click', kontoSheet);
 }
 
 /* --- Service Worker ----------------------------------------------------- */

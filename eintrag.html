@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Eintrag · Baujournal</title>
+<title>Eintrag · Baujournal · TRIGA App</title>
 <meta name="theme-color" content="#00233f">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Baujournal">
+<meta name="apple-mobile-web-app-title" content="TRIGA">
 <link rel="stylesheet" href="css/app.css">
 <style>
   .karte{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 18px; }
@@ -21,8 +21,8 @@
   #inhalt[data-modus="lesen"] .kp{ cursor:default; }
 </style>
 </head>
-<body>
-<div class="screen">
+<body data-bereich="baujournal">
+<div class="screen noch-mobil">
 
   <div class="topbar" style="display:flex; align-items:center; gap:12px;">
     <a id="zurueck" href="projekte.html" aria-label="Zurück" class="pressable" style="width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,0.08); flex-shrink:0;">
@@ -48,6 +48,7 @@
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
 <script src="js/store.js"></script>
+<script src="js/shell.js"></script>
 <script src="js/export.js"></script>
 <script src="js/eintrag.js"></script>
 </body>
