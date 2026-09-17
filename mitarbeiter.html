@@ -14,7 +14,17 @@
 </head>
 <body data-bereich="mitarbeiter">
 
-  <div class="tr-kopf nur-desktop"><h1>Mitarbeiter</h1></div>
+  <div class="tr-kopf nur-desktop">
+    <h1>Mitarbeiter</h1>
+    <div class="br-werkzeuge">
+      <a class="br-knopf" href="papierkorb-bereich.html?bereich=mitarbeiter" aria-label="Papierkorb">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </a>
+      <button type="button" class="br-knopf voll" data-neu aria-label="Mitarbeiter anlegen">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+  </div>
 
   <div class="br-kopf nur-mobil">
     <div style="display:flex; align-items:center; gap:12px; min-width:0;">
@@ -23,13 +33,29 @@
       </a>
       <div style="font-weight:700; font-size:17px;">Mitarbeiter</div>
     </div>
+    <div class="br-werkzeuge">
+      <a class="br-knopf pressable" href="papierkorb-bereich.html?bereich=mitarbeiter" aria-label="Papierkorb">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      </a>
+      <button type="button" class="br-knopf pressable" data-neu aria-label="Mitarbeiter anlegen">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
   </div>
 
-  <div style="padding:40px 20px; text-align:center;">
-    <div style="max-width:420px; margin-inline:auto; background:var(--card); border:1px dashed var(--border); border-radius:16px; padding:32px 24px;">
-      <div style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px;">Mitarbeiter</div>
-      <div style="font-size:13.5px; color:var(--text-dim); line-height:1.55;">Dieser Bereich wird gerade gebaut. Die Navigation steht schon, die Inhalte kommen in einem der nächsten Schritte.</div>
+  <div id="hinweis" hidden style="margin:12px 16px 0; background:rgba(178,0,0,0.06); border:1px solid rgba(178,0,0,0.18); border-radius:12px; padding:11px 14px; font-size:12.5px; font-weight:600; color:var(--red); line-height:1.45;"></div>
+
+  <div class="br-layout">
+    <div class="br-liste">
+      <div class="br-suche">
+        <input id="suche" type="search" placeholder="Mitarbeiter suchen" aria-label="Mitarbeiter suchen">
+        <button type="button" class="br-knopf voll pressable" data-neu aria-label="Mitarbeiter anlegen">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div id="liste" class="inhalt"></div>
     </div>
+    <div id="detail" class="br-detail"></div>
   </div>
 
 <script src="vendor/supabase-js-2.58.0.js"></script>
@@ -38,6 +64,6 @@
 <script src="js/app.js"></script>
 <script src="js/store.js"></script>
 <script src="js/shell.js"></script>
-<script>verlangeLogin();</script>
+<script src="js/mitarbeiter.js"></script>
 </body>
 </html>

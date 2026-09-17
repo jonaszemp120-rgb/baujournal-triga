@@ -328,3 +328,63 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   /* #liste ist auf dem Handy eine Flex-Spalte, als Raster muss das weg. */
   #liste.raster{ flex-direction:unset !important; }
 }
+
+/* ========================================================================
+   Bereichs-Layout für Mitarbeiter, Firmenpool und Dokumente
+   ------------------------------------------------------------------------
+   Handy: eine Liste, das Detail erscheint als Sheet von unten.
+   Desktop: Liste links, Detail rechts, beides gleichzeitig sichtbar.
+   Es ist dasselbe Markup und derselbe Zeichner, nur ein anderes Ziel.
+   ======================================================================== */
+
+.br-werkzeuge{ display:flex; gap:8px; align-items:center; flex-shrink:0; }
+.br-knopf.rot{ color:var(--red); }
+.br-knopf.voll{ background:var(--navy); color:#fff; }
+.br-knopf.voll:hover{ background:var(--navy-2); }
+
+.br-suche{ display:flex; gap:10px; padding:14px 16px 10px; }
+.br-suche input{
+  flex:1; min-width:0; height:42px; border-radius:10px; border:none;
+  background:var(--bg); padding:0 12px; font-size:13.5px; color:var(--text);
+  box-sizing:border-box;
+}
+.br-suche input:focus{ outline:2px solid var(--navy); outline-offset:-2px; }
+
+.br-zeile{
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px; border-radius:10px; width:100%;
+  background:transparent; border:none; text-align:left; color:var(--text);
+}
+.br-zeile:hover{ background:var(--bg); }
+.br-zeile[aria-current="true"]{ background:var(--bg); }
+.br-zeile .avatar{
+  width:38px; height:38px; border-radius:50%; background:var(--navy); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:12px; flex-shrink:0;
+}
+.br-zeile .titel{ font-weight:600; font-size:13.5px; }
+.br-zeile .unter{ color:var(--text-dim); font-size:11.5px; }
+
+.br-detail{ display:none; }
+.br-leer{
+  background:var(--card); border:1px dashed var(--border); border-radius:16px;
+  padding:32px 24px; text-align:center; font-size:13.5px; color:var(--text-dim); line-height:1.55;
+}
+
+@media (min-width:1024px){
+  .br-layout{ display:flex; align-items:stretch; min-height:calc(100dvh - 72px); }
+  .br-liste{
+    box-sizing:border-box;
+    width:360px; min-width:360px;
+    border-right:1px solid var(--border); background:var(--card);
+  }
+  .br-liste .inhalt{ padding:6px 10px 20px; }
+  .br-detail{ display:block; flex:1; min-width:0; padding:28px 32px 40px; }
+  .br-nur-handy{ display:none !important; }
+}
+
+@media (max-width:1023px){
+  .br-liste{ background:var(--card); min-height:calc(100dvh - 60px); }
+  .br-liste .inhalt{ padding:0 8px 24px; }
+  .br-suche .br-knopf.voll{ display:none; }
+}

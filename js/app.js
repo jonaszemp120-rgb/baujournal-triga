@@ -151,6 +151,21 @@ function sheet(inhalt) {
   return { el, schliessen: zu };
 }
 
+/* Rückfrage vor einer Handlung, die man nicht versehentlich auslösen
+   soll. Liefert true, wenn bestätigt wurde. */
+function frage({ titel, text, knopf, gefahr = true }) {
+  return new Promise(ok => {
+    const s = sheet(`
+      <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:8px;">${esc(titel)}</div>
+      <div style="font-size:13.5px; color:var(--text-dim); line-height:1.55; margin-bottom:20px;">${esc(text)}</div>
+      <button id="f-ja" class="${gefahr ? 'btn-primary ' : ''}pressable" style="width:100%; height:50px; border:none; border-radius:14px; background:${gefahr ? 'var(--red)' : 'var(--navy)'}; color:#fff; font-weight:700; font-size:15px; margin-bottom:10px;">${esc(knopf)}</button>
+      <button id="f-nein" class="pressable" style="width:100%; height:50px; border-radius:14px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Abbrechen</button>
+    `);
+    $('#f-ja', s.el).addEventListener('click', () => { s.schliessen(); ok(true); });
+    $('#f-nein', s.el).addEventListener('click', () => { s.schliessen(); ok(false); });
+  });
+}
+
 /* --- Kontozeile in der Kopfleiste --------------------------------------- */
 
 /* Der Kreis oben rechts zeigt die Initialen und oeffnet Name und Abmelden.
