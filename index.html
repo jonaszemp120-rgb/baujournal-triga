@@ -25,18 +25,10 @@
   <div style="position:absolute; top:150px; left:-52px; width:150px; height:14px; background:#ffffff; transform:skewY(3deg); border-radius:3px; opacity:0.14;"></div>
   <div style="position:absolute; top:204px; left:-40px; width:120px; height:14px; background:var(--red); transform:skewY(9deg); border-radius:3px; opacity:0.9;"></div>
 
-  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:32px; gap:28px; position:relative; z-index:2;">
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:28px; position:relative; z-index:2; padding:calc(32px + env(safe-area-inset-top)) calc(32px + env(safe-area-inset-right)) 32px calc(32px + env(safe-area-inset-left));">
 
     <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
-      <div style="display:flex; align-items:center; gap:13px;">
-        <svg viewBox="0 0 320 296" style="height:34px; width:auto; display:block;" role="img" aria-label="TRIGA Baumanagement AG">
-          <path fill="#b20000" d="M10,223 L10,255 L141,285 L139,253 Z"/>
-          <path fill="#b20000" d="M10,130 L10,161 L141,161 L140,130 Z"/>
-          <path fill="#b20000" d="M141,10 L12,40 L10,72 L140,42 Z"/>
-          <path fill="#ffffff" d="M182,10 L182,42 L251,54 L251,129 L182,131 L182,161 L251,162 L251,241 L182,254 L182,285 L282,268 L283,28 Z"/>
-        </svg>
-        <div style="font-size:25px; font-weight:400; color:#fff; letter-spacing:0.09em; line-height:1;">TRIGA</div>
-      </div>
+      <div data-logo="34"></div>
       <div style="width:36px; height:2px; background:#b20000; border-radius:2px;"></div>
     </div>
 
@@ -78,6 +70,7 @@
 </div>
 
 <script src="vendor/supabase-js-2.58.0.js"></script>
+<script src="js/logo.js"></script>
 <script src="js/config.js"></script>
 <script src="js/app.js"></script>
 <script>

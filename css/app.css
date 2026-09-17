@@ -46,11 +46,28 @@ button{ cursor:pointer; }
 
 /* Bildschirm-Geruest: Kopfzeile oben angeheftet, Aktionsleiste unten */
 .screen{ display:flex; flex-direction:column; min-height:100dvh; }
-.topbar{ position:sticky; top:0; z-index:20; background:var(--navy); }
 .scroll{ flex:1; }
+
+/* Die Abstaende der angehefteten Leisten stehen bewusst hier und nicht
+   inline. Ein inline gesetztes padding-Kuerzel wuerde die Safe-Area
+   wieder ueberschreiben, und genau das ist schon einmal passiert: unten
+   lag der Speichern-Bereich dadurch auf der Displaykante und wurde auf
+   iPhones von der Rundung und vom Home-Indicator angeschnitten.
+   --rand ist der Seitenabstand des jeweiligen Screens. */
+.topbar{
+  position:sticky; top:0; z-index:20; background:var(--navy);
+  padding-top:calc(20px + env(safe-area-inset-top));
+  padding-bottom:18px;
+  padding-left:calc(var(--rand, 18px) + env(safe-area-inset-left));
+  padding-right:calc(var(--rand, 18px) + env(safe-area-inset-right));
+}
 .actionbar{
   position:sticky; bottom:0; z-index:15;
+  background:linear-gradient(to top, var(--bg) 65%, transparent);
+  padding-top:14px;
   padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  padding-left:calc(var(--rand, 18px) + env(safe-area-inset-left));
+  padding-right:calc(var(--rand, 18px) + env(safe-area-inset-right));
 }
 
 /* Eingabefelder: Fokus in Navy, damit klar ist wo man tippt */
@@ -106,7 +123,9 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   position:fixed; left:0; right:0; bottom:0; z-index:51;
   max-width:430px; margin-inline:auto;
   background:var(--card); border-radius:20px 20px 0 0;
-  padding:20px 20px calc(24px + env(safe-area-inset-bottom));
+  padding:20px calc(20px + env(safe-area-inset-right))
+          calc(24px + env(safe-area-inset-bottom))
+          calc(20px + env(safe-area-inset-left));
   transform:translateY(102%); transition:transform .22s ease;
   box-shadow:0 -12px 40px rgba(0,10,20,.22);
 }
