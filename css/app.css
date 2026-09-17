@@ -1,0 +1,120 @@
+/* Baujournal TRIGA Baumanagement AG
+   Farben, Schrift und Masse stammen unveraendert aus dem Design-Prototyp.
+   Die Screens selbst tragen ihre Styles weiterhin inline, hier steht nur,
+   was sich inline nicht ausdruecken laesst: Schrift, Zustaende, Layout-Rahmen. */
+
+@font-face{font-family:'Archivo';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/archivo-latin-400-normal.woff2') format('woff2');}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:500;font-display:swap;src:url('../assets/fonts/archivo-latin-500-normal.woff2') format('woff2');}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:600;font-display:swap;src:url('../assets/fonts/archivo-latin-600-normal.woff2') format('woff2');}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:700;font-display:swap;src:url('../assets/fonts/archivo-latin-700-normal.woff2') format('woff2');}
+@font-face{font-family:'Archivo';font-style:normal;font-weight:900;font-display:swap;src:url('../assets/fonts/archivo-latin-900-normal.woff2') format('woff2');}
+
+:root{
+  --navy:#00233f;
+  --navy-2:#0c3457;
+  --red:#b20000;
+  --red-dark:#8a0000;
+  --bg:#eef1f2;
+  --card:#ffffff;
+  --border:#dfe4e6;
+  --text:#12181b;
+  --text-dim:#5c6a70;
+  --ok:#2e7d32;
+  --warn:#c7910a;
+  --mute:#9aa5a8;
+}
+
+*{ -webkit-tap-highlight-color:transparent; }
+html{ background:var(--bg); }
+body{
+  margin:0;
+  font-family:'Archivo', system-ui, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  max-width:430px;
+  margin-inline:auto;
+  min-height:100dvh;
+  overflow-x:hidden;
+}
+body.dark{ background:var(--navy); }
+a{ text-decoration:none; color:inherit; }
+input::placeholder, textarea::placeholder{ color:#a9b3b6; }
+input, textarea, button, select{ font-family:'Archivo', system-ui, sans-serif; }
+button{ cursor:pointer; }
+/* Inline gesetzte display-Werte wuerden das hidden-Attribut sonst aushebeln. */
+[hidden]{ display:none !important; }
+
+/* Bildschirm-Geruest: Kopfzeile oben angeheftet, Aktionsleiste unten */
+.screen{ display:flex; flex-direction:column; min-height:100dvh; }
+.topbar{ position:sticky; top:0; z-index:20; background:var(--navy); }
+.scroll{ flex:1; }
+.actionbar{
+  position:sticky; bottom:0; z-index:15;
+  padding-bottom:calc(24px + env(safe-area-inset-bottom));
+}
+
+/* Eingabefelder: Fokus in Navy, damit klar ist wo man tippt */
+input:focus, textarea:focus{ outline:none; border-color:var(--navy) !important; }
+.searchwrap:focus-within{ border-color:var(--navy) !important; }
+
+/* Gedrueckter Zustand fuer alle Primaer- und Sekundaerflaechen */
+.btn-primary:active{ background:var(--red-dark) !important; }
+.pressable{ transition:transform .06s ease, background-color .1s ease; }
+.pressable:active{ transform:scale(0.985); }
+button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-events:none; }
+
+/* Checkliste */
+.kp{ display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.kp:last-child{ border-bottom:none; }
+.kp .box{ width:24px; height:24px; border-radius:7px; border:2px solid var(--border); flex-shrink:0; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+.kp .box svg{ display:none; }
+.kp[data-ok="1"] .box{ background:var(--ok); border-color:var(--ok); }
+.kp[data-ok="1"] .box svg{ display:block; }
+.kp .label{ font-size:14px; color:var(--text); }
+.kp[data-ok="1"] .label{ color:var(--text-dim); text-decoration:line-through; }
+.kp.hinweis[data-ok="1"] .label{ color:var(--text); text-decoration:none; }
+
+/* Chips fuer Wetter und Temperatur */
+.chip{
+  display:flex; align-items:center; gap:6px;
+  border:1.5px solid var(--border); color:var(--text);
+  border-radius:999px; padding:9px 14px; font-size:13.5px; font-weight:500;
+  background:transparent; box-sizing:border-box;
+}
+.chip[aria-pressed="true"]{ border-color:var(--navy); background:var(--navy); color:#fff; font-weight:600; }
+.chip.temp[aria-pressed="true"]{ border-color:var(--red); background:var(--red); color:#fff; }
+
+/* Hinweiszeile unten, fuer Speichern, Sync und Fehler */
+.toast{
+  position:fixed; left:50%; transform:translateX(-50%) translateY(20px);
+  bottom:calc(92px + env(safe-area-inset-bottom));
+  background:var(--navy); color:#fff; font-size:13px; font-weight:600;
+  padding:11px 18px; border-radius:999px; box-shadow:0 10px 30px rgba(0,10,20,.3);
+  opacity:0; pointer-events:none; transition:opacity .18s ease, transform .18s ease;
+  z-index:60; max-width:340px; text-align:center;
+}
+.toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.err{ background:var(--red); }
+
+/* Sheet fuer Konto und Filter */
+.sheet-bg{
+  position:fixed; inset:0; background:rgba(0,16,30,.45);
+  opacity:0; pointer-events:none; transition:opacity .18s ease; z-index:50;
+}
+.sheet-bg.show{ opacity:1; pointer-events:auto; }
+.sheet{
+  position:fixed; left:0; right:0; bottom:0; z-index:51;
+  max-width:430px; margin-inline:auto;
+  background:var(--card); border-radius:20px 20px 0 0;
+  padding:20px 20px calc(24px + env(safe-area-inset-bottom));
+  transform:translateY(102%); transition:transform .22s ease;
+  box-shadow:0 -12px 40px rgba(0,10,20,.22);
+}
+.sheet.show{ transform:translateY(0); }
+
+.spin{ width:18px; height:18px; border-radius:999px; border:2.5px solid rgba(255,255,255,.35); border-top-color:#fff; animation:sp .7s linear infinite; }
+@keyframes sp{ to{ transform:rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
