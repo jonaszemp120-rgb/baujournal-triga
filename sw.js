@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'baujournal-v1';
+const VERSION = 'baujournal-v2';
 
 const DATEIEN = [
   './',

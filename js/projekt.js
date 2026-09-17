@@ -6,36 +6,50 @@
 
   const id = new URLSearchParams(location.search).get('id');
   const bearbeiten = !!id;
-  let zusatz = [];
 
   const X = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5a8" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
 
-  function zeichneZusatz() {
-    const liste = $('#kp-liste');
-    liste.innerHTML = zusatz.map((label, i) => `
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bg); border-radius:10px; padding:10px 12px;">
-        <span style="font-size:13.5px; color:var(--text); font-weight:500; min-width:0; overflow-wrap:anywhere;">${esc(label)}</span>
-        <button type="button" data-i="${i}" aria-label="Entfernen" style="border:none; background:none; padding:0; display:flex; flex-shrink:0;">${X}</button>
-      </div>`).join('');
-    $$('button[data-i]', liste).forEach(b =>
-      b.addEventListener('click', () => { zusatz.splice(+b.dataset.i, 1); zeichneZusatz(); }));
+  /* Zusaetzliche Kontrollpunkte und Gebaeude verhalten sich gleich:
+     antippbare Liste, Eingabefeld mit Plus, einzeln entfernbar. */
+  function freieListe(listeSel, feldSel, knopfSel) {
+    const eintraege = [];
+    const liste = $(listeSel);
+    const feld = $(feldSel);
+
+    function zeichne() {
+      liste.innerHTML = eintraege.map((label, i) => `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--bg); border-radius:10px; padding:10px 12px;">
+          <span style="font-size:13.5px; color:var(--text); font-weight:500; min-width:0; overflow-wrap:anywhere;">${esc(label)}</span>
+          <button type="button" data-i="${i}" aria-label="Entfernen" style="border:none; background:none; padding:0; display:flex; flex-shrink:0;">${X}</button>
+        </div>`).join('');
+      $$('button[data-i]', liste).forEach(b =>
+        b.addEventListener('click', () => { eintraege.splice(+b.dataset.i, 1); zeichne(); }));
+    }
+
+    function hinzu() {
+      const wert = feld.value.trim();
+      if (!wert) return;
+      if (eintraege.some(z => z.toLowerCase() === wert.toLowerCase())) { feld.value = ''; return; }
+      eintraege.push(wert);
+      feld.value = '';
+      zeichne();
+      feld.focus();
+    }
+
+    $(knopfSel).addEventListener('click', hinzu);
+    feld.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); hinzu(); }
+    });
+
+    return {
+      hinzu,
+      werte: () => [...eintraege],
+      setzen(neue) { eintraege.length = 0; eintraege.push(...neue.map(String)); zeichne(); }
+    };
   }
 
-  function zusatzHinzu() {
-    const feld = $('#kp-neu');
-    const wert = feld.value.trim();
-    if (!wert) return;
-    if (zusatz.some(z => z.toLowerCase() === wert.toLowerCase())) { feld.value = ''; return; }
-    zusatz.push(wert);
-    feld.value = '';
-    zeichneZusatz();
-    feld.focus();
-  }
-
-  $('#kp-add').addEventListener('click', zusatzHinzu);
-  $('#kp-neu').addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); zusatzHinzu(); }
-  });
+  const zusatz = freieListe('#kp-liste', '#kp-neu', '#kp-add');
+  const gebaeude = freieListe('#geb-liste', '#geb-neu', '#geb-add');
 
   /* Archiv-Schalter */
   const schalter = $('#f-archiviert');
@@ -63,9 +77,9 @@
     $('#f-nr').value = p.projekt_nr || '';
     $('#f-notizen').value = p.notizen || '';
     schalter.checked = !!p.archiviert;
-    zusatz = Array.isArray(p.zusatz_kontrollpunkte) ? p.zusatz_kontrollpunkte.map(String) : [];
+    zusatz.setzen(Array.isArray(p.zusatz_kontrollpunkte) ? p.zusatz_kontrollpunkte : []);
+    gebaeude.setzen(Array.isArray(p.gebaeude) ? p.gebaeude : []);
     zeichneSchalter();
-    zeichneZusatz();
   }
 
   /* Speichern */
@@ -73,9 +87,10 @@
     const fehler = $('#fehler');
     fehler.hidden = true;
 
-    // Ein noch nicht bestätigter Kontrollpunkt im Eingabefeld zählt mit,
-    // sonst geht er beim Speichern verloren.
-    zusatzHinzu();
+    // Was noch unbestaetigt im Eingabefeld steht, zaehlt mit, sonst geht
+    // es beim Speichern verloren.
+    zusatz.hinzu();
+    gebaeude.hinzu();
 
     const felder = {
       name: $('#f-name').value.trim(),
@@ -84,7 +99,8 @@
       parzelle: $('#f-parzelle').value.trim() || null,
       projekt_nr: $('#f-nr').value.trim() || null,
       notizen: $('#f-notizen').value.trim() || null,
-      zusatz_kontrollpunkte: zusatz,
+      zusatz_kontrollpunkte: zusatz.werte(),
+      gebaeude: gebaeude.werte(),
       archiviert: schalter.checked
     };
 

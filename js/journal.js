@@ -15,6 +15,7 @@
   let projekt = null;
   let punkte = [];
   let eintraege = [];
+  let hatGebaeude = false;
 
   /* --- Kopfzeile und Netzstatus ---------------------------------------- */
 
@@ -64,6 +65,33 @@
   function chipWert(wrap) {
     const b = $('button[aria-pressed="true"]', wrap);
     return b ? b.dataset.wert : null;
+  }
+
+  /* Gebaeude-Chips erlauben Mehrfachauswahl. "Alle" ist der Gegensatz
+     zur Einzelauswahl: wer Alle tippt, verliert die Einzelnen und
+     umgekehrt. Gespeichert wird genau das, was angetippt wurde. */
+  function gebaeudeChips(wrap, namen) {
+    wrap.innerHTML = [ALLE, ...namen].map(w => `
+      <button type="button" class="chip pressable" data-wert="${esc(w)}" aria-pressed="false">${esc(w)}</button>`).join('');
+    $$('button', wrap).forEach(b => b.addEventListener('click', () => {
+      const an = b.getAttribute('aria-pressed') === 'true';
+      if (b.dataset.wert === ALLE) {
+        $$('button', wrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
+        b.setAttribute('aria-pressed', an ? 'false' : 'true');
+      } else {
+        $(`button[data-wert="${CSS.escape(ALLE)}"]`, wrap)?.setAttribute('aria-pressed', 'false');
+        b.setAttribute('aria-pressed', an ? 'false' : 'true');
+      }
+      entwurfSichern();
+    }));
+  }
+
+  function chipWerte(wrap) {
+    return $$('button[aria-pressed="true"]', wrap).map(b => b.dataset.wert);
+  }
+  function chipeSetzen(wrap, werte) {
+    const gesetzt = new Set(werte || []);
+    $$('button', wrap).forEach(b => b.setAttribute('aria-pressed', String(gesetzt.has(b.dataset.wert))));
   }
   function chipSetzen(wrap, wert) {
     $$('button', wrap).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.wert === wert)));
@@ -123,6 +151,7 @@
       wetter: chipWert($('#wetter')),
       temperatur: chipWert($('#temperatur')),
       kontrolle: { punkte },
+      betrifft_gebaeude: hatGebaeude ? chipWerte($('#betrifft')) : null,
       firmen: $('#f-firmen').value.trim() || null,
       fortschritt: $('#f-fortschritt').value.trim() || null,
       feststellungen: $('#f-feststellungen').value.trim() || null,
@@ -131,6 +160,8 @@
     };
   }
 
+  /* Eine reine Gebaeudeauswahl ist noch kein Rundgang, die zaehlt hier
+     bewusst nicht mit. */
   function istLeer(f) {
     return !f.wetter && !f.temperatur && !f.firmen && !f.fortschritt &&
            !f.feststellungen && !f.anweisungen && !f.fotos_hinweis &&
@@ -161,6 +192,7 @@
     $('#f-anweisungen').value = e.anweisungen || '';
     fotos.dataset.ok = e.fotos_hinweis ? 1 : 0;
     fotos.setAttribute('aria-checked', String(!!e.fotos_hinweis));
+    if (hatGebaeude) chipeSetzen($('#betrifft'), e.betrifft_gebaeude);
 
     // Gespeicherte Haken auf die aktuelle Punkteliste uebertragen. Punkte,
     // die das Projekt seither verloren hat, fallen dabei weg.
@@ -191,7 +223,7 @@
 
   function zeile(e, letzte) {
     const { erfuellt, total } = kontrollStand(e.kontrolle);
-    const teile = [e.ersteller_name || 'Unbekannt', e.wetter, e.temperatur,
+    const teile = [e.ersteller_name || 'Unbekannt', gebaeudeText(e), e.wetter, e.temperatur,
                    total ? `Kontrolle ${erfuellt}/${total}` : null].filter(Boolean);
     const trenner = letzte ? '' : 'border-bottom:1px solid var(--border);';
     return `
@@ -215,7 +247,7 @@
       if (bis && String(e.datum) > bis) return false;
       if (!q) return true;
       return [e.ersteller_name, e.wetter, e.temperatur, e.firmen, e.fortschritt,
-              e.feststellungen, e.anweisungen, fmtDatum(e.datum)]
+              e.feststellungen, e.anweisungen, fmtDatum(e.datum), gebaeudeText(e)]
         .some(f => String(f || '').toLowerCase().includes(q));
     });
 
@@ -299,6 +331,7 @@
     // Formular fuer den naechsten Rundgang zuruecksetzen.
     chipSetzen($('#wetter'), null);
     chipSetzen($('#temperatur'), null);
+    if (hatGebaeude) chipeSetzen($('#betrifft'), []);
     ['#f-firmen', '#f-fortschritt', '#f-feststellungen', '#f-anweisungen'].forEach(s => $(s).value = '');
     fotos.dataset.ok = 0;
     fotos.setAttribute('aria-checked', 'false');
@@ -327,6 +360,14 @@
 
   chips($('#wetter'), WETTER, '', true);
   chips($('#temperatur'), TEMPERATUR, 'temp', false);
+
+  // Fuehrt das Projekt keine Gebaeude, faellt die ganze Zeile weg.
+  hatGebaeude = Array.isArray(projekt.gebaeude) && projekt.gebaeude.length > 0;
+  if (hatGebaeude) {
+    gebaeudeChips($('#betrifft'), projekt.gebaeude);
+    $('#betrifft-karte').hidden = false;
+  }
+
   punkte = kontrollpunkte(projekt);
 
   const wiederhergestellt = entwurfLaden();

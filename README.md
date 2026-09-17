@@ -31,6 +31,14 @@ beliebig viele eigene ergänzen. Die ergänzten tragen im Formular das Label
 nur referenziert. Ändert jemand später die Checkliste eines Projekts, bleiben
 alte Einträge deshalb genau so stehen, wie sie erfasst wurden.
 
+**Gebäude und Bauteile.** Ein Projekt kann beliebig viele Baukörper führen,
+gepflegt wie die Kontrollpunkte. Sind welche eingetragen, erscheint im Formular
+über dem Baufortschritt die Zeile *Betrifft* mit Mehrfachauswahl und einem festen
+Chip *Alle*. Der schliesst die Einzelauswahl aus und umgekehrt, gespeichert wird
+genau das, was angetippt wurde. Führt ein Projekt keine Gebäude, fällt die Zeile
+weg. Im Verlauf, in der Detailansicht und im Export steht die Auswahl neben den
+übrigen Angaben.
+
 **Angaben vom letzten Eintrag übernehmen.** Füllt nur, was gerade leer ist.
 Schon getippter Text wird nie überschrieben.
 
@@ -85,8 +93,10 @@ App ohne Netz vollständig und lädt nichts von fremden Servern nach.
 
 Supabase-Projekt `baujournal-triga`, Region `eu-central-1`.
 
-- `projekte` — Stammdaten, `zusatz_kontrollpunkte` als JSON-Liste, `archiviert`
-- `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten Punkteliste
+- `projekte` — Stammdaten, `zusatz_kontrollpunkte` und `gebaeude` als
+  JSON-Listen, `archiviert`
+- `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
+  Punkteliste, `betrifft_gebaeude` als JSON-Liste
 - `eintraege_korrekturen` — das Korrekturprotokoll, nur lesen und anhängen
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht

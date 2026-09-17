@@ -23,6 +23,17 @@ const WETTER = ['Sonnig', 'Wechselhaft', 'Bewölkt', 'Regen', 'Schnee', 'Nebel',
 const WETTER_ICON = { 'Sonnig': '☀', 'Wechselhaft': '⛅', 'Bewölkt': '☁', 'Regen': '☂', 'Schnee': '❄', 'Nebel': '≈', 'Sturm/Wind': '🌬' };
 const TEMPERATUR = ['< 0°C', '0–10°C', '10–20°C', '20–30°C', '> 30°C'];
 
+/* Fester Chip neben den Gebaeuden eines Projekts. Er steht fuer sich und
+   schliesst die Einzelauswahl aus, gespeichert wird genau das Wort. */
+const ALLE = 'Alle';
+
+/* Welche Gebaeude ein Eintrag betrifft, als Text fuer Verlauf, Detail
+   und Export. Ohne Angabe kommt null zurueck, dann faellt die Stelle weg. */
+function gebaeudeText(eintrag) {
+  const g = eintrag?.betrifft_gebaeude;
+  return Array.isArray(g) && g.length ? g.join(', ') : null;
+}
+
 const CACHE_PROJEKTE = 'bj_cache_projekte';
 const CACHE_EINTRAEGE = 'bj_cache_eintraege';   // { [projektId]: Eintrag[] }
 const QUEUE = 'bj_queue';

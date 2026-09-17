@@ -66,6 +66,7 @@
     const teile = [
       karte('Rundgang',
         paar('Datum', fmtDatum(eintrag.datum)) +
+        (gebaeudeText(eintrag) ? paar('Betrifft', gebaeudeText(eintrag)) : '') +
         paar('Bauleiter', eintrag.ersteller_name || 'Unbekannt') +
         paar('Erfasst am', eintrag.erstellt_am ? new Date(eintrag.erstellt_am).toLocaleString('de-CH') : '–') +
         (eintrag._offen ? '<div style="margin-top:8px; font-size:12px; font-weight:700; color:var(--red);">Noch nicht übertragen, liegt in der Warteschlange.</div>' : '')),
@@ -132,6 +133,10 @@
 
       karte('Wetter', '<div id="e-wetter" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div><div id="e-temp" style="display:flex; flex-wrap:wrap; gap:8px;"></div>'),
 
+      gebaeudeDesProjekts().length
+        ? karte('Betrifft', '<div id="e-betrifft" style="display:flex; flex-wrap:wrap; gap:8px;"></div>')
+        : '',
+
       `<div class="karte">
         <div class="kartentitel">Allgemeine Kontrolle</div>
         <div id="e-kontrolle">${kontrollListe(entwurf.kontrolle.punkte, true)}</div>
@@ -148,6 +153,7 @@
 
     chipsBauen($('#e-wetter'), WETTER, false, entwurf.wetter, w => entwurf.wetter = w);
     chipsBauen($('#e-temp'), TEMPERATUR, true, entwurf.temperatur, w => entwurf.temperatur = w);
+    if ($('#e-betrifft')) gebaeudeChipsBauen($('#e-betrifft'));
 
     $$('#e-kontrolle .kp').forEach(el => {
       const um = () => {
@@ -168,6 +174,28 @@
     };
     f.addEventListener('click', fUm);
     f.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); fUm(); } });
+  }
+
+  function gebaeudeDesProjekts() {
+    return Array.isArray(projekt?.gebaeude) ? projekt.gebaeude : [];
+  }
+
+  /* Mehrfachauswahl wie im Formular: "Alle" schliesst die Einzelnen aus
+     und umgekehrt. */
+  function gebaeudeChipsBauen(wrap) {
+    const gewaehlt = new Set(entwurf.betrifft_gebaeude || []);
+    wrap.innerHTML = [ALLE, ...gebaeudeDesProjekts()].map(w => `
+      <button type="button" class="chip pressable" data-wert="${esc(w)}" aria-pressed="${gewaehlt.has(w)}">${esc(w)}</button>`).join('');
+    $$('button', wrap).forEach(b => b.addEventListener('click', () => {
+      const an = b.getAttribute('aria-pressed') === 'true';
+      if (b.dataset.wert === ALLE) {
+        $$('button', wrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
+      } else {
+        $(`button[data-wert="${CSS.escape(ALLE)}"]`, wrap)?.setAttribute('aria-pressed', 'false');
+      }
+      b.setAttribute('aria-pressed', an ? 'false' : 'true');
+      entwurf.betrifft_gebaeude = $$('button[aria-pressed="true"]', wrap).map(x => x.dataset.wert);
+    }));
   }
 
   function chipsBauen(wrap, werte, temp, aktiv, beiWahl) {
@@ -233,6 +261,7 @@
       entwurf = JSON.parse(JSON.stringify({
         datum: eintrag.datum, wetter: eintrag.wetter, temperatur: eintrag.temperatur,
         kontrolle: eintrag.kontrolle || { punkte: [] },
+        betrifft_gebaeude: eintrag.betrifft_gebaeude || [],
         firmen: eintrag.firmen, fortschritt: eintrag.fortschritt,
         feststellungen: eintrag.feststellungen, anweisungen: eintrag.anweisungen,
         fotos_hinweis: eintrag.fotos_hinweis
@@ -273,6 +302,22 @@
         neu[feld] = jetzt[feld];
       }
     }
+    // Fuer den Vergleich spielt die Reihenfolge keine Rolle, im Protokoll
+    // steht sie aber so, wie sie erfasst wurde.
+    const gebAlt = eintrag.betrifft_gebaeude || [];
+    const gebNeu = entwurf.betrifft_gebaeude || [];
+    const gleich = gebAlt.length === gebNeu.length &&
+      [...gebAlt].sort().join('\u0000') === [...gebNeu].sort().join('\u0000');
+    if (!gleich) {
+      log.push({
+        feld: 'Betrifft',
+        alter_wert: gebAlt.join(', ') || null,
+        neuer_wert: gebNeu.join(', ') || null
+      });
+      neu.betrifft_gebaeude = entwurf.betrifft_gebaeude;
+      jetzt.betrifft_gebaeude = entwurf.betrifft_gebaeude;
+    }
+
     if (jetzt.fotos_hinweis !== !!eintrag.fotos_hinweis) {
       log.push({ feld: 'Fotos-Hinweis', alter_wert: eintrag.fotos_hinweis ? 'ja' : 'nein', neuer_wert: jetzt.fotos_hinweis ? 'ja' : 'nein' });
       neu.fotos_hinweis = jetzt.fotos_hinweis;

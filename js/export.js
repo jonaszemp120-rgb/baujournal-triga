@@ -64,6 +64,7 @@ function abschnitte(e) {
   return [
     { titel: 'Rundgang', zeilen: [
       ['Datum', fmtDatum(e.datum)],
+      ...(gebaeudeText(e) ? [['Betrifft', gebaeudeText(e)]] : []),
       ['Bauleiter', e.ersteller_name || '–'],
       ['Erfasst am', e.erstellt_am ? new Date(e.erstellt_am).toLocaleString('de-CH') : '–'],
       ['Wetter', e.wetter || '–'],
