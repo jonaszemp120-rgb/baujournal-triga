@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'triga-v10';
+const VERSION = 'triga-v11';
 
 const DATEIEN = [
   './',
@@ -29,6 +29,7 @@ const DATEIEN = [
   'js/start.js',
   'js/mitarbeiter.js',
   'js/dokumente.js',
+  'js/firmenpool.js',
   'js/papierkorb-bereich.js',
   'js/app.js',
   'js/store.js',
@@ -82,6 +83,11 @@ self.addEventListener('fetch', e => {
 
   // Nur eigene GET-Anfragen. Supabase und alles andere geht direkt raus.
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
+
+  // Die Serverless-Functions liefern zu jeder Suchanfrage ein anderes
+  // Ergebnis. Der Cache ignoriert den Query-String, wuerde also jeder
+  // Suche die erste Antwort zurueckgeben. Also gar nicht erst anfassen.
+  if (url.pathname.startsWith('/api/')) return;
 
   e.respondWith((async () => {
     const cache = await caches.open(VERSION);

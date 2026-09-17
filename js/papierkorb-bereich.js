@@ -13,7 +13,10 @@ const BEREICHE_PK = {
   },
   firmen: {
     titel: 'Firmenpool', zurueck: 'firmenpool.html', bereich: 'firmenpool',
-    teile: [{ tabelle: 'firmen', spalte: 'name' }]
+    teile: [
+      { tabelle: 'firmen',    spalte: 'name', ueberschrift: 'Firmen' },
+      { tabelle: 'bkp_liste', spalte: 'code', zusatz: 'bezeichnung', ueberschrift: 'BKP-Kategorien' }
+    ]
   },
   ordner: {
     titel: 'Dokumente', zurueck: 'dokumente.html', bereich: 'dokumente',
@@ -40,15 +43,18 @@ const BEREICHE_PK = {
   const PFEIL_ZURUECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
 
   async function ladeTeil(t, wer) {
+    /* Manche Tabellen brauchen zwei Spalten, um erkennbar zu sein: eine
+       BKP-Kategorie ist "211 Baumeisterarbeiten", nicht nur "211". */
+    const felder = [t.spalte, t.zusatz].filter(Boolean);
     const { data, error } = await sb.from(t.tabelle)
-      .select(`id, ${t.spalte}, geloescht_am, geloescht_von`)
+      .select(`id, ${felder.join(', ')}, geloescht_am, geloescht_von`)
       .not('geloescht_am', 'is', null)
       .order('geloescht_am', { ascending: false });
     if (meckern(`Papierkorb ${t.tabelle}`, error)) return null;
 
     const zeilen = (data || []).map(z => `
       <div class="pk-zeile">
-        <div class="pk-name">${esc(z[t.spalte])}</div>
+        <div class="pk-name">${esc(felder.map(f => z[f]).filter(Boolean).join(' '))}</div>
         <div class="pk-wann">${esc(new Date(z.geloescht_am).toLocaleDateString('de-CH'))}</div>
         <div class="pk-wer">${esc(wer[z.geloescht_von] || 'Unbekannt')}</div>
         <button type="button" class="pk-zurueck pressable" data-tabelle="${esc(t.tabelle)}" data-id="${esc(z.id)}">
@@ -79,7 +85,7 @@ const BEREICHE_PK = {
       return;
     }
 
-    $('#inhalt').innerHTML = teile.every(t => t.anzahl === 0) && b.teile.length === 1
+    $('#inhalt').innerHTML = teile.every(t => t.anzahl === 0)
       ? `<div class="br-leer">Der Papierkorb ist leer.</div>`
       : teile.map(t => t.html).join('');
 

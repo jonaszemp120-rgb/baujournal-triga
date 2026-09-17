@@ -19,6 +19,11 @@ Datei, speichert, fertig.
 | `journal.html` | Das Formular für den Rundgang. |
 | `eintrag.html` | Ein einzelner Eintrag: lesen, korrigieren, exportieren, löschen. |
 | `papierkorb.html` | Die gelöschten Einträge eines Projekts, mit Wiederherstellen. |
+| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den vier Bereichen. |
+| `mitarbeiter.html` | Das Adressbuch des Teams. |
+| `firmenpool.html` | Unternehmer nach BKP-Kategorie und Ortschaft, mit Ansprechpersonen und Notizen. |
+| `dokumente.html` | Ordner und PDF aus dem Supabase-Storage. |
+| `papierkorb-bereich.html` | Der Papierkorb der drei neuen Bereiche, `?bereich=mitarbeiter\|firmen\|ordner`. |
 
 Der Weg durch die App: Übersicht → Projekt-Startseite → entweder ein neues
 Baujournal oder ein bestehender Eintrag.
@@ -92,28 +97,47 @@ Projekte, Einträge und Korrekturen bewusst keine delete-Policy.
 ## Aufbau
 
 ```
-index.html projekte.html projekt-start.html projekt.html
+index.html start.html
+projekte.html projekt-start.html projekt.html
 journal.html eintrag.html papierkorb.html
-css/app.css          Schrift, Farben, Zustände. Die Screens tragen ihre
-                     Masse weiterhin inline, so wie im Design-Prototyp.
-                     Die Abstände der angehefteten Leisten stehen bewusst
-                     hier, nicht inline: ein inline gesetztes padding
-                     würde die Safe-Area wieder überschreiben.
+mitarbeiter.html firmenpool.html dokumente.html
+papierkorb-bereich.html   ein Papierkorb für alle drei neuen Bereiche,
+                          aufgerufen mit ?bereich=…
+css/app.css          Schrift, Farben, Zustände, der gemeinsame Rahmen.
+                     Die Screens tragen ihre Masse weiterhin inline, so
+                     wie im Design-Prototyp. Die Abstände der
+                     angehefteten Leisten stehen bewusst hier, nicht
+                     inline: ein inline gesetztes padding würde die
+                     Safe-Area wieder überschreiben.
 js/logo.js           die einzige Logoquelle
 js/config.js         Supabase-URL und anon key
-js/app.js            Client, Session, Datumsformate, Kontozeile
-js/store.js          Datenzugriff, lokaler Spiegel, Offline-Warteschlange
+js/app.js            Client, Session, Datumsformate, Sheets, Kontozeile
+js/shell.js          die Seitenleiste ab 1024px, die vier Bereiche,
+                     das Test-Banner (ein einziger Schalter)
+js/start.js          die Startseite mit der Bereichsauswahl
+js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
+                     Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
 js/journal.js js/eintrag.js js/papierkorb.js
 js/verlauf.js        Eintragszeile und Filter, geteilt von Startseite
                      und Papierkorb
 js/export.js         PDF und Word
-vendor/              supabase-js, jsPDF, docx, lokal statt vom CDN
-assets/              Marke als SVG, PWA-Icons, Archivo als woff2
-tools/build_icons.py erzeugt Marke und Icons neu
+js/mitarbeiter.js js/firmenpool.js js/dokumente.js
+js/papierkorb-bereich.js
+api/search-ch.js     Serverless-Function als Proxy zur Tel-API von
+                     search.ch, hält den Schlüssel serverseitig
+vendor/              supabase-js, jsPDF, docx, SheetJS, lokal statt
+                     vom CDN
+assets/              Logo, PWA-Icons, Archivo als woff2
+tools/build_icons.py erzeugt Logo und Icons neu
 supabase/migrations/ das komplette Datenbankschema
 manifest.json sw.js  PWA und Offline-Cache
 ```
+
+Die Bereichsdateien kapseln sich alle in eine `(() => { … })()`. Klassische
+`<script>`-Tags teilen sich einen einzigen globalen Raum, zwei gleichnamige
+Deklarationen in zwei Dateien sind ein harter SyntaxError und die zweite Datei
+läuft dann gar nicht. Genau das ist einmal passiert.
 
 Alles liegt lokal im Repo, auch Schrift und Bibliotheken. Damit funktioniert die
 App ohne Netz vollständig und lädt nichts von fremden Servern nach.
@@ -130,11 +154,33 @@ Supabase-Projekt `baujournal-triga`, Region `eu-central-1`.
 - `eintraege_korrekturen` — das Korrekturprotokoll, nur lesen und anhängen
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
+- `mitarbeiter` — das Adressbuch des Teams, bewusst getrennt von den
+  Login-Konten. Einen Eintrag zu löschen berührt kein Konto
+- `ordner`, `dateien` — die Dokumentenablage, die PDF selbst liegt im
+  Storage-Bucket `dokumente`
+- `bkp_liste` — die BKP-Kategorien des Firmenpools, als Daten und nicht
+  hart codiert
+- `firmen` — nur der Name ist Pflicht, die BKP-Codes stehen als
+  JSON-Liste im Feld `bkp_codes`
+- `ansprechpersonen`, `notizen` — Unterdetails einer Firma
+- `projekteinsaetze` — welche Firma auf welchem Projekt im Einsatz war,
+  noch ohne eigene Oberfläche
 
-Auf allen vier Tabellen ist Row Level Security aktiv, jede Policy verlangt die
+Auf allen Tabellen ist Row Level Security aktiv, jede Policy verlangt die
 Rolle `authenticated`. Ohne Login liefert jede Abfrage leer zurück. Alle
-Teammitglieder sehen alle Projekte und dürfen überall erfassen, Rollen gibt es
-keine.
+Teammitglieder sehen alles und dürfen überall erfassen, Rollen gibt es keine.
+
+Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
+`ordner`, `dateien`, `bkp_liste` und `firmen` tragen `geloescht_am` und
+`geloescht_von` und haben schlicht keine Delete-Policy: ein DELETE über die
+API trifft dort null Zeilen. Wer und wann gelöscht hat, trägt der Trigger
+`setze_loeschspur()` serverseitig ein, der Client kann das nicht fälschen.
+Die einzigen Ausnahmen sind `ansprechpersonen` und `notizen`, die zu genau
+einer Firma gehören und bewusst direkt löschbar sind.
+
+Die Ampelfarbe einer Firma ist nirgends gespeichert. Sie ist die Farbe der
+jüngsten Notiz, ohne Notiz bleibt sie grau. Damit gibt es keine zweite
+Wahrheit, die irgendwann von den Notizen abweicht.
 
 Die Korrektur läuft über die Datenbankfunktion `korrigiere_eintrag`. Die
 schreibt Protokoll und neue Werte in derselben Transaktion, entweder beides oder
@@ -178,6 +224,20 @@ einzige Stelle nur das Zeichen ohne Schriftzug: auf 180 × 180 Pixeln wäre
 zusammen.
 
 Im PDF-Export wird dieselbe Datei eingebettet, siehe `js/export.js`.
+
+## Umgebungsvariablen
+
+Eine einzige, und die ist optional:
+
+| Name | Wofür |
+|---|---|
+| `SEARCH_CH_API_KEY` | Schlüssel für die Tel-API von search.ch. Wird in den Projekteinstellungen von Vercel gesetzt, nicht im Repo. |
+
+Der Schlüssel bleibt in `api/search-ch.js` und erreicht den Browser nie. Ist
+er nicht gesetzt, antwortet die Function mit einem Hinweis, und der
+Firmenpool funktioniert vollständig weiter — nur die Adresssuche beim
+Erfassen einer neuen Firma sagt dann, dass noch kein Schlüssel hinterlegt
+ist.
 
 ## Entwickeln
 

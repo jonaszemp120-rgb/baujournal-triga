@@ -11,26 +11,262 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="TRIGA">
 <link rel="stylesheet" href="css/app.css">
+<style>
+  /* --- Liste: Kategorien links, Firmen rechts ---------------------------- */
+
+  .fp-kategorien{
+    box-sizing:border-box;
+    width:280px; min-width:280px;
+    border-right:1px solid var(--border); background:var(--card);
+    padding:18px 12px; display:flex; flex-direction:column; gap:2px;
+  }
+  .fp-titelchen{
+    padding:0 10px 12px; color:var(--text-dim);
+    font-size:11.5px; font-weight:700; letter-spacing:.5px;
+  }
+  .fp-kat{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    width:100%; padding:9px 8px 9px 14px; border-radius:10px;
+    background:transparent; border:none; text-align:left; color:var(--text);
+  }
+  .fp-kat:hover{ background:var(--bg); }
+  .fp-kat[aria-current="true"]{ background:var(--bg); }
+  .fp-kat[aria-current="true"] .was{ font-weight:700; }
+  .fp-kat .was{ font-size:13.5px; font-weight:500; min-width:0; overflow-wrap:anywhere; }
+  .fp-kat .wieviele{ font-size:12px; color:var(--text-dim); font-weight:600; flex-shrink:0; }
+  .fp-kat .werkzeug{ display:flex; gap:4px; flex-shrink:0; }
+  .fp-mini{
+    width:26px; height:26px; border-radius:6px; border:none; background:transparent;
+    display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+  }
+  .fp-mini:hover{ background:#e3e8ea; }
+  .fp-mini.rot{ color:var(--red); }
+  .fp-kat-liste{ overflow-y:auto; }
+
+  .fp-gestrichelt{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:11px; border-radius:10px; border:1px dashed var(--navy);
+    background:transparent; color:var(--navy); font-weight:700; font-size:13px;
+  }
+  .fp-voll{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:12px; border-radius:10px; border:none;
+    background:var(--navy); color:#fff; font-weight:700; font-size:13.5px;
+  }
+  .fp-voll:hover{ background:var(--navy-2); }
+
+  .fp-flaeche{ flex:1; min-width:0; padding:24px 32px 40px; }
+  .fp-gruppe{
+    font-weight:700; font-size:13px; color:var(--text-dim);
+    letter-spacing:.5px; margin:0 0 14px;
+  }
+  .fp-gruppe + .fp-gruppe-inhalt{ margin-bottom:28px; }
+
+  /* Firmenkarte, Desktop */
+  .fp-raster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr)); gap:16px; }
+  .fp-karte{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:18px; display:flex; flex-direction:column; gap:10px; text-align:left;
+    width:100%; color:var(--text);
+  }
+  .fp-karte:hover{ border-color:var(--navy); }
+  .fp-karte .oben{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .fp-karte .fname{ font-weight:700; font-size:15px; overflow-wrap:anywhere; }
+  .fp-karte .meta{ color:var(--text-dim); font-size:12.5px; overflow-wrap:anywhere; }
+  .fp-karte .knoepfe{ display:flex; gap:8px; margin-top:4px; }
+  .fp-karte .knoepfe a{
+    width:32px; height:32px; border-radius:8px; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; color:var(--navy);
+  }
+  .fp-karte .knoepfe a:hover{ background:#e3e8ea; }
+
+  /* Firmenzeile, Handy */
+  .fp-zeile{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:13px 4px; border-bottom:1px solid var(--border);
+    background:transparent; border-left:none; border-right:none; border-top:none;
+    text-align:left; color:var(--text);
+  }
+  .fp-zeile .fname{ font-weight:700; font-size:14.5px; overflow-wrap:anywhere; }
+  .fp-zeile .meta{ color:var(--text-dim); font-size:12px; margin-top:2px; overflow-wrap:anywhere; }
+
+  .punkt{ display:inline-block; width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .punkt.rot{ background:var(--red); }
+  .punkt.gelb{ background:var(--warn); }
+  .punkt.gruen{ background:var(--ok); }
+  .punkt.grau{ background:var(--mute); }
+
+  /* Chips: BKP-Kategorien und Ampel, nur auf dem Handy */
+  .fp-chipzeile{
+    display:flex; gap:8px; overflow-x:auto; padding:14px 16px 4px;
+    scrollbar-width:none;
+  }
+  .fp-chipzeile::-webkit-scrollbar{ display:none; }
+  .fp-chip{
+    padding:9px 16px; border-radius:20px; background:var(--card); color:var(--text);
+    border:1px solid var(--border); font-size:13px; font-weight:600; white-space:nowrap;
+    display:flex; align-items:center; gap:6px; flex-shrink:0;
+  }
+  .fp-chip[aria-pressed="true"]{ background:var(--navy); color:#fff; border-color:var(--navy); }
+  .fp-chip.gestrichelt{ border:1px dashed var(--navy); color:var(--navy); padding:9px 14px; }
+  .fp-chip.klein{ padding:7px 13px; font-size:12.5px; }
+  .fp-chip .punkt{ width:10px; height:10px; }
+  .fp-hilfe{ padding:6px 16px 10px; color:var(--text-dim); font-size:11px; }
+
+  .fp-suchzeile{ display:flex; gap:10px; padding:10px 16px 12px; }
+  .fp-suchzeile input{
+    flex:1; min-width:0; height:42px; border-radius:10px; border:1px solid var(--border);
+    background:var(--card); padding:0 12px; font-size:13.5px; color:var(--text);
+    box-sizing:border-box;
+  }
+
+  /* --- Firmendetail ------------------------------------------------------ */
+
+  .fp-links{ display:flex; flex-direction:column; gap:16px; }
+  .fp-rechts{ display:flex; flex-direction:column; gap:14px; }
+
+  .fp-ampel{
+    display:flex; align-items:center; gap:8px; width:fit-content;
+    padding:8px 15px; border-radius:20px; font-weight:700; font-size:13px;
+  }
+  .fp-ampel.rot{ background:#fdeaea; color:#8a0000; }
+  .fp-ampel.gelb{ background:#fbf1de; color:#7d5a05; }
+  .fp-ampel.gruen{ background:#e7f2e8; color:#1f5c22; }
+  .fp-ampel.grau{ background:var(--bg); color:var(--text-dim); }
+
+  .fp-kontakt{ background:var(--bg); border-radius:12px; padding:14px 16px; }
+  .fp-kontakt > *{ display:flex; align-items:flex-start; gap:10px; padding:8px 2px; }
+  .fp-kontakt a{ color:var(--navy); font-weight:600; font-size:13.5px; overflow-wrap:anywhere; }
+  .fp-kontakt .ruhig{ color:var(--text-dim); font-size:13px; overflow-wrap:anywhere; }
+  .fp-kontakt svg{ flex-shrink:0; margin-top:1px; }
+
+  .fp-umriss{
+    height:42px; border-radius:10px; border:1px solid var(--navy); background:transparent;
+    color:var(--navy); font-weight:700; font-size:13px;
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  }
+  .fp-umriss:hover{ background:var(--bg); }
+
+  .fp-ueberschrift{ font-weight:700; font-size:13.5px; margin-bottom:2px; }
+
+  .fp-person{ display:flex; align-items:center; gap:10px; padding:10px 2px; border-bottom:1px solid var(--border); }
+  .fp-person .wer{ flex:1; min-width:0; }
+  .fp-person .wer .pname{ font-weight:700; font-size:13.5px; overflow-wrap:anywhere; }
+  .fp-person .wer .prolle{ color:var(--text-dim); font-size:11.5px; overflow-wrap:anywhere; }
+  .fp-person .tasten{ display:flex; gap:6px; flex-shrink:0; }
+  .fp-person .tasten a, .fp-person .tasten button{
+    width:30px; height:30px; border-radius:8px; border:none; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; color:var(--navy);
+  }
+  .fp-person .tasten .schlicht{ background:transparent; color:var(--text-dim); }
+  .fp-person .tasten .rot{ background:transparent; color:var(--red); }
+
+  .fp-dazu{
+    display:flex; align-items:center; gap:8px; padding:10px 2px;
+    background:none; border:none; color:var(--navy); font-weight:700; font-size:13px;
+  }
+
+  .fp-notizfeld{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .fp-notizfeld input{
+    flex:1 1 200px; min-width:0; height:46px; border-radius:10px; border:1px solid var(--border);
+    padding:0 14px; font-size:14px; background:var(--card); color:var(--text); box-sizing:border-box;
+  }
+  .fp-farben{ display:flex; gap:6px; align-items:center; padding:0 2px; }
+  .fp-farbe{
+    width:26px; height:26px; border-radius:50%; border:2px solid transparent; background:none;
+    display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .fp-farbe .punkt{ width:17px; height:17px; }
+  .fp-farbe[aria-pressed="true"]{ border-color:var(--navy); }
+  .fp-notizspeichern{
+    height:46px; padding:0 18px; border-radius:10px; border:none;
+    background:var(--red); color:#fff; font-weight:700; font-size:13.5px; flex-shrink:0;
+  }
+
+  .fp-notiz{ display:flex; gap:12px; padding:14px 0; border-bottom:1px solid var(--border); }
+  .fp-notiz .kopf{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .fp-notiz .autor{ font-weight:700; font-size:13px; }
+  .fp-notiz .wann{ color:var(--mute); font-size:11.5px; }
+  .fp-notiz .text{ font-size:13px; margin-top:4px; line-height:1.45; overflow-wrap:anywhere; }
+  .fp-notiz .tasten{ display:flex; gap:4px; flex-shrink:0; }
+
+  /* --- Breiten ----------------------------------------------------------- */
+
+  @media (min-width:1024px){
+    .fp-layout{ display:flex; align-items:stretch; min-height:calc(100dvh - 72px); }
+    .fp-kat-liste{ max-height:calc(100dvh - 300px); }
+    .fp-firma{ display:flex; align-items:stretch; min-height:calc(100dvh - 72px); }
+    .fp-firma .fp-links{
+      box-sizing:border-box; width:440px; min-width:440px;
+      padding:28px; border-right:1px solid var(--border); background:var(--card);
+    }
+    .fp-firma .fp-rechts{ flex:1; min-width:0; padding:28px 32px 40px; }
+    /* Die Flaeche bringt ihren Seitenabstand schon mit, die Chip- und
+       Suchzeile duerfen ihn nicht ein zweites Mal setzen. */
+    .fp-chipzeile{ padding:0 0 12px; }
+    .fp-suchzeile{ padding:0 0 18px; max-width:520px; }
+    .fp-zeile{ display:none; }
+  }
+
+  @media (max-width:1023px){
+    .fp-flaeche{ padding:0 16px 24px; }
+    .fp-layout, .fp-firma{ background:var(--card); min-height:calc(100dvh - 60px); }
+    .fp-firma .fp-links{ padding:16px 16px 0; }
+    .fp-firma .fp-rechts{ padding:16px; }
+    .fp-raster{ display:block; }
+    .fp-karte{ display:none; }
+    .fp-gruppe{ padding:0 4px; margin:16px 0 6px; font-size:12px; }
+  }
+</style>
 </head>
 <body data-bereich="firmenpool">
 
-  <div class="tr-kopf nur-desktop"><h1>Firmenpool</h1></div>
+  <div class="tr-kopf nur-desktop">
+    <div style="display:flex; align-items:center; gap:14px; min-width:0;">
+      <button type="button" id="d-zurueck" class="br-knopf" hidden aria-label="Zurück zur Firmenliste"></button>
+      <h1 id="d-titel">Firmenpool</h1>
+    </div>
+    <div id="d-werkzeuge" class="br-werkzeuge"></div>
+  </div>
 
   <div class="br-kopf nur-mobil">
     <div style="display:flex; align-items:center; gap:12px; min-width:0;">
-      <a href="start.html" class="br-knopf pressable" aria-label="Zur Startseite">
+      <a id="m-zurueck" href="start.html" class="br-knopf pressable" aria-label="Zurück">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
       </a>
-      <div style="font-weight:700; font-size:17px;">Firmenpool</div>
+      <div id="m-titel" style="font-weight:700; font-size:17px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Firmenpool</div>
+    </div>
+    <div id="m-werkzeuge" class="br-werkzeuge"></div>
+  </div>
+
+  <div id="hinweis" hidden style="margin:12px 16px 0; background:rgba(178,0,0,0.06); border:1px solid rgba(178,0,0,0.18); border-radius:12px; padding:11px 14px; font-size:12.5px; font-weight:600; color:var(--red); line-height:1.45;"></div>
+
+  <div id="ansicht-liste" class="fp-layout">
+    <aside id="kat-leiste" class="fp-kategorien nur-desktop">
+      <div class="fp-titelchen">BKP-KATEGORIEN</div>
+      <div id="kat-desktop" class="fp-kat-liste"></div>
+      <div style="flex:1;"></div>
+      <button type="button" id="kat-neu" class="fp-gestrichelt pressable" style="margin-bottom:8px;"></button>
+      <button type="button" id="firma-neu" class="fp-voll pressable"></button>
+    </aside>
+
+    <div class="fp-flaeche">
+      <div id="kat-chips" class="fp-chipzeile nur-mobil"></div>
+      <div class="fp-hilfe nur-mobil">BKP-Kategorien lang gedrückt halten zum Bearbeiten oder Löschen.</div>
+      <div id="ampel-chips" class="fp-chipzeile" style="padding-top:0;"></div>
+      <div class="fp-suchzeile">
+        <input id="suche" type="search" placeholder="Firma, Ort oder BKP suchen" aria-label="Firma suchen">
+      </div>
+      <div id="gruppen"></div>
     </div>
   </div>
 
-  <div style="padding:40px 20px; text-align:center;">
-    <div style="max-width:420px; margin-inline:auto; background:var(--card); border:1px dashed var(--border); border-radius:16px; padding:32px 24px;">
-      <div style="font-size:15px; font-weight:700; color:var(--text); margin-bottom:6px;">Firmenpool</div>
-      <div style="font-size:13.5px; color:var(--text-dim); line-height:1.55;">Dieser Bereich wird gerade gebaut. Die Navigation steht schon, die Inhalte kommen in einem der nächsten Schritte.</div>
-    </div>
+  <div id="ansicht-firma" class="fp-firma" hidden>
+    <div id="firma-links" class="fp-links"></div>
+    <div id="firma-rechts" class="fp-rechts"></div>
   </div>
+
+  <input id="import-datei" type="file" accept=".csv,.xlsx,text/csv" hidden>
 
 <script src="vendor/supabase-js-2.58.0.js"></script>
 <script src="js/logo.js"></script>
@@ -38,6 +274,6 @@
 <script src="js/app.js"></script>
 <script src="js/store.js"></script>
 <script src="js/shell.js"></script>
-<script>verlangeLogin();</script>
+<script src="js/firmenpool.js"></script>
 </body>
 </html>
