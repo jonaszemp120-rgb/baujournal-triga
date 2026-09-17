@@ -424,7 +424,7 @@
   $('#zurueck').href = `projekt-start.html?projekt=${encodeURIComponent(eintrag.projekt_id)}`;
   $('#k-titel').textContent = `Rundgang ${fmtDatum(eintrag.datum)}`;
   $('#k-sub').textContent = projekt?.name || '';
-  document.title = `${fmtDatum(eintrag.datum)} · Baujournal`;
+  document.title = `${fmtDatum(eintrag.datum)} · Baujournal · TRIGA App`;
 
   korrekturen = await ladeKorrekturen(id);
   zeichneLesen();

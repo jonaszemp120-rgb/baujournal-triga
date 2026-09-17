@@ -52,7 +52,7 @@ function seitenleiste(aktiv) {
   return `
     <aside class="tr-sidebar">
       <a class="marke" href="start.html" aria-label="Zur Startseite">
-        <img src="assets/triga-logo.png" alt="TRIGA Baumanagement">
+        <img src="${LOGO_BILD}" alt="TRIGA Baumanagement">
       </a>
       <nav style="display:flex; flex-direction:column; gap:4px;">${punkte}</nav>
       <button type="button" class="tr-konto pressable">

@@ -271,7 +271,7 @@
 
   $('#p-name').textContent = projekt.name;
   $('#p-standort').textContent = [projekt.standort, projekt.bauherrschaft].filter(Boolean).join(' · ');
-  document.title = `${projekt.name} · Baujournal`;
+  document.title = `${projekt.name} · Baujournal · TRIGA App`;
 
   const p = await profil();
   $('#f-bauleiter').textContent = p?.name || '–';

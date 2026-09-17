@@ -1,0 +1,385 @@
+bkp_code,bkp_bezeichnung,unt_id,firma,adresse,plz_ort,telefon,email
+112,Rückbau,25028,Albert Bucher AG,Brünigstrasse 48,6056 Kägiswil,+41 (41) 660 56 00,info@albertbucher-ag.ch
+112,Rückbau,25472,Anliker AG Bauunternehmung Erneuerungsbau,Reusseggstrasse 2,6002 Luzern,+41 (41) 429 34 34,bauunternehmung@anliker.ch
+112,Rückbau,11305,M+B Bau AG Schweiz,Gorgenstrasse 2,6074 Giswil,+41 (41) 666 30 00,info@mb-bauag.ch
+112,Rückbau,12333,Buchertiefbau GmbH,Industriestrasse 10,6064 Kerns,+41 (41) 660 36 25,info@buchertiefbau.ch
+112,Rückbau,12395,Bürgi AG,Grüneckweg 3,6055 Alpnach Dorf,+41 (41) 672 71 11,info@buergibau.ch
+112,Rückbau,13759,Eberli Bau AG,Feldstrasse 2,6060 Sarnen 2,+41 (41) 666 38 48,info@eberli-ag.ch
+112,Rückbau,15147,Gasser Felstechnik AG,Walchistrasse 30,6078 Lungern,+41 (41) 679 77 77,gasser@felstechnik.ch
+112,Rückbau,25022,Grunder Tiefbau GmbH,Flüelistrasse 59b,6064 Kerns,,
+112,Rückbau,17749,Höhener Tiefbau AG,Industrie Nord 21,5643 Sins,+41 (41) 787 17 87,info@hoehenertiefbau.ch
+112,Rückbau,25023,Josef Berwert AG,Wilerstrasse 44,6062 Wilen (Sarnen),+41 (41) 660 27 35,info@berwertbau.ch
+112,Rückbau,17640,KIBAG Bauleistungen AG,Rotzloch,6362 Stansstad,+41 (41) 618 22 00,
+112,Rückbau,18382,Lötscher Tiefbau AG,Spahau 3,6014 Luzern,+41 (41) 259 07 07,loetscher-plus@ltp.ch
+112,Rückbau,25024,Markus Enz AG,Schlossmattli 10,6074 Giswil,+41 (41) 879 80 00,info@enz-ag.ch
+112,Rückbau,25025,Melk Durrer AG,Kanalstrasse 20,6056 Kägiswil,+41 (41) 660 56 58,mario.durrer@melkdurrer.ch
+112,Rückbau,21328,Schleiss AG,Alpenstrasse 1,6370 Stans,+41 (41) 610 35 50,info@schleiss.ch
+112,Rückbau,21361,Schmid Bauunternehmung AG,Neuhaltenring 1,6030 Ebikon,+41 (41) 444 40 33,bau@schmid.lu
+112,Rückbau,25026,Stephan Thalmann AG,Dörli 9,6060 Ramersberg,+41 (41) 660 43 68,mail@thalmann-bau.ch
+112,Rückbau,25027,von Deschwanden Bau GmbH,Stanserstrasse 101,6064 Kerns,+41 (41) 660 29 48,vondeschwandenbau@bluewin.ch
+112,Rückbau,25097,Zimmermann Tiefbau AG,Faden 3,6374 Buochs,+41 (41) 624 91 96,tiefbau@zimgroup.ch
+201,Baugrubenaushub,25028,Albert Bucher AG,Brünigstrasse 48,6056 Kägiswil,+41 (41) 660 56 00,info@albertbucher-ag.ch
+201,Baugrubenaushub,10745,Anliker Bauunternehmung AG,Meierhöflistrasse 18,6021 Emmenbrücke 1,+41 (41) 268 88 88,bauunternehmung@anliker.ch
+201,Baugrubenaushub,11305,M+B Bau AG Schweiz,Gorgenstrasse 2,6074 Giswil,+41 (41) 666 30 00,info@mb-bauag.ch
+201,Baugrubenaushub,12333,Buchertiefbau GmbH,Industriestrasse 10,6064 Kerns,+41 (41) 660 36 25,info@buchertiefbau.ch
+201,Baugrubenaushub,12395,Bürgi AG,Grüneckweg 3,6055 Alpnach Dorf,+41 (41) 672 71 11,info@buergibau.ch
+201,Baugrubenaushub,13759,Eberli Bau AG,Feldstrasse 2,6060 Sarnen 2,+41 (41) 666 38 48,info@eberli-ag.ch
+201,Baugrubenaushub,15147,Gasser Felstechnik AG,Walchistrasse 30,6078 Lungern,+41 (41) 679 77 77,gasser@felstechnik.ch
+201,Baugrubenaushub,25022,Grunder Tiefbau GmbH,Flüelistrasse 59b,6064 Kerns,,
+201,Baugrubenaushub,17749,Höhener Tiefbau AG,Industrie Nord 21,5643 Sins,+41 (41) 787 17 87,info@hoehenertiefbau.ch
+201,Baugrubenaushub,25023,Josef Berwert AG,Wilerstrasse 44,6062 Wilen (Sarnen),+41 (41) 660 27 35,info@berwertbau.ch
+201,Baugrubenaushub,17649,KIBAG Bauleistungen AG,Sihlbruggstrasse 20,6345 Neuheim,+41 (58) 387 21 80,info.kzi@kibag.ch
+201,Baugrubenaushub,18382,Lötscher Tiefbau AG,Spahau 3,6014 Luzern,+41 (41) 259 07 07,loetscher-plus@ltp.ch
+201,Baugrubenaushub,25024,Markus Enz AG,Schlossmattli 10,6074 Giswil,+41 (41) 879 80 00,info@enz-ag.ch
+201,Baugrubenaushub,25025,Melk Durrer AG,Kanalstrasse 20,6056 Kägiswil,+41 (41) 660 56 58,mario.durrer@melkdurrer.ch
+201,Baugrubenaushub,19963,Peter Schmid Baudienstleistungen AG,Lindenmoosstrasse 9,8910 Affoltern am Albis,+41 (43) 333 44 77,dispo@bau-dienstleistungen.ch
+201,Baugrubenaushub,20088,PK Bau AG,Hirserenriedstrasse 38,6074 Giswil,+41 (41) 675 18 18,mail@pkbau.ch
+201,Baugrubenaushub,21328,Schleiss AG,Alpenstrasse 1,6370 Stans,+41 (41) 610 35 50,info@schleiss.ch
+201,Baugrubenaushub,21361,Schmid Bauunternehmung AG,Neuhaltenring 1,6030 Ebikon,+41 (41) 444 40 33,bau@schmid.lu
+201,Baugrubenaushub,25026,Stephan Thalmann AG,Dörli 9,6060 Ramersberg,+41 (41) 660 43 68,mail@thalmann-bau.ch
+201,Baugrubenaushub,25027,von Deschwanden Bau GmbH,Stanserstrasse 101,6064 Kerns,+41 (41) 660 29 48,vondeschwandenbau@bluewin.ch
+201,Baugrubenaushub,25097,Zimmermann Tiefbau AG,Faden 3,6374 Buochs,+41 (41) 624 91 96,tiefbau@zimgroup.ch
+211,Baumeisterarbeiten,10745,Anliker Bauunternehmung AG,Meierhöflistrasse 18,6021 Emmenbrücke 1,+41 (41) 268 88 88,bauunternehmung@anliker.ch
+211,Baumeisterarbeiten,11305,M+B Bau AG Schweiz,Gorgenstrasse 2,6074 Giswil,+41 (41) 666 30 00,info@mb-bauag.ch
+211,Baumeisterarbeiten,12395,Bürgi AG,Grüneckweg 3,6055 Alpnach Dorf,+41 (41) 672 71 11,info@buergibau.ch
+211,Baumeisterarbeiten,13759,Eberli Bau AG,Feldstrasse 2,6060 Sarnen 2,+41 (41) 666 38 48,info@eberli-ag.ch
+211,Baumeisterarbeiten,15147,Gasser Felstechnik AG,Walchistrasse 30,6078 Lungern,+41 (41) 679 77 77,gasser@felstechnik.ch
+211,Baumeisterarbeiten,25023,Josef Berwert AG,Wilerstrasse 44,6062 Wilen (Sarnen),+41 (41) 660 27 35,info@berwertbau.ch
+211,Baumeisterarbeiten,25025,Melk Durrer AG,Kanalstrasse 20,6056 Kägiswil,+41 (41) 660 56 58,mario.durrer@melkdurrer.ch
+211,Baumeisterarbeiten,20147,Poli Bau AG,Hasliweg 1,6052 Hergiswil,+41 (41) 632 40 20,info@polibau.ch
+211,Baumeisterarbeiten,21361,Schmid Bauunternehmung AG,Neuhaltenring 1,6030 Ebikon,+41 (41) 444 40 33,bau@schmid.lu
+214.3,Holzelementbau,15222,Amstutz Holzbau AG,Galgenried 14,6370 Stans,+41 (41) 619 40 40,info@holzbau-amstutz.ch
+214.3,Holzelementbau,16168,Haupt AG,Rosswöschstrasse 28,6017 Ruswil,+41 (41) 496 77 77,info@haupt-ag.ch
+214.3,Holzelementbau,25474,Hecht Holzbau AG,Rigistrasse 11a,6210 Sursee,+41 (41) 925 18 40,info@hecht-holzbau.ch
+214.3,Holzelementbau,16487,Holzbau Bucher AG,Untergasse 11,6064 Kerns,+41 (41) 666 07 07,info@holzbau-bucher.ch
+214.3,Holzelementbau,16493,Holzbautechnik Burch AG,Brünigstrasse 88,6060 Sarnen,+41 (41) 666 76 86,burch@holzbautechnik.ch
+214.3,Holzelementbau,25053,Josef Rohrer AG,Langacker 5,6073 Flüeli-Ranft,+41 (41) 666 27 80,info@rohrex.ch
+214.3,Holzelementbau,25054,Karl Rohrer AG,Wichelstrasse 1,6072 Sachseln,+41 (41) 660 30 44,info@karo-holz.ch
+214.3,Holzelementbau,25473,Kayser Holzbau AG,Gerenmüli 16,6370 Oberdorf NW,+41 (41) 618 31 80,info@kayser.ch
+214.3,Holzelementbau,17845,Kost Holzbau AG,Alte Zugerstrasse 5,6403 Küssnacht am Rigi,+41 (41) 854 34 43,info@kost.ch
+214.3,Holzelementbau,17944,Küng Holzbau AG,Chilcherlistrasse 7,6055 Alpnach Dorf,+41 (41) 672 76 76,info@kueng-holz.ch
+214.3,Holzelementbau,23012,Tschopp Holzbau AG,An der Ron 17,6280 Hochdorf,+41 (41) 914 20 20,info@tschopp-holzbau.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",15222,Amstutz Holzbau AG,Galgenried 14,6370 Stans,+41 (41) 619 40 40,info@holzbau-amstutz.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",16168,Haupt AG,Rosswöschstrasse 28,6017 Ruswil,+41 (41) 496 77 77,info@haupt-ag.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",25474,Hecht Holzbau AG,Rigistrasse 11a,6210 Sursee,+41 (41) 925 18 40,info@hecht-holzbau.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",16487,Holzbau Bucher AG,Untergasse 11,6064 Kerns,+41 (41) 666 07 07,info@holzbau-bucher.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",16493,Holzbautechnik Burch AG,Brünigstrasse 88,6060 Sarnen,+41 (41) 666 76 86,burch@holzbautechnik.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",25053,Josef Rohrer AG,Langacker 5,6073 Flüeli-Ranft,+41 (41) 666 27 80,info@rohrex.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",25054,Karl Rohrer AG,Wichelstrasse 1,6072 Sachseln,+41 (41) 660 30 44,info@karo-holz.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",25473,Kayser Holzbau AG,Gerenmüli 16,6370 Oberdorf NW,+41 (41) 618 31 80,info@kayser.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",17845,Kost Holzbau AG,Alte Zugerstrasse 5,6403 Küssnacht am Rigi,+41 (41) 854 34 43,info@kost.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",17944,Küng Holzbau AG,Chilcherlistrasse 7,6055 Alpnach Dorf,+41 (41) 672 76 76,info@kueng-holz.ch
+214.4,"Äussere Bekleidungen, Gesimse, Treppen",23012,Tschopp Holzbau AG,An der Ron 17,6280 Hochdorf,+41 (41) 914 20 20,info@tschopp-holzbau.ch
+215.5,Äussere Bekleidungen,25152,Dach und Solar AG,Kernserstrasse 11,6056 Kägiswil,+41 (41) 660 16 70,info@dachundsolar.ch
+215.5,Äussere Bekleidungen,25184,Eleconstruct & Partner AG,Eichli 19,6370 Stans,+41 (41) 260 06 55,info@eleconstruct.ch
+215.5,Äussere Bekleidungen,24901,Fassaden Outfit AG,Falkenweg 9,6340 Baar,+41 (41) 541 49 48,info@fassaden-outfit.ch
+215.5,Äussere Bekleidungen,17338,Josef Wey AG,Buzibachstrasse 40,6023 Rothenburg,+41 (41) 552 05 80,info@wey-ag.ch
+215.5,Äussere Bekleidungen,25185,Näpflin Gebäudehülle AG,Rüttistrasse 67,6467 Schattdorf,+41 (41) 874 74 84,info@nag.swiss
+215.5,Äussere Bekleidungen,19597,Odermatt Bedachungen und Spenglerei AG,Brandbodenstrasse 9,6383 Dallenwil,+41 (41) 629 08 08,info@amstutz-odermatt.ch
+215.5,Äussere Bekleidungen,21361,Schmid Bauunternehmung AG,Neuhaltenring 1,6030 Ebikon,+41 (41) 444 40 33,bau@schmid.lu
+215.5,Äussere Bekleidungen,25156,Sepp Wagner GmbH,Industriestrasse 8,6064 Kerns,+41 (41) 660 72 44,info@seppwagnergmbh.ch
+215.5,Äussere Bekleidungen,25154,Von Rotz Gebäudehülle Plus,Industriestrasse 11,6064 Kerns,+41 (41) 660 60 88,info@ghplus.ch
+221.1,Fenster aus Holz-Metall,10025,4B AG,An der Ron 7,6280 Hochdorf,+41 (41) 914 50 50,info@4-b.ch
+221.1,Fenster aus Holz-Metall,12282,BS Fenster + Türenbau AG,Rigistrasse 11,6210 Sursee,+41 (41) 925 11 50,info@bs-fensterbau.ch
+221.1,Fenster aus Holz-Metall,14545,Fenster Bünter AG,Brisenstrasse 1,6382 Büren NW,+41 (41) 619 70 80,info@fensterbuenter.ch
+221.1,Fenster aus Holz-Metall,15012,G. Baumgartner AG,Flurstrasse 41,6332 Hagendorn,+41 (41) 785 85 85,info@baumgartnerfenster.ch
+221.1,Fenster aus Holz-Metall,15197,Gawo Gasser AG,Entlebucherstrasse 46,6110 Wolhusen,+41 (41) 492 60 90,info@gawo.ch
+221.1,Fenster aus Holz-Metall,16487,Holzbau Bucher AG,Untergasse 11,6064 Kerns,+41 (41) 666 07 07,info@holzbau-bucher.ch
+221.1,Fenster aus Holz-Metall,25054,Karl Rohrer AG,Wichelstrasse 1,6072 Sachseln,+41 (41) 660 30 44,info@karo-holz.ch
+221.6,"Aussentüren, Tore aus Metall",16797,Imfeld Metall- und Stahlbau AG,Chnewisstrasse 10,6078 Lungern,+41 (41) 678 10 05,imfeld@imfeld-stahlbau.ch
+221.6,"Aussentüren, Tore aus Metall",17056,Iromet AG,Industriestrasse 2,6055 Alpnach Dorf,+41 (41) 672 70 20,offerten@iromet.ch
+221.6,"Aussentüren, Tore aus Metall",17607,Keller Werner Metallbau AG,Bahnhofstrasse 5a,6052 Hergiswil,+41 (41) 632 62 32,mail@kellermetall.ch
+221.6,"Aussentüren, Tore aus Metall",21336,Schlosserei Andreas Rohrer AG,Galileo-Strasse 6,6056 Kägiswil,+41 (41) 497 00 71,info@schlosserei-rohrer.ch
+221.6,"Aussentüren, Tore aus Metall",25180,Waldvogel Schlossrei GmbH,Arlistrasse 5,6064 Kerns,+41 (41) 660 57 49,schlosserei_gmbh@bluewin.ch
+221.6,"Aussentüren, Tore aus Metall",23969,Wolfisberg Metallbau AG,Pilatusstrasse 4,6060 Sarnen,+41 (41) 660 12 19,info@wolfisberg-metallbau.ch
+221.9,Garagentore,11575,Bautech AG,Alte Zugerstrasse 14,6403 Küssnacht am Rigi,+41 (41) 854 77 44,info@bautech.ch
+221.9,Garagentore,14098,Ema-Tech Nottwil AG,Kantonsstrasse 20,6207 Nottwil,+41 (41) 939 20 40,info@ema-tech.ch
+221.9,Garagentore,21747,Sidler Epp Torbau AG,Hohenrainstrasse 52,6280 Hochdorf,+41 (41) 910 00 62,info@sidler-epp.ch
+221.9,Garagentore,25168,Sisto GmbH,Eichli 25,6370 Stans,+41 (41) 620 86 52,sisto@sisto.swiss
+221.9,Garagentore,23970,Wolfisberg Tor-Technik AG,Kreuzstrasse 46,6056 Kägiswil,+41 (41) 666 03 70,info@wolfisberg.com
+222,Spenglerarbeiten,25151,Bedachungen Rohrer GmbH,Hänsigrüt 5,6072 Sachseln,+41 (41) 660 70 40,info@rohrer-dach.ch
+222,Spenglerarbeiten,12324,Bucher Dach AG,Sandbachstrasse 13,6064 Kerns,+41 (41) 740 19 91,info@bucherdach.ch
+222,Spenglerarbeiten,25152,Dach und Solar AG,Kernserstrasse 11,6056 Kägiswil,+41 (41) 660 16 70,info@dachundsolar.ch
+222,Spenglerarbeiten,13692,Durrer AG Abdichtungsbau,Industriestrasse 25,6055 Alpnach Dorf,+41 0848 000 666,info@durrer-abdichtungen.ch
+222,Spenglerarbeiten,17338,Josef Wey AG,Buzibachstrasse 40,6023 Rothenburg,+41 (41) 552 05 80,info@wey-ag.ch
+222,Spenglerarbeiten,18747,Mathis Flachdach AG,Steinhausstrasse 4,6056 Kägiswil,+41 (41) 666 50 50,hallo@mathis-flachdach.ch
+222,Spenglerarbeiten,25185,Näpflin Gebäudehülle AG,Rüttistrasse 67,6467 Schattdorf,+41 (41) 874 74 84,info@nag.swiss
+222,Spenglerarbeiten,19597,Odermatt Bedachungen und Spenglerei AG,Brandbodenstrasse 9,6383 Dallenwil,+41 (41) 629 08 08,info@amstutz-odermatt.ch
+222,Spenglerarbeiten,19837,Paul Gisler AG,Alte Steinhauserstrasse 32,6330 Cham,+41 (41) 748 50 30,info@paulgislerag.ch
+222,Spenglerarbeiten,25156,Sepp Wagner GmbH,Industriestrasse 8,6064 Kerns,+41 (41) 660 72 44,info@seppwagnergmbh.ch
+222,Spenglerarbeiten,25153,Soland Spenglerei GmbH,Bürglenstrasse 64,6078 Bürglen OW,+41 (41) 678 22 02,soland.spenglerei@bluewin.ch
+222,Spenglerarbeiten,25154,Von Rotz Gebäudehülle Plus,Industriestrasse 11,6064 Kerns,+41 (41) 660 60 88,info@ghplus.ch
+222,Spenglerarbeiten,25155,B + W Bedachungen GmbH,Schwanderstrasse 28,6063 Sarnen,+41 (41) 660 94 05,ak@wb-dach.ch
+222,Spenglerarbeiten,23562,Wallimann AG,Büntenmatt 17,6060 Sarnen,+41 (41) 660 31 16,wallimann@bluewin.ch
+224.0,Deckungen geneigte Dächer,25151,Bedachungen Rohrer GmbH,Hänsigrüt 5,6072 Sachseln,+41 (41) 660 70 40,info@rohrer-dach.ch
+224.0,Deckungen geneigte Dächer,12324,Bucher Dach AG,Sandbachstrasse 13,6064 Kerns,+41 (41) 740 19 91,info@bucherdach.ch
+224.0,Deckungen geneigte Dächer,25152,Dach und Solar AG,Kernserstrasse 11,6056 Kägiswil,+41 (41) 660 16 70,info@dachundsolar.ch
+224.0,Deckungen geneigte Dächer,17338,Josef Wey AG,Buzibachstrasse 40,6023 Rothenburg,+41 (41) 552 05 80,info@wey-ag.ch
+224.0,Deckungen geneigte Dächer,25185,Näpflin Gebäudehülle AG,Rüttistrasse 67,6467 Schattdorf,+41 (41) 874 74 84,info@nag.swiss
+224.0,Deckungen geneigte Dächer,19597,Odermatt Bedachungen und Spenglerei AG,Brandbodenstrasse 9,6383 Dallenwil,+41 (41) 629 08 08,info@amstutz-odermatt.ch
+224.0,Deckungen geneigte Dächer,19837,Paul Gisler AG,Alte Steinhauserstrasse 32,6330 Cham,+41 (41) 748 50 30,info@paulgislerag.ch
+224.0,Deckungen geneigte Dächer,25156,Sepp Wagner GmbH,Industriestrasse 8,6064 Kerns,+41 (41) 660 72 44,info@seppwagnergmbh.ch
+224.0,Deckungen geneigte Dächer,25153,Soland Spenglerei GmbH,Bürglenstrasse 64,6078 Bürglen OW,+41 (41) 678 22 02,soland.spenglerei@bluewin.ch
+224.0,Deckungen geneigte Dächer,25154,Von Rotz Gebäudehülle Plus,Industriestrasse 11,6064 Kerns,+41 (41) 660 60 88,info@ghplus.ch
+224.0,Deckungen geneigte Dächer,25155,B + W Bedachungen GmbH,Schwanderstrasse 28,6063 Sarnen,+41 (41) 660 94 05,ak@wb-dach.ch
+224.1,Dichtungsbeläge Flachdächer,25151,Bedachungen Rohrer GmbH,Hänsigrüt 5,6072 Sachseln,+41 (41) 660 70 40,info@rohrer-dach.ch
+224.1,Dichtungsbeläge Flachdächer,12324,Bucher Dach AG,Sandbachstrasse 13,6064 Kerns,+41 (41) 740 19 91,info@bucherdach.ch
+224.1,Dichtungsbeläge Flachdächer,25152,Dach und Solar AG,Kernserstrasse 11,6056 Kägiswil,+41 (41) 660 16 70,info@dachundsolar.ch
+224.1,Dichtungsbeläge Flachdächer,13692,Durrer AG Abdichtungsbau,Industriestrasse 25,6055 Alpnach Dorf,+41 0848 000 666,info@durrer-abdichtungen.ch
+224.1,Dichtungsbeläge Flachdächer,17338,Josef Wey AG,Buzibachstrasse 40,6023 Rothenburg,+41 (41) 552 05 80,info@wey-ag.ch
+224.1,Dichtungsbeläge Flachdächer,18747,Mathis Flachdach AG,Steinhausstrasse 4,6056 Kägiswil,+41 (41) 666 50 50,hallo@mathis-flachdach.ch
+224.1,Dichtungsbeläge Flachdächer,25185,Näpflin Gebäudehülle AG,Rüttistrasse 67,6467 Schattdorf,+41 (41) 874 74 84,info@nag.swiss
+224.1,Dichtungsbeläge Flachdächer,19597,Odermatt Bedachungen und Spenglerei AG,Brandbodenstrasse 9,6383 Dallenwil,+41 (41) 629 08 08,info@amstutz-odermatt.ch
+224.1,Dichtungsbeläge Flachdächer,19837,Paul Gisler AG,Alte Steinhauserstrasse 32,6330 Cham,+41 (41) 748 50 30,info@paulgislerag.ch
+224.1,Dichtungsbeläge Flachdächer,25156,Sepp Wagner GmbH,Industriestrasse 8,6064 Kerns,+41 (41) 660 72 44,info@seppwagnergmbh.ch
+224.1,Dichtungsbeläge Flachdächer,25153,Soland Spenglerei GmbH,Bürglenstrasse 64,6078 Bürglen OW,+41 (41) 678 22 02,soland.spenglerei@bluewin.ch
+224.1,Dichtungsbeläge Flachdächer,25154,Von Rotz Gebäudehülle Plus,Industriestrasse 11,6064 Kerns,+41 (41) 660 60 88,info@ghplus.ch
+224.1,Dichtungsbeläge Flachdächer,25155,B + W Bedachungen GmbH,Schwanderstrasse 28,6063 Sarnen,+41 (41) 660 94 05,ak@wb-dach.ch
+224.1,Dichtungsbeläge Flachdächer,23562,Wallimann AG,Büntenmatt 17,6060 Sarnen,+41 (41) 660 31 16,wallimann@bluewin.ch
+225.1,Fugendichtungen,10316,AGI AG für Isolierugen,Langwiesenstrasse 6,8108 Dällikon,+41 (44) 316 63 63,zh@agi.swiss
+225.1,Fugendichtungen,13343,DD-T Dicht & Dämm Technik GmbH,Industriestrasse 59,6034 Inwil,+41 (41) 360 02 00,info@dd-t.ch
+225.1,Fugendichtungen,24956,Enz & Muff GmbH,Dörflistrasse 32b,6056 Kägiswil,+41 (41) 660 69 35,enzmuff@bluewin.ch
+225.1,Fugendichtungen,14969,Fugenexpress Kluser GmbH,Industriestrasse 11,6074 Giswil,+41 (41) 660 88 60,info@kitter.ch
+225.1,Fugendichtungen,18010,L.Fugenbau GmbH,Buzibachstrasse 12,6023 Rothenburg,+41 (41) 440 68 14,info@lfugenbau.ch
+225.1,Fugendichtungen,23070,Ulmi AG,Schrotmättli 16,6014 Luzern,+41 (41) 250 12 21,info@ulmiluzern.ch
+225.2,Spezielle Dämmungen,10362,Akon AG,Ausserfeld 1,6362 Stansstad,+41 (41) 632 33 99,sekretariat@akon-ag.ch
+225.2,Spezielle Dämmungen,25212,Dominik von Flüe,Rüteli 8,6072 Sachseln,+41 (41) 660 99 85,pfuisi@bluewin.ch
+225.2,Spezielle Dämmungen,25052,Durrer Sägerei und Trockenbau GmbH,Sagenmatt 2,6066 St. Niklausen OW,+41 (41) 660 54 33,dst@durrer-gmbh.ch
+225.2,Spezielle Dämmungen,24901,Fassaden Outfit AG,Falkenweg 9,6340 Baar,+41 (41) 541 49 48,info@fassaden-outfit.ch
+225.2,Spezielle Dämmungen,25214,Filliger & Partner AG,Gruobstrasse 52,6372 Ennetmoos,+41 (41) 611 00 15,info@filliger-partner.ch
+225.2,Spezielle Dämmungen,16493,Holzbautechnik Burch AG,Brünigstrasse 88,6060 Sarnen,+41 (41) 666 76 86,burch@holzbautechnik.ch
+225.2,Spezielle Dämmungen,25183,Mabeco AG,Industriestrasse 1,6055 Alpnach Dorf,,
+225.2,Spezielle Dämmungen,19297,MVM AG,Kirchfeldstrasse 44,6032 Emmen,+41 (41) 289 04 04,mail@mvm-ag.ch
+225.2,Spezielle Dämmungen,25187,Odermatt Fassadenbau AG,Brandbodenstrasse 9,6383 Dallenwil,+41 (41) 629 08 08,fassaden@gebrueder-odermatt.ch
+225.2,Spezielle Dämmungen,20147,Poli Bau AG,Hasliweg 1,6052 Hergiswil,+41 (41) 632 40 20,info@polibau.ch
+225.2,Spezielle Dämmungen,25213,Roman Colledani der Gestalter GmbH,Tellenstrasse 23,6056 Kägiswil,,
+225.2,Spezielle Dämmungen,20959,Roth AG Malters,Werkstrasse 1,6102 Malters,+41 (41) 498 07 20,malters@roth.ch
+225.2,Spezielle Dämmungen,21859,Slanzi Malen Gipsen AG,Mühlemattli 10,6074 Giswil,+41 (41) 675 10 60,info@slanzi.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,25057,Bollhalder Systemabdichtungen AG,Breitenweg 10,6370 Stans,+41 (41) 555 12 60,info@systemabdichtungen.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,14560,Ferotekt AG,Ronmatte 8,6033 Buchrain,+41 (41) 289 15 15,info@ferotekt.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,17083,Isotech Zentralschweiz AG,Eichli 25,6370 Stans,+41 (41) 340 54 55,info@isotech-zentralschweiz.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,25058,Kittech AG,Postfach 253,6074 Giswil,+41 (41) 676 70 60,info@kittech.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,22247,Stocker & Partner AG,Postplatz 5,6274 Eschenbach LU,+41 (41) 448 20 60,info@stopag.ch
+225.3,Spezielle Feuchtigkeitsabdichtungen,23405,Vistona AG,Wyssmattstrasse 2,6010 Kriens,+41 (41) 311 00 62,e.birkigt@vistona.com
+225.4,Brandschutzbekleidungen und dgl.,10318,AGI AG für Isolierungen,Acherfang 24,6274 Eschenbach LU,+41 (41) 449 90 30,lu@agi.swiss
+225.4,Brandschutzbekleidungen und dgl.,13343,DD-T Dicht & Dämm Technik GmbH,Industriestrasse 59,6034 Inwil,+41 (41) 360 02 00,info@dd-t.ch
+225.4,Brandschutzbekleidungen und dgl.,16034,Halter & Colledani AG,Kägiswilerstrasse 47,6060 Sarnen,+41 (41) 670 30 20,info@halter-colledani.ch
+225.4,Brandschutzbekleidungen und dgl.,16917,Infrasafe AG,Grossmatte 11,6014 Luzern,+41 (41) 250 60 50,info@infrasafe.ch
+225.4,Brandschutzbekleidungen und dgl.,17083,Isotech Zentralschweiz AG,Eichli 25,6370 Stans,+41 (41) 340 54 55,info@isotech-zentralschweiz.ch
+225.4,Brandschutzbekleidungen und dgl.,24317,L. Fugenbau GmbH,Buzibachstrasse 12,6023 Rothenburg,+41 (41) 440 68 14,info@lfugenbau.ch
+225.4,Brandschutzbekleidungen und dgl.,20959,Roth AG Malters,Werkstrasse 1,6102 Malters,+41 (41) 498 07 20,malters@roth.ch
+227.1,Äussere Malerarbeiten,25219,Capraro Malerei-Decor AG,Pilatusstrasse 10,6060 Sarnen,+41 (41) 377 00 44,info@capraro.ch
+227.1,Äussere Malerarbeiten,18537,Maler Durrer GmbH,Postplatz 4,6064 Kerns,+41 (41) 660 30 41,info@malerdurrer.ch
+227.1,Äussere Malerarbeiten,25475,Maler Grimm AG,Werkhofstrasse 8,6052 Hergiswil NW,+41 (41) 630 21 51,info@maler-grimm.ch
+227.1,Äussere Malerarbeiten,25288,Maler Hinter AG,Brünigstrasse 126a,6072 Sachseln,+41 (41) 660 28 33,kontakt@malerhinter.ch
+227.1,Äussere Malerarbeiten,25186,MVM AG Stans,Hansmatt 30,6370 Stans,+41 (41) 610 00 42,mail@mvm-ag.ch
+227.1,Äussere Malerarbeiten,25289,Schwarzenberger GmbH,Baumgartenstrasse 7,6055 Alpnach Dorf,+41 (41) 660 67 01,urs@schwarzenberger-gmbh.ch
+227.1,Äussere Malerarbeiten,21859,Slanzi Malen Gipsen AG,Mühlemattli 10,6074 Giswil,+41 (41) 675 10 60,info@slanzi.ch
+227.1,Äussere Malerarbeiten,25291,Theo Fischer & Partner AG,Kreuzstrasse 20,6056 Kägiswil,,
+227.1,Äussere Malerarbeiten,25290,Walter Zünd AG,Kapuzinerweg 8,6060 Sarnen,+41 (41) 660 07 70,info@zuendmalerei.ch
+228.3,Markisen,11915,Birrer-Storen AG,Hinter-Listrig 4,6020 Emmenbrücke,+41 (41) 282 04 04,info@birrer-storen.ch
+228.3,Markisen,15782,Griesser AG,Grossmatte 12,6014 Luzern,+41 (58) 822 40 02,info@griesser.ch
+228.3,Markisen,25476,Näf AG,Werkhofstrasse 10,6052 Hergiswil NW,+41 (41) 630 34 22,storen@naef.swiss
+228.3,Markisen,21273,Schenker Storen AG,Allmendstrasse 6,6210 Sursee,+41 (41) 926 60 80,schenker.sursee@storen.ch
+228.3,Markisen,22245,Stobag AG,Postfach 373,5630 Muri AG,+41 (56) 675 42 00,info@stobag.ch
+230,Elektroanlagen,25060,Durrer Jost Energie GmbH,Flüelistrasse 26,6064 Kerns,+41 (41) 660 86 66,info@durrerenergie.ch
+230,Elektroanlagen,25064,Elektro Ettlin AG,Sagenstrasse 1,6064 Kerns,+41 (41) 660 51 66,elektro.ettlinag@bluewin.ch
+230,Elektroanlagen,24925,Elektro Furrer AG,Edisriederstrasse 83,6072 Sachseln,+41 (41) 662 00 70,info@elektrofurrer.ch
+230,Elektroanlagen,25065,Elektro Huwyler AG,Kanalstrasse 10,6056 Kägiswil,+41 (41) 666 30 70,info@elektro-huwyler.ch
+230,Elektroanlagen,13996,Elektro Kaiser AG Maréchaux,Dorfstrasse 10,6072 Sachseln,+41 (41) 666 56 66,info@elektro-kaiser.ch
+230,Elektroanlagen,25061,Enertech AG,Kägiswilerstrasse 29,6060 Sarnen,+41 (41) 666 29 99,info@enertech.ch
+230,Elektroanlagen,14339,Ettlin AG,Brünigstrasse 12,6055 Alpnach Dorf,+41 (41) 672 72 72,info@elektro-ettlin.ch
+230,Elektroanlagen,25063,EWO Gebäudetechnik AG,Stanserstrasse 8,6064 Kerns,+41 (41) 672 77 00,info@ewo-gbt.ch
+230,Elektroanlagen,25082,Frey+Cie Elektro AG Stans,Oberstmühle 1,6370 Stans,+41 (41) 622 00 20,info@freycie-stans.ch
+230,Elektroanlagen,25067,Gasser Elektro AG,Industriestrasse 6,6055 Alpnach Dorf,+41 (41) 670 19 52,info@gasserag-elektro.ch
+230,Elektroanlagen,25068,Gebr. Kiser Elektro,Brünigstrasse 166,6060 Sarnen,+41 (41) 660 26 56,info@kiser-elektro.ch
+235.8,Sicherheitsanlagen,25297,CKW Security Stansstad,Rotzbergstrasse 15,6362 Stansstad,+41 (41) 618 08 08,security@ckw.ch
+235.8,Sicherheitsanlagen,14885,Frey + Cie Sicherheitstechnik AG,Stationsstrasse 89,6023 Rothenburg,+41 (41) 329 06 06,info@freysicherheit.ch
+235.8,Sicherheitsanlagen,21617,Securiton AG,Station-Ost 7,6023 Rothenburg,+41 (58) 910 62 10,luzern@securiton.ch
+235.8,Sicherheitsanlagen,21775,Siemens Schweiz AG,Platz 3,6039 Root D4,+41 (58) 557 65 79,
+235.8,Sicherheitsanlagen,22683,Telcom Cablenet AG,Buzibachstrasse 31A,6023 Rothenburg,+41 (41) 618 20 10,info@telcomcablenet.ch
+239,Photovoltaik- und Solaranlagen,25151,Bedachungen Rohrer GmbH,Hänsigrüt 5,6072 Sachseln,+41 (41) 660 70 40,info@rohrer-dach.ch
+239,Photovoltaik- und Solaranlagen,12324,Bucher Dach AG,Sandbachstrasse 13,6064 Kerns,+41 (41) 740 19 91,info@bucherdach.ch
+239,Photovoltaik- und Solaranlagen,25152,Dach und Solar AG,Kernserstrasse 11,6056 Kägiswil,+41 (41) 660 16 70,info@dachundsolar.ch
+239,Photovoltaik- und Solaranlagen,25477,E. Lutz AG Gebäudehülle,Rothering 9a,6015 Luzern,+41 (41) 260 77 77,info@elutzag.ch
+239,Photovoltaik- und Solaranlagen,25061,Enertech AG,Kägiswilerstrasse 29,6060 Sarnen,+41 (41) 666 29 99,info@enertech.ch
+239,Photovoltaik- und Solaranlagen,25063,EWO Gebäudetechnik AG,Stanserstrasse 8,6064 Kerns,+41 (41) 672 77 00,info@ewo-gbt.ch
+239,Photovoltaik- und Solaranlagen,18747,Mathis Flachdach AG,Steinhausstrasse 4,6056 Kägiswil,+41 (41) 666 50 50,hallo@mathis-flachdach.ch
+239,Photovoltaik- und Solaranlagen,25156,Sepp Wagner GmbH,Industriestrasse 8,6064 Kerns,+41 (41) 660 72 44,info@seppwagnergmbh.ch
+239,Photovoltaik- und Solaranlagen,25154,Von Rotz Gebäudehülle Plus,Industriestrasse 11,6064 Kerns,+41 (41) 660 60 88,info@ghplus.ch
+239,Photovoltaik- und Solaranlagen,25118,Weibel+Sommer Elektro Telecom AG,Stationsstrasse 89,6023 Rothenburg,+41 (41) 289 10 00,elektro@weibel-sommer.ch
+242,Heizungsanlagen,25060,Durrer Jost Energie GmbH,Flüelistrasse 26,6064 Kerns,+41 (41) 660 86 66,info@durrerenergie.ch
+242,Heizungsanlagen,13738,E3 HLK AG,Horwerstrasse 62,6010 Kriens,+41 (41) 329 20 40,luzern@e3-hlk.ch
+242,Heizungsanlagen,25061,Enertech AG,Kägiswilerstrasse 29,6060 Sarnen,+41 (41) 666 29 99,info@enertech.ch
+242,Heizungsanlagen,14177,Equans Services AG,Industriestrasse 20,6060 Sarnen,+41 (41) 662 00 30,sarnen.ch@equans.com
+242,Heizungsanlagen,15149,Gasser Heizung-Sanitär AG,Muotastrasse 24,6438 Ibach,+41 (41) 818 50 80,info@gasser-haustechnik.ch
+242,Heizungsanlagen,15908,Gut AG Gebäudetechnik,Grossmatte Ost 16,6014 Luzern,+41 (41) 818 09 90,
+242,Heizungsanlagen,18118,Langensand AG,Schulhausstrasse 9,6055 Alpnach Dorf,+41 (41) 670 16 60,info@langensand-ag.ch
+242,Heizungsanlagen,19450,Niedermann HLK AG,Fronhofenstrasse 10,6370 Stans,+41 (41) 618 30 80,info@niedermann-hlk.ch
+242,Heizungsanlagen,25059,Pilatus-Therm AG,Brünigstrasse 2,6055 Alpnach Dorf,+41 (41) 670 11 24,info@pilatus-therm.ch
+242,Heizungsanlagen,20559,Reinhard Haustechnik AG,Gartenstrasse 23,6060 Sarnen,+41 (41) 660 12 82,info@reinhard-ht.ch
+242,Heizungsanlagen,22122,Stalder & Birrer AG,Bürgenstockstrasse 8,6362 Stansstad,+41 (41) 610 41 55,info@stalder-birrer.ch
+244,Lufttechnische Anlagen,12234,Bruni Haustechnik AG,Centralstrasse 8B,6210 Sursee,+41 (41) 220 22 00,info@bruni-haustechnik.ch
+244,Lufttechnische Anlagen,12925,Clima-Nova AG,Sinserstrasse 116,6330 Cham,+41 (41) 785 25 85,info@climanova.ch
+244,Lufttechnische Anlagen,13738,E3 HLK AG,Horwerstrasse 62,6010 Kriens,+41 (41) 329 20 40,luzern@e3-hlk.ch
+244,Lufttechnische Anlagen,25061,Enertech AG,Kägiswilerstrasse 29,6060 Sarnen,+41 (41) 666 29 99,info@enertech.ch
+244,Lufttechnische Anlagen,14177,Equans Services AG,Industriestrasse 20,6060 Sarnen,+41 (41) 662 00 30,sarnen.ch@equans.com
+244,Lufttechnische Anlagen,14711,Flüma Klima AG,Postfach 1155,6031 Ebikon,+41 (41) 445 68 28,info@fluema.ch
+244,Lufttechnische Anlagen,25066,Frial GmbH,Ächerlistrasse 18,6064 Kerns,+41 (41) 660 85 37,manfreda@gmx.ch
+244,Lufttechnische Anlagen,15149,Gasser Heizung-Sanitär AG,Muotastrasse 24,6438 Ibach,+41 (41) 818 50 80,info@gasser-haustechnik.ch
+244,Lufttechnische Anlagen,15908,Gut AG Gebäudetechnik,Grossmatte Ost 16,6014 Luzern,+41 (41) 818 09 90,
+244,Lufttechnische Anlagen,19450,Niedermann HLK AG,Fronhofenstrasse 10,6370 Stans,+41 (41) 618 30 80,info@niedermann-hlk.ch
+244,Lufttechnische Anlagen,25059,Pilatus-Therm AG,Brünigstrasse 2,6055 Alpnach Dorf,+41 (41) 670 11 24,info@pilatus-therm.ch
+244,Lufttechnische Anlagen,20559,Reinhard Haustechnik AG,Gartenstrasse 23,6060 Sarnen,+41 (41) 660 12 82,info@reinhard-ht.ch
+244,Lufttechnische Anlagen,22122,Stalder & Birrer AG,Bürgenstockstrasse 8,6362 Stansstad,+41 (41) 610 41 55,info@stalder-birrer.ch
+250,Sanitäranlagen,25069,Aqwa Sanitär AG,Kägiswilerstrasse 29,6060 Sarnen,+41 (41) 618 90 00,info@aqwa.ch
+250,Sanitäranlagen,25060,Durrer Jost Energie GmbH,Flüelistrasse 26,6064 Kerns,+41 (41) 660 86 66,info@durrerenergie.ch
+250,Sanitäranlagen,15149,Gasser Heizung-Sanitär AG,Muotastrasse 24,6438 Ibach,+41 (41) 818 50 80,info@gasser-haustechnik.ch
+250,Sanitäranlagen,15908,Gut AG Gebäudetechnik,Grossmatte Ost 16,6014 Luzern,+41 (41) 818 09 90,
+250,Sanitäranlagen,17909,Krummenacher Sanitär AG,Steinhauserstrasse 4,6056 Kägiswil,+41 (41) 660 53 53,info@krummenacher-sanitaer.ch
+250,Sanitäranlagen,18118,Langensand AG,Schulhausstrasse 9,6055 Alpnach Dorf,+41 (41) 670 16 60,info@langensand-ag.ch
+250,Sanitäranlagen,19598,Nur noch Sanitäranlagen Odermatt Kerns AG,Erlenstrasse 16,6064 Kerns,+41 (41) 660 48 55,info@odermatt-kerns.ch
+250,Sanitäranlagen,25059,Pilatus-Therm AG,Brünigstrasse 2,6055 Alpnach Dorf,+41 (41) 670 11 24,info@pilatus-therm.ch
+250,Sanitäranlagen,20559,Reinhard Haustechnik AG,Gartenstrasse 23,6060 Sarnen,+41 (41) 660 12 82,info@reinhard-ht.ch
+258,Kücheneinrichtungen,10553,Alpnach Küchen AG,Seetalstrasse 190,6032 Emmen,+41 (41) 455 52 52,emmen@alpnachkuechen.ch
+258,Kücheneinrichtungen,11057,Astor Küchen AG,Luzernerstrasse 3,6030 Ebikon,+41 (41) 420 22 23,info@astor-kuechen.ch
+258,Kücheneinrichtungen,25040,Berchtold Küchen,Stansstaderstrasse 54,6371 Stans,+41 (41) 610 32 50,info@berchtold-kuechen.ch
+258,Kücheneinrichtungen,14649,Sanitas Troesch AG,Unterlachenstrasse 32,6005 Luzern,+41 (41) 317 20 30,luzern@sanitastroesch.ch
+258,Kücheneinrichtungen,25226,J. Reinhart Söhne AG,Flüelistrasse 61,6064 Kerns,+41 (41) 660 11 20,box@jrs-design.ch
+258,Kücheneinrichtungen,25231,Möbel Ettlin Innendekorations AG,Erlenstrasse 5,6064 Kerns,+41 (41) 660 38 46,info@moebel-ettlin.ch
+258,Kücheneinrichtungen,20781,Rinderknecht AG,Obere Spichermatt 12,6371 Stans,+41 (41) 624 94 94,info@rinderknecht-ag.ch
+258,Kücheneinrichtungen,25227,Röösli Küchenbau,Birkenweg 6,6064 Kerns,+41 (41) 660 84 58,info@kuechenbau-roeoesli.ch
+258,Kücheneinrichtungen,25228,Schreinerei Röthlin AG,Haltenstrasse 24,6064 Kerns,+41 (41) 662 90 50,info@schreinerei-roethlin.ch
+258,Kücheneinrichtungen,25283,Schreinerei Roy Jakober GmbH,Feldstrasse 1,6060 Sarnen,+41 (41) 660 19 58,ideen@royjakober.ch
+258,Kücheneinrichtungen,25229,TG Gasser AG,Gorgenstrasse 3,6074 Giswil,+41 (41) 676 75 75,info@tg-gasser.ch
+258,Kücheneinrichtungen,25284,Titlis Küchen,Museumstrasse 6,6060 Sarnen,+41 (41) 660 13 26,info@titlis-kuechen.ch
+258,Kücheneinrichtungen,24980,Walter Spichtig AG,Itiweg 3,6072 Sachseln,+41 (41) 662 00 02,info@spichtig-schreinerei.ch
+261,Aufzüge,10984,AS Aufzüge AG,Erlistrasse 3,6403 Küssnacht am Rigi,+41 (41) 445 27 27,as-kus@lift.ch
+261,Aufzüge,17797,KONE (Schweiz) AG,Ruchstuckstrasse 21,8306 Brüttisellen,+41 (44) 838 38 38,switzerland@kone.com
+261,Aufzüge,18283,Lift AG,Postfach 2255,8105 Regensdorf,+41 (44) 871 91 91,info@liftag.ch
+261,Aufzüge,19706,OTIS AG Niederlassung Luzern,Postfach 2246,6010 Kriens,+41 (41) 329 68 40,lu.ch@otis.com
+261,Aufzüge,21312,Schindler Aufzüge AG,Zugerstrasse 13,6030 Ebikon,+41 (41) 369 82 82,luzern.ch@schindler.com
+271,Gipserarbeiten,25212,Dominik von Flüe,Rüteli 8,6072 Sachseln,+41 (41) 660 99 85,pfuisi@bluewin.ch
+271,Gipserarbeiten,25052,Durrer Sägerei und Trockenbau GmbH,Sagenmatt 2,6066 St. Niklausen OW,+41 (41) 660 54 33,dst@durrer-gmbh.ch
+271,Gipserarbeiten,25214,Filliger & Partner AG,Gruobstrasse 52,6372 Ennetmoos,+41 (41) 611 00 15,info@filliger-partner.ch
+271,Gipserarbeiten,25183,Mabeco AG,Industriestrasse 1,6055 Alpnach Dorf,,
+271,Gipserarbeiten,19297,MVM AG,Kirchfeldstrasse 44,6032 Emmen,+41 (41) 289 04 04,mail@mvm-ag.ch
+271,Gipserarbeiten,20147,Poli Bau AG,Hasliweg 1,6052 Hergiswil,+41 (41) 632 40 20,info@polibau.ch
+271,Gipserarbeiten,25213,Roman Colledani der Gestalter GmbH,Tellenstrasse 23,6056 Kägiswil,,
+271,Gipserarbeiten,20950,Rossi Aregger AG,Oberneuhofstrasse 6,6340 Baar,+41 (41) 451 05 75,info@rossi-aregger.ch
+271,Gipserarbeiten,21859,Slanzi Malen Gipsen AG,Mühlemattli 10,6074 Giswil,+41 (41) 675 10 60,info@slanzi.ch
+272.2,Allgemeine Metallbauarbeiten,16797,Imfeld Metall- und Stahlbau AG,Chnewisstrasse 10,6078 Lungern,+41 (41) 678 10 05,imfeld@imfeld-stahlbau.ch
+272.2,Allgemeine Metallbauarbeiten,17056,Iromet AG,Industriestrasse 2,6055 Alpnach Dorf,+41 (41) 672 70 20,offerten@iromet.ch
+272.2,Allgemeine Metallbauarbeiten,17594,Keiser Metall-Stahlbau AG,Galgenried 12,6371 Stans,+41 (41) 619 81 10,info@keiser-metallbau.ch
+272.2,Allgemeine Metallbauarbeiten,17607,Keller Werner Metallbau AG,Bahnhofstrasse 5a,6052 Hergiswil,+41 (41) 632 62 32,mail@kellermetall.ch
+272.2,Allgemeine Metallbauarbeiten,21336,Schlosserei Andreas Rohrer AG,Galileo-Strasse 6,6056 Kägiswil,+41 (41) 497 00 71,info@schlosserei-rohrer.ch
+272.2,Allgemeine Metallbauarbeiten,25180,Waldvogel Schlossrei GmbH,Arlistrasse 5,6064 Kerns,+41 (41) 660 57 49,schlosserei_gmbh@bluewin.ch
+272.2,Allgemeine Metallbauarbeiten,23645,Wasta AG,Galgenried 28,6370 Stans,+41 (41) 619 09 70,info@wasta.ch
+272.2,Allgemeine Metallbauarbeiten,23969,Wolfisberg Metallbau AG,Pilatusstrasse 4,6060 Sarnen,+41 (41) 660 12 19,info@wolfisberg-metallbau.ch
+273.0,Innentüren,12282,BS Fenster + Türenbau AG,Rigistrasse 11,6210 Sursee,+41 (41) 925 11 50,info@bs-fensterbau.ch
+273.0,Innentüren,12321,Bucher AG,Fännring 6,6403 Küssnacht am Rigi,+41 (41) 780 36 64,info@schreinereibucher.ch
+273.0,Innentüren,16487,Holzbau Bucher AG,Untergasse 11,6064 Kerns,+41 (41) 666 07 07,info@holzbau-bucher.ch
+273.0,Innentüren,25226,J. Reinhart Söhne AG,Flüelistrasse 61,6064 Kerns,+41 (41) 660 11 20,box@jrs-design.ch
+273.0,Innentüren,25053,Josef Rohrer AG,Langacker 5,6073 Flüeli-Ranft,+41 (41) 666 27 80,info@rohrex.ch
+273.0,Innentüren,25054,Karl Rohrer AG,Wichelstrasse 1,6072 Sachseln,+41 (41) 660 30 44,info@karo-holz.ch
+273.0,Innentüren,25056,M&T von Rotz GmbH,Flüelistrasse 28,6064 Kerns,,
+273.0,Innentüren,19246,Müller Die Fachschreinerei AG,Pilatusstrasse 16,6060 Sarnen,+41 (41) 660 23 73,info@fachschreinerei.ch
+273.0,Innentüren,19491,Norma Reiden AG,Hauptstrasse 99,6260 Reiden,+41 (62) 749 09 09,info@norma.ch
+273.0,Innentüren,25227,Röösli Küchenbau,Birkenweg 6,6064 Kerns,+41 (41) 660 84 58,info@kuechenbau-roeoesli.ch
+273.0,Innentüren,21067,RWD Schlatter AG,Bergstrasse 23,8953 Dietikon,+41 (44) 745 40 40,dominik.vogel@rwdschlatter.ch
+273.0,Innentüren,21448,Schreinerei Amschwand AG,Chäli 1,6064 Kerns,+41 (41) 666 28 28,info@amschwand.ch
+273.0,Innentüren,25228,Schreinerei Röthlin AG,Haltenstrasse 24,6064 Kerns,+41 (41) 662 90 50,info@schreinerei-roethlin.ch
+273.0,Innentüren,25229,TG Gasser AG,Gorgenstrasse 3,6074 Giswil,+41 (41) 676 75 75,info@tg-gasser.ch
+273.0,Innentüren,23024,Türenfabrik Turbenthal AG,Postfach 324,8488 Turbenthal,+41 (52) 397 25 50,info@tt-tueren.ch
+273.0,Innentüren,25230,Wagner Fredi GmbH,Sarnerstrasse 27,6064 Kerns,+41 (41) 660 97 92,info@wagnerfredi.ch
+273.0,Innentüren,24980,Walter Spichtig AG,Itiweg 3,6072 Sachseln,+41 (41) 662 00 02,info@spichtig-schreinerei.ch
+273.3,Allgemeine Schreinerarbeiten,12321,Bucher AG,Fännring 6,6403 Küssnacht am Rigi,+41 (41) 780 36 64,info@schreinereibucher.ch
+273.3,Allgemeine Schreinerarbeiten,16487,Holzbau Bucher AG,Untergasse 11,6064 Kerns,+41 (41) 666 07 07,info@holzbau-bucher.ch
+273.3,Allgemeine Schreinerarbeiten,16493,Holzbautechnik Burch AG,Brünigstrasse 88,6060 Sarnen,+41 (41) 666 76 86,burch@holzbautechnik.ch
+273.3,Allgemeine Schreinerarbeiten,25226,J. Reinhart Söhne AG,Flüelistrasse 61,6064 Kerns,+41 (41) 660 11 20,box@jrs-design.ch
+273.3,Allgemeine Schreinerarbeiten,25053,Josef Rohrer AG,Langacker 5,6073 Flüeli-Ranft,+41 (41) 666 27 80,info@rohrex.ch
+273.3,Allgemeine Schreinerarbeiten,25054,Karl Rohrer AG,Wichelstrasse 1,6072 Sachseln,+41 (41) 660 30 44,info@karo-holz.ch
+273.3,Allgemeine Schreinerarbeiten,25056,M&T von Rotz GmbH,Flüelistrasse 28,6064 Kerns,,
+273.3,Allgemeine Schreinerarbeiten,19246,Müller Die Fachschreinerei AG,Pilatusstrasse 16,6060 Sarnen,+41 (41) 660 23 73,info@fachschreinerei.ch
+273.3,Allgemeine Schreinerarbeiten,21448,Schreinerei Amschwand AG,Chäli 1,6064 Kerns,+41 (41) 666 28 28,info@amschwand.ch
+273.3,Allgemeine Schreinerarbeiten,25228,Schreinerei Röthlin AG,Haltenstrasse 24,6064 Kerns,+41 (41) 662 90 50,info@schreinerei-roethlin.ch
+273.3,Allgemeine Schreinerarbeiten,25229,TG Gasser AG,Gorgenstrasse 3,6074 Giswil,+41 (41) 676 75 75,info@tg-gasser.ch
+273.3,Allgemeine Schreinerarbeiten,25230,Wagner Fredi GmbH,Sarnerstrasse 27,6064 Kerns,+41 (41) 660 97 92,info@wagnerfredi.ch
+273.3,Allgemeine Schreinerarbeiten,24980,Walter Spichtig AG,Itiweg 3,6072 Sachseln,+41 (41) 662 00 02,info@spichtig-schreinerei.ch
+275,Schliessanlagen,25224,Delbag AG,Pilatusstrasse 2,6036 Dierikon,+41 (41) 375 02 90,luzern@delbag.ch
+275,Schliessanlagen,19182,Moser Sicherheit AG,Blegistrasse 23,6340 Baar,+41 (41) 781 33 77,info@moser-sicherheit.ch
+275,Schliessanlagen,20059,Pilatus Schliesstechnik GmbH,Arsenalstrasse 4,6005 Luzern,+41 (41) 342 10 70,
+275,Schliessanlagen,20939,Rösch & Partner GmbH,Obergrundstrasse 28,6002 Luzern,+41 (41) 342 03 42,info@roesch-schliesstechnik.ch
+275,Schliessanlagen,21106,SAG Schlüssl-Service AG,Buchenstrasse 4,6210 Sursee,+41 (41) 921 21 05,info@sag-sursee.ch
+275,Schliessanlagen,25225,SE Sicherheit & Energie AG,Pilatusstrasse 9,6036 Dierikon,+41 (41) 259 29 89,schliesstechnik@sicherheit-energie.ch
+275,Schliessanlagen,24391,Zaugg Schliesstechnik AG,Täschmattstrasse 16,6015 Luzern,+41 (58) 255 64 00,verkauf@zaugg-sicher.ch
+278,"Beschriftungen, Markierungen, Signaletik",17512,Karl Morf AG,Riedstrasse 9,6330 Cham,+41 (44) 852 30 00,info@morf-ag.ch
+278,"Beschriftungen, Markierungen, Signaletik",20341,PSM Markierungen Hannes Püntener,Unterhofstrasse 14,6208 Oberkirch LU,+41 (41) 921 03 33,psm-markierungen@bluewin.ch
+278,"Beschriftungen, Markierungen, Signaletik",21783,Signal AG Strassensignalisationen,Postfach 55,3294 Büren an der Aare,+41 (32) 352 11 11,
+281.0,Unterlagsböden,24501,Ernst Zurfluh AG,Bernerhöhe Süd 1,6410 Goldau,+41 (41) 855 35 94,renizurfluh@bluewin.ch
+281.0,Unterlagsböden,14594,Fiechter + Fuchs AG,Aspacherstrasse 58 A,8413 Neftenbach,+41 (52) 305 01 11,info@fiechterfuchs.ch
+281.0,Unterlagsböden,14690,Flooratec AG,Hasenmoosstrasse 15,6023 Rothenburg,+41 (41) 289 20 10,flooratec.ag@bluewin.ch
+281.0,Unterlagsböden,18681,Marrer Unterlagsböden AG,Industriestrasse 8,4658 Däniken,+41 (62) 858 20 30,info@marrer-ag.ch
+281.0,Unterlagsböden,24552,MSV Floor AG,Moosstrasse 7,6212 St. Erhard,+41 (41) 980 66 85,info@msvfloor.ch
+281.0,Unterlagsböden,20619,Repoxit AG,Spinnereiweg 9,8307 Illnau-Effretikon,+41 (52) 244 09 09,info@repoxit.com
+281.0,Unterlagsböden,22396,Susag Unterlagsboden GmbH,Zentralstrasse 9,6036 Dierikon,+41 (41) 455 00 11,susag@susag.ch
+281.1,Fugenlose Bodenbeläge,24501,Ernst Zurfluh AG,Bernerhöhe Süd 1,6410 Goldau,+41 (41) 855 35 94,renizurfluh@bluewin.ch
+281.1,Fugenlose Bodenbeläge,14594,Fiechter + Fuchs AG,Aspacherstrasse 58 A,8413 Neftenbach,+41 (52) 305 01 11,info@fiechterfuchs.ch
+281.1,Fugenlose Bodenbeläge,14690,Flooratec AG,Hasenmoosstrasse 15,6023 Rothenburg,+41 (41) 289 20 10,flooratec.ag@bluewin.ch
+281.1,Fugenlose Bodenbeläge,18681,Marrer Unterlagsböden AG,Industriestrasse 8,4658 Däniken,+41 (62) 858 20 30,info@marrer-ag.ch
+281.1,Fugenlose Bodenbeläge,24552,MSV Floor AG,Moosstrasse 7,6212 St. Erhard,+41 (41) 980 66 85,info@msvfloor.ch
+281.1,Fugenlose Bodenbeläge,20619,Repoxit AG,Spinnereiweg 9,8307 Illnau-Effretikon,+41 (52) 244 09 09,info@repoxit.com
+281.1,Fugenlose Bodenbeläge,22396,Susag Unterlagsboden GmbH,Zentralstrasse 9,6036 Dierikon,+41 (41) 455 00 11,susag@susag.ch
+281.1,Fugenlose Bodenbeläge,23567,Walo Bertschinger AG,Neuhaltenring 8,6030 Ebikon,+41 (41) 444 14 41,bodenbelaege.zentral@walo.ch
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",10640,Amstutz Dekoration,Dominiweg 2,6072 Sachseln,+41 (41) 660 26 44,info@amstutz-dekoration.ch
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",12319,Bucher AG,Dorfstrasse 3,6064 Kerns,+41 (41) 660 17 04,bucher.innendeko@bluewin.ch
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",16075,Hans Hassler AG,Chamerstrasse 174,6300 Zug,+41 (41) 748 00 48,infozug@hassler.ch
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",17990,Küttel Teppiche AG,Luzernerstrasse 94,6010 Kriens,+41 (41) 311 23 23,info@kuettel.ch
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",25345,Parkettplus GmbH,Hohfurlistrasse 4,6064 Kerns,+41 (41) 660 11 53,info@parkettplus.com
+281.2,"Bodenbeläge aus Kunststoffen, Textilien etc.",21983,Spiller AG,Horwerstrasse 133,6010 Kriens,+41 (41) 349 10 00,info@spiller.ch
+281.6,Bodenbeläge Plattenarbeiten,11552,Baumo AG,Seeburgstrasse 27,6403 Küssnacht am Rigi,+41 (79) 209 22 08,baumo@gmx.ch
+281.6,Bodenbeläge Plattenarbeiten,13529,Dillier Feuer + Platten AG,Postfach 1217,6061 Sarnen 1,+41 (41) 660 45 22,info@dilliersarnen.ch
+281.6,Bodenbeläge Plattenarbeiten,14198,Enz Karl GmbH,Brünigstrasse 219,6078 Bürglen OW,+41 (41) 678 15 83,info@enz-der-pflaesterer.ch
+281.6,Bodenbeläge Plattenarbeiten,14738,Föhn Platten AG Keramische Platten,Gätzlistrasse 2,6440 Brunnen,+41 (41) 825 61 61,info@foehnplatten.ch
+281.6,Bodenbeläge Plattenarbeiten,16355,Hess & Partner Platten Ofenbau AG,Chilcherlistrasse 1,6055 Alpnach Dorf,+41 (41) 670 15 18,info@hessundpartner.ch
+281.6,Bodenbeläge Plattenarbeiten,25323,Philipp Staub GmbH,Gartenstrasse 25,6060 Sarnen,,
+281.6,Bodenbeläge Plattenarbeiten,25322,Rohrer Platten GmbH,Brünigstrasse 270,6072 Sachseln,+41 (41) 661 22 35,info@rohrer-platten.ch
+281.6,Bodenbeläge Plattenarbeiten,25216,Zimmermann & Riebli AG,Gotthardlistrasse 1,6372 Ennetmoos,+41 (41) 610 77 66,zimmermannriebli@bluewin.ch
+281.7,Bodenbeläge aus Holz,10640,Amstutz Dekoration,Dominiweg 2,6072 Sachseln,+41 (41) 660 26 44,info@amstutz-dekoration.ch
+281.7,Bodenbeläge aus Holz,12319,Bucher AG,Dorfstrasse 3,6064 Kerns,+41 (41) 660 17 04,bucher.innendeko@bluewin.ch
+281.7,Bodenbeläge aus Holz,25052,Durrer Sägerei und Trockenbau GmbH,Sagenmatt 2,6066 St. Niklausen OW,+41 (41) 660 54 33,dst@durrer-gmbh.ch
+281.7,Bodenbeläge aus Holz,16075,Hans Hassler AG,Chamerstrasse 174,6300 Zug,+41 (41) 748 00 48,infozug@hassler.ch
+281.7,Bodenbeläge aus Holz,17990,Küttel Teppiche AG,Luzernerstrasse 94,6010 Kriens,+41 (41) 311 23 23,info@kuettel.ch
+281.7,Bodenbeläge aus Holz,25345,Parkettplus GmbH,Hohfurlistrasse 4,6064 Kerns,+41 (41) 660 11 53,info@parkettplus.com
+281.7,Bodenbeläge aus Holz,24323,Schnyder Parkett GmbH,Riedenmatt 4,6370 Stans,+41 (41) 622 40 22,
+281.7,Bodenbeläge aus Holz,21983,Spiller AG,Horwerstrasse 133,6010 Kriens,+41 (41) 349 10 00,info@spiller.ch
+285.1,Innere Malerarbeiten,25219,Capraro Malerei-Decor AG,Pilatusstrasse 10,6060 Sarnen,+41 (41) 377 00 44,info@capraro.ch
+285.1,Innere Malerarbeiten,18537,Maler Durrer GmbH,Postplatz 4,6064 Kerns,+41 (41) 660 30 41,info@malerdurrer.ch
+285.1,Innere Malerarbeiten,25288,Maler Hinter AG,Brünigstrasse 126a,6072 Sachseln,+41 (41) 660 28 33,kontakt@malerhinter.ch
+285.1,Innere Malerarbeiten,25186,MVM AG Stans,Hansmatt 30,6370 Stans,+41 (41) 610 00 42,mail@mvm-ag.ch
+285.1,Innere Malerarbeiten,25289,Schwarzenberger GmbH,Baumgartenstrasse 7,6055 Alpnach Dorf,+41 (41) 660 67 01,urs@schwarzenberger-gmbh.ch
+285.1,Innere Malerarbeiten,21859,Slanzi Malen Gipsen AG,Mühlemattli 10,6074 Giswil,+41 (41) 675 10 60,info@slanzi.ch
+285.1,Innere Malerarbeiten,25291,Theo Fischer & Partner AG,Kreuzstrasse 20,6056 Kägiswil,,
+285.1,Innere Malerarbeiten,25290,Walter Zünd AG,Kapuzinerweg 8,6060 Sarnen,+41 (41) 660 07 70,info@zuendmalerei.ch
+286,Bautrocknung,12374,Burch Bauaustrocknung AG,Industriestrasse 11,6074 Giswil,+41 (41) 676 77 44,
+286,Bautrocknung,16025,Hälg & Co. AG,Ronstrasse 7,6030 Ebikon,+41 (41) 369 60 60,
+286,Bautrocknung,16472,Holag Bauheizung,Feldmattstrasse 34,6032 Emmen,+41 (41) 260 65 44,info@holag.ch
+286,Bautrocknung,22978,Trockentech AG,Bachweid 3,6340 Baar,+41 (41) 761 41 70,info@trockentech.ch
+287,Baureinigung,25389,A.G. Blitz Clean GmbH,Panoramastrasse 17,6074 Giswil,+41 (41) 675 29 10,info@blitz-clean.ch
+287,Baureinigung,25391,Cleandor GmbH,Vorderrainstrasse 13,6005 Luzern,,
+287,Baureinigung,15069,Gallo AG,Bösch 45,6331 Hünenberg,+41 (41) 785 63 50,info.huenenberg@gallo.ch
+287,Baureinigung,15860,gschaffig ag,Brünigstrasse 114,6060 Sarnen,+41 (41) 620 88 88,info@gschaffig.ch
+287,Baureinigung,25392,Inter Clean AG,Horwerstrasse 26,6010 Kriens,+41 (41) 410 97 92,info@interclean.ch
+287,Baureinigung,25390,Paul Hegglin GmbH,Industriestrasse 4,6060 Sarnen,+41 (41) 660 85 77,info@hausmanager.ch
+287,Baureinigung,19916,Perltex AG,Horwerstrasse 83,6005 Luzern,+41 (41) 249 43 30,info@perltex.ch
+421,Gärtnerarbeiten,25481,Amstutz Gartenbau AG,Neuhasli 2,6032 Emmen,+41 (41) 268 60 10,info@amstutzgartenbau.ch
+421,Gärtnerarbeiten,11959,Blättler Gartenbau GmbH Gartenbau Gartenpflege,Gerbistrasse 3,6064 Kerns,+41 (41) 660 56 55,info@blaettler-gartenbau.ch
+421,Gärtnerarbeiten,12439,Burri & Achermann Gartenbau AG,Unter Pfaffwil 1,6034 Inwil,+41 (41) 340 30 32,
+421,Gärtnerarbeiten,13681,DUKA Gartenbau AG,Niderholzstrasse 40,6062 Wilen (Sarnen),+41 (41) 662 09 62,duka@bluewin.ch
+421,Gärtnerarbeiten,13842,Egli Gartenbau AG Sursee,Allee 3,6210 Sursee,+41 (41) 926 60 00,info@gartenbau-egli.ch
+421,Gärtnerarbeiten,14199,Enz Markus AG Gartenbau,Postfach 318,6460 Altdorf UR 1,+41 (41) 879 80 00,info@enz-ag.ch
+421,Gärtnerarbeiten,15099,Gärnter Pflugshaupt AG,Postfach 373,6210 Sursee,+41 (41) 925 70 00,info@pflugshaupt.ch
+421,Gärtnerarbeiten,15242,Gebr. Kuster AG,Bahnhofplatz 1,6371 Stans,+41 (41) 619 20 80,info@blumenkuster.ch
+421,Gärtnerarbeiten,16446,Hodel & Partner AG Gartenunternehmer,Kaiserhof 1,6102 Malters,+41 (41),
+421,Gärtnerarbeiten,16258,Küng Garten,Vockigenstrasse 8,6055 Alpnach Dorf,+41 (41) 670 10 10,pk@kuenggarten.ch
+421,Gärtnerarbeiten,20185,Portmann Garten AG,Mittelgasse 5,6056 Kägiswil,+41 (41) 666 50 30,
