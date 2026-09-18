@@ -21,10 +21,16 @@
 
   /* --- Daten -------------------------------------------------------------- */
 
+  /* Bewusst keine Sternchen-Abfrage: die Unterschrift aus Mein Profil hängt
+     an derselben Zeile und ist ein Bild. Die gehört weder in eine Liste
+     noch in den Spiegel im localStorage. */
+  const SPALTEN = 'id, user_id, name, rolle, telefon, email, berechtigung, erstellt_am';
+
   async function ladeMitarbeiter() {
     if (!navigator.onLine) return lies(MA_CACHE, []);
     const { data, error } = await sb.from('mitarbeiter')
-      .select('*').is('geloescht_am', null).order('name', { ascending: true });
+      .select(SPALTEN)
+      .is('geloescht_am', null).order('name', { ascending: true });
     if (meckern('Mitarbeiter laden', error)) return lies(MA_CACHE, []);
     schreib(MA_CACHE, data || []);
     return data || [];
@@ -33,13 +39,14 @@
   async function speichereMitarbeiter(felder, id) {
     if (!navigator.onLine) throw new Error('Mitarbeiter lassen sich nur online bearbeiten');
     if (id) {
-      const { data, error } = await sb.from('mitarbeiter').update(felder).eq('id', id).select().single();
+      const { data, error } = await sb.from('mitarbeiter')
+        .update(felder).eq('id', id).select(SPALTEN).single();
       if (error) throw error;
       return data;
     }
     const s = await session();
     const { data, error } = await sb.from('mitarbeiter')
-      .insert({ ...felder, erstellt_von: s.user.id }).select().single();
+      .insert({ ...felder, erstellt_von: s.user.id }).select(SPALTEN).single();
     if (error) throw error;
     return data;
   }

@@ -136,6 +136,53 @@ function istBerechtigt(wert) {
   return STUFEN_ERWEITERT.includes(wert || STUFE_STANDARD);
 }
 
+/* --- Eigene Unterschrift ------------------------------------------------- */
+
+/* Die im Profil hinterlegte Unterschrift der angemeldeten Person.
+   Steht hier und nicht in js/profil.js, weil sie ab Schritt 14 an anderen
+   Orten gebraucht wird: Bauabnahme, Protokolle, alles, was jemand
+   offiziell bestätigt. Erfasst wird sie weiterhin nur an einem Ort.
+
+   Liefert immer ein Objekt, nie einen Fehler: fehlt die Unterschrift,
+   steht in grund der Satz, der dem Benutzer zu zeigen ist. Wer das
+   aufruft, soll niemandem eine rote Fehlermeldung hinstellen, wenn in
+   Wahrheit nur noch nicht unterschrieben wurde. */
+async function meineUnterschrift() {
+  const s = await session();
+  if (!s) return { bild: null, grund: 'Nicht angemeldet.' };
+  if (!istOnline()) return { bild: null, grund: 'Offline. Die Unterschrift braucht eine Verbindung.' };
+
+  const { data, error } = await sb.from('mitarbeiter')
+    .select('id, name, unterschrift, unterschrift_am')
+    .eq('user_id', s.user.id).is('geloescht_am', null).maybeSingle();
+
+  if (error) return { bild: null, grund: 'Die Unterschrift liess sich nicht laden.' };
+  if (!data) return {
+    bild: null,
+    grund: 'Zu diesem Konto gehört kein Eintrag im Bereich Mitarbeiter. Die Administration stellt die Verknüpfung her.'
+  };
+  if (!data.unterschrift) return {
+    bild: null, name: data.name, fehlt: true,
+    grund: 'Sie haben noch keine Unterschrift hinterlegt. Einmal unter «Mein Profil» unterschreiben, danach setzt sie die App hier von selbst ein.'
+  };
+  return { bild: data.unterschrift, name: data.name, am: data.unterschrift_am };
+}
+
+/* Der fertige Block dazu: entweder die Unterschrift oder der Hinweis mit
+   dem Weg dorthin. Ein Ort für beide Fälle, damit die Bauabnahme später
+   nicht ihre eigene Variante davon erfindet. */
+function unterschriftBlock(u) {
+  if (u.bild) {
+    return `<div style="border:1.5px solid var(--border); border-radius:14px; background:var(--card); padding:12px; display:flex; flex-direction:column; align-items:center; gap:6px;">
+      <img src="${esc(u.bild)}" alt="Unterschrift ${esc(u.name || '')}" style="max-width:100%; max-height:120px;">
+      <span style="font-size:12px; color:var(--text-dim);">${esc(u.name || '')}</span>
+    </div>`;
+  }
+  return `<div style="border:1.5px dashed var(--border); border-radius:14px; background:#fafbfb; padding:16px; font-size:13px; color:var(--text-dim); line-height:1.55;">
+    ${esc(u.grund)}${u.fehlt ? ' <a href="profil.html" style="color:var(--red); font-weight:700;">Zum Profil</a>' : ''}
+  </div>`;
+}
+
 /* --- Online-Status ------------------------------------------------------ */
 
 function istOnline() { return navigator.onLine; }
@@ -205,6 +252,10 @@ async function kontoSheet() {
   const p = await profil();
   const s = sheet(`
       <div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--red);margin-bottom:14px;">Konto</div>
+      <a href="profil.html" class="pressable" style="display:flex;align-items:center;gap:10px;height:50px;border-radius:14px;background:var(--card);border:1.5px solid var(--navy);color:var(--navy);font-weight:700;font-size:15px;justify-content:center;margin-bottom:16px;">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Mein Profil
+      </a>
       <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
         <label style="font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-dim);">Anzeigename</label>
         <input id="k-name" type="text" value="${esc(p?.name || '')}" style="height:44px;border-radius:10px;border:1.5px solid var(--border);padding:0 13px;font-size:14px;color:var(--text);box-sizing:border-box;">

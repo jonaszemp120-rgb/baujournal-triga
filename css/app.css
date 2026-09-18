@@ -25,7 +25,15 @@
 }
 
 *{ -webkit-tap-highlight-color:transparent; }
-html{ background:var(--bg); }
+html{
+  background:var(--bg);
+  /* Kein Doppeltipp-Zoom. Die App soll sich wie eine App anfassen und
+     nicht wie eine Webseite, die beim zweiten Tippen wegspringt.
+     "manipulation" lässt Scrollen und Wischen unberührt, es fällt nur
+     das Zoomen weg. Das Vergrössern der Schrift über die Einstellungen
+     des Geräts bleibt davon unberührt, das läuft nicht über diesen Weg. */
+  touch-action:manipulation;
+}
 body{
   margin:0;
   font-family:'Archivo', system-ui, sans-serif;
@@ -60,6 +68,7 @@ button{ cursor:pointer; }
 [class^="fp-"], [class*=" fp-"],
 [class^="pj-"], [class*=" pj-"],
 [class^="pk-"], [class*=" pk-"],
+[class^="pr-"], [class*=" pr-"],
 [class^="st-"], [class*=" st-"]{ box-sizing:border-box; }
 
 /* Bildschirm-Geruest: Kopfzeile oben angeheftet, Aktionsleiste unten */

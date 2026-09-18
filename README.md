@@ -43,6 +43,30 @@ Erfassen einer neuen Firma lassen sich Adresse und Nummer über search.ch holen.
 **Dokumente** ist eine freie Ordnerablage für PDF, mit Dateiname, Datum und
 hochladender Person.
 
+Daneben steht **Mein Profil**, kein Bereich, sondern die eigene Seite jeder
+angemeldeten Person: erreichbar über das Konto-Feld unten in der Seitenleiste
+und über den Kreis mit den Initialen auf der Startseite. Dort pflegt jede Person
+Telefonnummer und E-Mail selbst und hinterlegt einmal ihre Unterschrift. Name
+und Funktion bleiben bei der Administration.
+
+Das Profil zeigt keine Kopie: es ist dieselbe Zeile aus `mitarbeiter`, die auch
+in der Liste und bei den Projektzuordnungen steht. Gefunden wird sie über
+`mitarbeiter.user_id = auth.uid()`; die Seite nimmt keine ID aus der Adresszeile
+entgegen, es gibt also keinen Weg, über sie an fremde Daten zu kommen. Die
+Verknüpfung über den Schlüssel statt über die E-Mail ist Absicht — die E-Mail
+darf jede Person selbst ändern, und ein Tippfehler darf niemanden aus dem
+eigenen Profil aussperren.
+
+Die **Unterschrift** liegt als PNG in einer Data-URL an derselben Zeile. Sie
+wird beim Speichern auf den beschriebenen Bereich zugeschnitten, das hält sie
+bei rund zehn Kilobyte. Neu erfassen überschreibt die alte, eine Historie gibt
+es bewusst nicht. Wer sie später braucht — Bauabnahme, Protokolle — ruft
+`meineUnterschrift()` aus `js/app.js` auf. Die Funktion wirft nie, sondern
+liefert im Zweifel den Satz, der dem Benutzer zu zeigen ist; `unterschriftBlock()`
+macht daraus entweder das Bild oder den Hinweis mit dem Weg ins Profil. Damit
+steht dort später kein roter Fehler, wo in Wahrheit nur noch nicht unterschrieben
+wurde.
+
 ## Screens
 
 | Datei | Zweck |
@@ -50,6 +74,7 @@ hochladender Person.
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
 | `start.html` | Die Startseite nach dem Login: Auswahl zwischen den fünf Bereichen, mit Zahlen aus der Datenbank. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
+| `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
 | `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal und Dokumenten. |
@@ -91,6 +116,8 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Ansprechperson | in der Firma | dort | direkt, ohne Papierkorb |
 | Notiz | in der Firma | dort | direkt, ohne Papierkorb |
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
+| Eigene Kontaktdaten | — | `profil.html` | — |
+| Eigene Unterschrift | `profil.html` | dort neu erfassen | dort |
 
 Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
 der Garantie- und Verjährungsfristen. **Unterdetails** — Ansprechpersonen,
@@ -101,8 +128,10 @@ auch so.
 
 **Jede Angabe hat genau einen Ort zum Pflegen.** Die Unternehmerliste wird auf
 der Projektseite gepflegt; im Firmenpool steht dieselbe Zuordnung, aber nur zum
-Lesen. Die Adresse eines Projekts steht in einer Spalte, nicht in zweien. Wo es
-zwei Orte gäbe, laufen die Angaben früher oder später auseinander.
+Lesen. Die Adresse eines Projekts steht in einer Spalte, nicht in zweien. Mein
+Profil ist keine zweite Kopie der Kontaktdaten, sondern dieselbe Zeile aus
+`mitarbeiter`, die auch die Mitarbeiter-Liste zeigt. Wo es zwei Orte gäbe,
+laufen die Angaben früher oder später auseinander.
 
 **Der Papierkorb funktioniert überall gleich.** Löschen setzt `geloescht_am`,
 nichts verschwindet. Jeder Bereich hat seine eigene Papierkorb-Ansicht mit Name,
@@ -114,6 +143,15 @@ Tabellen fehlt schlicht die Delete-Policy.
 grossen Bildschirm brauchbar sein. Ab 1024px tritt die permanente Seitenleiste
 dazu und der Inhalt verteilt sich auf die Breite, darunter bleibt es die
 Handyspalte mit Zurück-Pfeil. Das gilt auch für das bestehende Baujournal.
+
+**Auf dem Handy wird nicht gezoomt.** Jede Seite trägt dasselbe viewport-Meta mit
+`maximum-scale=1, user-scalable=no`, dazu steht `touch-action:manipulation` auf
+`html` gegen den Doppeltipp-Zoom. Die App soll sich wie eine App anfassen und
+nicht wie eine Webseite, die beim zweiten Tippen wegspringt. Die
+Schriftvergrösserung aus den Einstellungen des Geräts bleibt davon unberührt:
+die läuft nicht über den Zoom, und `text-size-adjust` steht nirgends auf `none`.
+Wer eine neue Seite anlegt, kopiert die Meta-Zeile mit — eine Seite ohne sie
+fällt aus der Reihe, und genau das prüft die Testsuite über alle Seiten.
 
 **Nichts kommt von einem fremden Server.** Schrift, Bibliotheken und Logo liegen
 im Repo. Die einzige Ausnahme ist die Serverless-Function zu search.ch, und die
@@ -220,6 +258,8 @@ js/projekte-daten.js  alles, was mehrere Seiten über Projekte wissen
                       schon vergeben ist
 js/projekte-bereich.js js/projekt-detail.js js/pendenzen.js
 js/suche.js           die globale Suche
+js/profil.js          Mein Profil: eigene Kontaktdaten, Unterschrift
+                      auf einem Canvas erfassen und zuschneiden
 css/projekte.css      Statusmarken und Karten des Bereichs Projekte.
                       Liegt auch auf mitarbeiter.html, wegen der Marke
                       für die Berechtigungsstufe
@@ -276,7 +316,9 @@ alle vier Bereiche.
   Login-Konten. Einen Eintrag zu löschen berührt kein Konto. `berechtigung`
   hält die Stufe (`mitarbeiter`, `geschaeftsleitung` oder `entwickler`) und
   heisst absichtlich nicht `rolle`: die Spalte `rolle` trägt schon die Funktion
-  im Betrieb («Bauleiter», «Administration»)
+  im Betrieb («Bauleiter», «Administration»). `user_id` verknüpft die Zeile mit
+  dem Login-Konto, `unterschrift` hält die im Profil erfasste Unterschrift als
+  PNG in einer Data-URL
 - `ordner`, `dateien` — die Dokumentenablage, die PDF selbst liegt im
   Storage-Bucket `dokumente`. Ein Ordner darf ein `projekt_id` tragen, die
   Dateien darin erben die Zuordnung über ihren Ordner und haben bewusst kein
