@@ -468,6 +468,16 @@ unter der Gesprächs-ID als erstem Ordner, und die Storage-Policy fragt dieselbe
 Funktion. Wer aus einer Gruppe fliegt, verliert damit auch die Bilder daraus,
 ohne dass irgendwo ein zweiter Schalter umgelegt werden müsste.
 
+Eintragen darf, wer das Gespräch angelegt hat — beim Anlegen selbst und
+später beim Hinzufügen weiterer Personen. Dafür gibt es `ist_chat_ersteller()`,
+und zwar mit `security definer`, aus einem Grund, der einmal Geld gekostet hat:
+**eine Policy darf keine Tabelle mit RLS direkt lesen.** Die erste Fassung
+prüfte die Berechtigung mit einer Unterabfrage auf `chats` — die lief selbst
+durch `chats_select`, das Mitgliedschaft verlangt, und im Moment der allerersten
+Mitgliederzeile ist noch niemand Mitglied. Die Regel biss sich selbst, und kein
+Gespräch liess sich anlegen. Wer aus einer Policy heraus eine geschützte Tabelle
+lesen muss, geht über eine Funktion mit `security definer`.
+
 **Der Ungelesen-Zähler steht nirgends als Zahl.** Er ist die Anzahl Nachrichten
 nach `chat_mitglieder.zuletzt_gelesen`. Eine gepflegte Zahl daneben würde beim
 ersten verlorenen Update abweichen, und niemand merkte es.
