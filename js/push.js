@@ -164,21 +164,24 @@ async function pushAbmelden() {
   }
 }
 
-/* Schickt eine Meldung. Genau eines von dreien sagt, worum es geht:
+/* Schickt eine Meldung. Genau eines von vieren sagt, worum es geht:
 
-     chat     an die anderen Mitglieder eines Gesprächs
-     beitrag  an alle anderen im Adressbuch, bei einem wichtigen Feed-Beitrag
-     antrag   an die einreichende Person, wenn ein Antrag entschieden wurde
+     chat      an die anderen Mitglieder eines Gesprächs
+     beitrag   an alle anderen im Adressbuch, bei einem wichtigen
+               Feed-Beitrag — und an die dort erwähnten Personen
+     kommentar an die im Kommentar erwähnten Personen
+     antrag    an die einreichende Person, wenn ein Antrag entschieden wurde
 
    Wer die Meldung bekommt und ob sie überhaupt hinausgeht, entscheidet
    api/push.js und nicht diese Zeile hier: die Funktion liest jedes Mal
    selbst nach, ob die Person im Gespräch steht, ob der Beitrag ihr gehört
-   und "wichtig" ist, ob sie den Antrag entschieden hat.
+   und "wichtig" ist, wer wirklich im Text erwähnt wurde, ob sie den
+   Antrag entschieden hat.
 
    Der Aufruf wartet nicht: was gemeldet wird, steht längst in der
    Datenbank und ist bei den anderen angekommen. Die Meldung ist die
    Zugabe, nicht der Weg. */
-function pushSenden({ chat, beitrag, antrag, titel, text, ziel }) {
+function pushSenden({ chat, beitrag, kommentar, antrag, titel, text, ziel }) {
   (async () => {
     try {
       if (!istOnline()) return;
@@ -187,6 +190,7 @@ function pushSenden({ chat, beitrag, antrag, titel, text, ziel }) {
       const rumpf = { titel, text, ziel };
       if (chat) rumpf.chat = chat;
       else if (beitrag) rumpf.beitrag = beitrag;
+      else if (kommentar) rumpf.kommentar = kommentar;
       else if (antrag) rumpf.antrag = antrag;
       const antwort = await fetch('/api/push', {
         method: 'POST',

@@ -462,6 +462,34 @@ function kontoKreis(el) {
   el.addEventListener('click', kontoSheet);
 }
 
+/* --- Erwähnungen -------------------------------------------------------- */
+
+/* Eine Erwähnung steht im Text selbst, als @[Name](Kennung). Nicht in
+   einer eigenen Tabelle daneben: der Text ist die Wahrheit, und wer
+   nachsehen will, wer wirklich erwähnt wurde — api/push.js tut das —,
+   liest dieselbe Zeichenkette wie der Bildschirm. Eine zweite Tabelle
+   liefe früher oder später auseinander, etwa wenn jemand den Namen aus
+   dem Text löscht.
+
+   Der Name steht mit drin, obwohl die Kennung genügen würde. Damit bleibt
+   der Text auch dort lesbar, wo niemand das Adressbuch zur Hand hat: im
+   Push auf dem Sperrbildschirm, im Auszug auf der Projektseite. */
+const ERWAEHNUNG = /@\[([^\]\n]{1,80})\]\(([0-9a-zA-Z_-]{1,64})\)/gi;
+
+/* Die Kennungen aller erwähnten Personen, jede einmal. */
+function erwaehnungenAus(text) {
+  const raus = new Set();
+  for (const m of String(text || '').matchAll(ERWAEHNUNG)) raus.add(m[2].toLowerCase());
+  return [...raus];
+}
+
+/* Derselbe Text ohne die Klammern: "@Thomas Zürcher" statt
+   "@[Thomas Zürcher](…)". Für alles, was den Text nur anzeigt und keine
+   Verknüpfung braucht. */
+function erwaehnungKlartext(text) {
+  return String(text || '').replace(ERWAEHNUNG, (_, name) => `@${name}`);
+}
+
 /* --- Service Worker ----------------------------------------------------- */
 
 if ('serviceWorker' in navigator) {

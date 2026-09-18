@@ -8,9 +8,14 @@
  * Läuft täglich über den Cron-Eintrag in vercel.json, eine halbe Stunde
  * nach dem Chat — beide greifen auf dasselbe Storage zu, und nacheinander
  * ist das leichter zu lesen, wenn man später ins Protokoll schaut.
+ *
+ * Aufgeräumt wird in feed_bilder und nicht mehr am Beitrag: seit ein
+ * Beitrag mehrere Fotos tragen kann, steht jedes mit eigenem Pfad und
+ * eigener Frist in dieser Tabelle. Die Spaltennamen sind dieselben
+ * geblieben, darum genügt hier der andere Tabellenname.
  */
 
 const { raeumeAb } = require('./_bilder.js');
 
 module.exports = (req, res) =>
-  raeumeAb(req, res, { tabelle: 'feed_beitraege', bucket: 'feed-bilder' });
+  raeumeAb(req, res, { tabelle: 'feed_bilder', bucket: 'feed-bilder' });

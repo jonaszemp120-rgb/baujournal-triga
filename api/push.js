@@ -11,17 +11,25 @@
  * Dienstschlüssel kommt erst danach zum Einsatz, und nur für die Abos der
  * so ermittelten Personen.
  *
- * Drei Wege hinein, ein Weg hinaus:
+ * Vier Wege hinein, ein Weg hinaus:
  *
- *   { chat: <uuid> }     die anderen Mitglieder dieses Gesprächs
- *   { beitrag: <uuid> }  alle anderen im Adressbuch, aber nur bei einem
- *                        Beitrag der Kategorie "wichtig"
- *   { antrag: <uuid> }   die Person, die den Antrag eingereicht hat, und
- *                        nur, wenn er gerade entschieden wurde
+ *   { chat: <uuid> }      die anderen Mitglieder dieses Gesprächs
+ *   { beitrag: <uuid> }   bei einem Beitrag der Kategorie "wichtig" alle
+ *                         anderen im Adressbuch, sonst nur die im Text
+ *                         erwähnten Personen
+ *   { kommentar: <uuid> } die im Kommentar erwähnten Personen
+ *   { antrag: <uuid> }    die Person, die den Antrag eingereicht hat, und
+ *                         nur, wenn er gerade entschieden wurde
  *
  * Wer melden darf und wann, entscheidet jedes Mal diese Funktion und nicht
- * die App: ein Update, eine Umfrage oder ein noch offener Antrag lösen
- * nichts aus, auch dann nicht, wenn jemand den Aufruf von Hand nachbaut.
+ * die App: ein Update ohne Erwähnung, eine Umfrage oder ein noch offener
+ * Antrag lösen nichts aus, auch dann nicht, wenn jemand den Aufruf von
+ * Hand nachbaut.
+ *
+ * Eine Erwähnung steht als @[Name](Kennung) im gespeicherten Text. Diese
+ * Funktion liest die Kennungen dort selbst heraus und schneidet sie mit
+ * dem Adressbuch — wer im Aufruf steht, spielt keine Rolle, und an eine
+ * frei erfundene Kennung geht nichts.
  *
  * Umgebungsvariablen in Vercel:
  *   VAPID_PRIVAT        privater Schlüssel, Gegenstück zu BJ_CONFIG.vapid
@@ -85,6 +93,19 @@ function kennungAus(token) {
   } catch { return null; }
 }
 
+/* Die Kennungen aller im Text erwähnten Personen. Dieselbe Form wie in
+   js/app.js, und zwar bewusst zweimal geschrieben: diese Datei läuft im
+   Serverless-Umfeld und teilt mit dem Frontend keine Module. Ändert sich
+   die Form, ändern sich beide — sie steht darum an beiden Orten im
+   Kommentar. */
+const ERWAEHNUNG = /@\[[^\]\n]{1,80}\]\(([0-9a-zA-Z_-]{1,64})\)/gi;
+
+function erwaehnungenAus(text) {
+  const raus = new Set();
+  for (const m of String(text || '').matchAll(ERWAEHNUNG)) raus.add(m[1].toLowerCase());
+  return [...raus];
+}
+
 /* Liefert immer, was wirklich zurückkam — Status und Text inklusive.
    Vorher gab es hier nur null, und damit war im Log nicht mehr zu
    erkennen, ob Supabase die Anfrage abgewiesen hat oder ob schlicht
@@ -132,13 +153,27 @@ module.exports = async (req, res) => {
   const daten = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const chat = String(daten.chat || '');
   const beitrag = String(daten.beitrag || '');
+  const kommentar = String(daten.kommentar || '');
   const antrag = String(daten.antrag || '');
   const istKennung = w => /^[0-9a-f-]{36}$/i.test(w);
 
-  const wege = [chat, beitrag, antrag].filter(istKennung);
+  const wege = [chat, beitrag, kommentar, antrag].filter(istKennung);
   if (wege.length !== 1) {
-    console.error(`[push] Abbruch: es braucht genau eines von chat, beitrag und antrag (chat "${chat}", beitrag "${beitrag}", antrag "${antrag}").`);
-    return res.status(400).json({ fehler: 'Weder Gespräch noch Beitrag noch Antrag angegeben.' });
+    console.error(`[push] Abbruch: es braucht genau eines von chat, beitrag, kommentar und antrag (chat "${chat}", beitrag "${beitrag}", kommentar "${kommentar}", antrag "${antrag}").`);
+    return res.status(400).json({ fehler: 'Weder Gespräch noch Beitrag noch Kommentar noch Antrag angegeben.' });
+  }
+
+  /* Wer im Adressbuch steht — mit dem Token der Person geholt, nicht mit
+     dem Dienstschlüssel. Daran wird jede Erwähnung geschnitten: an eine
+     Kennung, die zu keinem Konto im Haus gehört, geht nichts hinaus. */
+  async function adressbuch() {
+    const leute = await hole(
+      'mitarbeiter?user_id=not.is.null&geloescht_am=is.null&select=user_id', { apikey: ANON, token });
+    if (!leute.ok) {
+      console.error(`[push] Abbruch: das Adressbuch liess sich nicht laden — Status ${leute.status}, Antwort: ${leute.roh}`);
+      return null;
+    }
+    return (leute.daten || []).map(m => m.user_id).filter(Boolean);
   }
 
   const kennung = wege[0];
@@ -198,12 +233,47 @@ module.exports = async (req, res) => {
       console.log(`[push] ${antrag}: eigener Antrag, keine Meldung noetig.`);
       return res.status(200).json({ gesendet: 0 });
     }
+  } else if (istKennung(kommentar)) {
+    /* Ein Kommentar meldet sich nur bei den Leuten, die darin erwähnt
+       werden. Wer erwähnt wurde, steht im gespeicherten Text und wird
+       hier gelesen — nicht dem Aufruf geglaubt. */
+    const k = await hole(
+      `feed_kommentare?id=eq.${kommentar}&select=verfasser,text`, { apikey: ANON, token });
+
+    if (!k.ok) {
+      console.error(`[push] Abbruch: Supabase hat den Kommentar ${kommentar} nicht herausgegeben — Status ${k.status}, Antwort: ${k.roh}`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Kommentar.' });
+    }
+    const zeile = Array.isArray(k.daten) ? k.daten[0] : null;
+    if (!zeile) {
+      console.error(`[push] Abbruch: ${ich} sieht den Kommentar ${kommentar} nicht, RLS liefert eine leere Liste.`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Kommentar.' });
+    }
+    if (zeile.verfasser !== ich) {
+      console.error(`[push] Abbruch: ${ich} hat den Kommentar ${kommentar} nicht geschrieben.`);
+      return res.status(403).json({ fehler: 'Das ist nicht Ihr Kommentar.' });
+    }
+
+    const erwaehnt = erwaehnungenAus(zeile.text).filter(u => u !== ich);
+    if (!erwaehnt.length) {
+      console.log(`[push] ${kommentar}: niemand erwaehnt, es gibt nichts zu melden.`);
+      return res.status(200).json({ gesendet: 0, grund: 'niemand erwaehnt' });
+    }
+
+    const alle = await adressbuch();
+    if (!alle) return res.status(502).json({ fehler: 'Das Adressbuch liess sich nicht laden.' });
+
+    ziele = erwaehnt.filter(u => alle.includes(u));
+    if (!ziele.length) {
+      console.log(`[push] ${kommentar}: die erwaehnten Kennungen gehoeren zu keinem Konto im Haus.`);
+      return res.status(200).json({ gesendet: 0 });
+    }
   } else {
     /* Derselbe Gedanke für den Feed: erst mit dem Token der Person
        nachsehen, ob es den Beitrag gibt, ob er ihr gehört und ob er
        überhaupt melden darf. Erst danach die Empfänger. */
     const b = await hole(
-      `feed_beitraege?id=eq.${beitrag}&select=art,kategorie,erstellt_von`, { apikey: ANON, token });
+      `feed_beitraege?id=eq.${beitrag}&select=art,kategorie,text,erstellt_von`, { apikey: ANON, token });
 
     if (!b.ok) {
       console.error(`[push] Abbruch: Supabase hat den Beitrag ${beitrag} nicht herausgegeben — Status ${b.status}, Antwort: ${b.roh}`);
@@ -218,22 +288,29 @@ module.exports = async (req, res) => {
       console.error(`[push] Abbruch: ${ich} hat den Beitrag ${beitrag} nicht geschrieben.`);
       return res.status(403).json({ fehler: 'Das ist nicht Ihr Beitrag.' });
     }
-    /* Die eine Regel, um die es hier geht. Sie steht hier und nicht in
-       der App: ein Update oder eine Umfrage soll niemandem aufs Telefon
-       poppen, auch dann nicht, wenn jemand den Aufruf selbst nachbaut. */
-    if (zeile.art !== 'beitrag' || zeile.kategorie !== 'wichtig') {
-      console.log(`[push] ${beitrag}: ${zeile.art}/${zeile.kategorie} meldet nicht, nur "wichtig" tut das.`);
+    /* Die Regeln, um die es hier geht. Sie stehen hier und nicht in der
+       App: ein Update ohne Erwähnung soll niemandem aufs Telefon poppen,
+       auch dann nicht, wenn jemand den Aufruf selbst nachbaut.
+       Eine Umfrage meldet nie — auch nicht mit einer Erwähnung darin. Sie
+       richtet sich an alle, sonst wäre es keine. */
+    const wichtig = zeile.art === 'beitrag' && zeile.kategorie === 'wichtig';
+    const erwaehnt = zeile.art === 'beitrag'
+      ? erwaehnungenAus(zeile.text).filter(u => u !== ich) : [];
+
+    if (!wichtig && !erwaehnt.length) {
+      console.log(`[push] ${beitrag}: ${zeile.art}/${zeile.kategorie} ohne Erwaehnung meldet nicht, nur "wichtig" oder eine Erwaehnung tun das.`);
       return res.status(200).json({ gesendet: 0, grund: 'nicht wichtig' });
     }
 
-    const leute = await hole(
-      'mitarbeiter?user_id=not.is.null&geloescht_am=is.null&select=user_id', { apikey: ANON, token });
-    if (!leute.ok) {
-      console.error(`[push] Abbruch: das Adressbuch liess sich nicht laden — Status ${leute.status}, Antwort: ${leute.roh}`);
-      return res.status(502).json({ fehler: 'Das Adressbuch liess sich nicht laden.' });
-    }
+    const alle = await adressbuch();
+    if (!alle) return res.status(502).json({ fehler: 'Das Adressbuch liess sich nicht laden.' });
 
-    ziele = (leute.daten || []).map(m => m.user_id).filter(u => u && u !== ich);
+    /* Wichtig heisst: an alle anderen. Sonst nur an die Erwähnten. Damit
+       gibt es zu einem wichtigen Beitrag mit Erwähnung genau eine
+       Meldung und nicht zwei — die Erwähnten stecken in "alle" schon
+       drin. */
+    ziele = (wichtig ? alle : erwaehnt.filter(u => alle.includes(u)))
+      .filter(u => u && u !== ich);
     if (!ziele.length) {
       console.log(`[push] ${beitrag}: ausser der schreibenden Person hat niemand ein Konto.`);
       return res.status(200).json({ gesendet: 0 });

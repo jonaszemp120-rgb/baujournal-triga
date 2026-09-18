@@ -68,6 +68,87 @@
   font-size:11px; color:var(--text-dim);
 }
 
+/* --- Mehrere Fotos --------------------------------------------------------- */
+
+/* Eine Spur, durch die man wischt. Das Einrasten übernimmt der Browser
+   mit scroll-snap; ohne das bliebe nach dem Wischen ein halbes Foto
+   stehen. Die Leiste darunter wird ausgeblendet, die Punkte sagen
+   dasselbe und sind auf dem Handy die gewohnte Sprache. */
+.fd-rahmen{ position:relative; }
+.fd-spur{
+  display:flex; gap:0; overflow-x:auto; scroll-snap-type:x mandatory;
+  border-radius:12px; margin-top:12px;
+  scrollbar-width:none; -ms-overflow-style:none;
+  overscroll-behavior-x:contain;
+}
+.fd-spur::-webkit-scrollbar{ display:none; }
+.fd-spur > .fd-bild{
+  flex:0 0 100%; scroll-snap-align:center; margin-top:0; border-radius:0;
+}
+
+.fd-punkte{ display:flex; justify-content:center; gap:6px; margin-top:8px; }
+.fd-punkt{
+  width:7px; height:7px; border-radius:50%; background:var(--border);
+  transition:background-color .15s ease;
+}
+.fd-punkt.an{ background:var(--navy); }
+
+/* Die Pfeile sind für die Maus. Auf dem Handy wischt man, dort wären sie
+   zwei Knöpfe, die nur den Daumen im Weg stehen. */
+.fd-pfeil{
+  position:absolute; top:50%; transform:translateY(-50%);
+  width:36px; height:36px; border-radius:50%; border:none;
+  background:rgba(255,255,255,.92); color:var(--navy);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 1px 6px rgba(0,16,30,.18);
+}
+.fd-pfeil:hover{ background:#fff; }
+.fd-pfeil.links{ left:10px; }
+.fd-pfeil.rechts{ right:10px; }
+
+/* Die Vorschau im Dialog: eine Reihe kleiner Bilder, jedes einzeln
+   wieder wegzunehmen. */
+.fd-fotos{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.fd-fotos:empty{ display:none; }
+.fd-vorschau{ position:relative; width:84px; height:84px; }
+.fd-vorschau img{
+  width:100%; height:100%; object-fit:cover; border-radius:10px; display:block;
+  background:var(--bg);
+}
+.fd-vorschau button{
+  position:absolute; top:-6px; right:-6px;
+  width:22px; height:22px; border-radius:50%; border:none;
+  background:var(--navy); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+}
+.fd-vorschau button:hover{ background:var(--red); }
+
+/* --- Erwähnungen ----------------------------------------------------------- */
+
+/* Hervorgehoben, aber nicht schreiend: der Name soll im Satz erkennbar
+   sein und den Satz nicht sprengen. */
+.fd-erwaehnt{
+  color:var(--navy); font-weight:700; text-decoration:none;
+  background:#e4eaf0; border-radius:5px; padding:0 3px;
+}
+a.fd-erwaehnt:hover{ background:#d5dfe8; }
+
+/* Die Auswahlliste steht fest im Fenster, siehe js/feed.js. */
+.fd-erwaehnliste{
+  position:fixed; z-index:60;
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  box-shadow:0 6px 24px rgba(0,16,30,.16);
+  overflow:hidden; max-height:46dvh; overflow-y:auto;
+}
+.fd-erwaehnliste button{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:9px 12px; border:none; border-bottom:1px solid var(--border);
+  background:transparent; text-align:left; font-size:13.5px; font-weight:600;
+  color:var(--text);
+}
+.fd-erwaehnliste button:last-child{ border-bottom:none; }
+.fd-erwaehnliste button.an, .fd-erwaehnliste button:hover{ background:var(--bg); }
+
 /* --- Umfrage -------------------------------------------------------------- */
 
 .fd-optionen{ display:flex; flex-direction:column; gap:8px; margin-top:12px; }

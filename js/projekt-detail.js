@@ -653,8 +653,10 @@
      einer mit Foto. */
   function zeichneFeed() {
     const nameVon = u => mitarbeiter.find(m => m.user_id === u)?.name || 'Jemand';
+    /* Ohne die Klammern einer Erwähnung: hier steht ein Auszug, keine
+       Verknüpfung, und "@[Thomas Zürcher](…)" wäre nur Krimskrams. */
     const kurz = b => {
-      const t = (b.text || '').trim();
+      const t = erwaehnungKlartext(b.text || '').trim();
       if (t) return t;
       return b.bild_ablauf ? 'Foto gepostet.' : 'Ohne Text gepostet.';
     };

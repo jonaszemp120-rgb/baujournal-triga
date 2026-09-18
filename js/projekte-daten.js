@@ -30,9 +30,13 @@ const PJ = (() => {
     { id: 'ausgefuehrt', titel: 'Ausgeführt', farbe: 'navy' }
   ];
 
-  /* Vorschläge, kein Zwang: das Feld bleibt Freitext. Wer eine dritte
-     Rolle braucht, tippt sie einfach. */
-  const ROLLEN = ['Bauleiter', 'Unterstützung'];
+  /* Vorschläge, kein Zwang: das Feld bleibt Freitext. Wer eine vierte
+     Rolle braucht, tippt sie einfach.
+     Die Rolle ist reine Beschreibung. An ihr hängen keine Rechte und
+     keine Sichtbarkeit — die kommen aus mitarbeiter.berechtigung, siehe
+     istBerechtigt() in js/app.js. Eine neue Rolle hier ist deshalb genau
+     das, wonach es aussieht: ein zusätzlicher Vorschlag. */
+  const ROLLEN = ['Bauleiter', 'Projektleiter', 'Unterstützung'];
 
   const statusTitel = id => (STATUS.find(s => s.id === id) || {}).titel || '—';
   const einsatzTitel = id => (EINSATZ.find(s => s.id === id) || {}).titel || '—';

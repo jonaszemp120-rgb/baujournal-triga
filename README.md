@@ -17,7 +17,10 @@ alle. Zwei Arten stehen darin: ein Beitrag mit Text, optional einem Foto und
 optional einem Projekt, und eine Umfrage mit Frage und Antwortmöglichkeiten.
 Ein Beitrag trägt die Kategorie **Update** oder **Wichtig**; ein wichtiger
 bekommt einen roten Rahmen und fällt damit auf, was sonst nirgends in der App
-vorkommt. Herz und Kommentare gibt es an beidem.
+vorkommt. Herz und Kommentare gibt es an beidem. An einem Beitrag hängen
+beliebig viele Fotos, durch die man im Feed wischt, und in Text wie Kommentar
+lässt sich mit **@** jemand direkt ansprechen — wer erwähnt wird, bekommt eine
+Meldung aufs Telefon.
 
 **Mitarbeiter** ist das Adressbuch des Teams, bewusst getrennt von den
 Login-Konten. Telefon und E-Mail sind direkt antippbar. Einen Eintrag hier zu
@@ -26,7 +29,9 @@ Person. Konten legt weiterhin nur die Geschäftsleitung im Supabase-Dashboard an
 
 **Projekte** ist die Klammer um alles andere. Ein Projekt führt seine
 Stammdaten, die Unternehmerliste mit Gewerk, Status und Auftragssumme, die
-zuständigen Mitarbeiter mit ihrer Rolle, die offenen Pendenzen, die letzten
+zuständigen Mitarbeiter mit ihrer Rolle auf diesem Projekt — Bauleiter,
+Projektleiter oder Unterstützung, als Vorschläge in einem Freitextfeld, an
+denen bewusst keine Rechte hängen —, die offenen Pendenzen, die letzten
 Baujournal-Einträge und die zugeordneten Dokumentenordner. Die Projektseite
 zeigt jeden dieser Teile als Auszug und verlinkt in den Bereich, der die volle
 Ansicht hat.
@@ -448,6 +453,11 @@ alle acht Bereiche.
   wird mit `feed_ergebnisse()`, das nur Zahlen zurückgibt. Ein Foto liegt im
   Bucket `feed-bilder` unter `<beitrag_id>/<zufall>`, mit derselben
   30-Tage-Regel wie im Chat
+- `feed_bilder` — die Fotos eines Beitrags, mehrere je Beitrag, sortiert nach
+  `reihenfolge`. `bild_pfad` und `bild_ablauf` heissen hier gleich wie in
+  `nachrichten`, damit `api/_bilder.js` unverändert auch hier aufräumt. Am
+  Beitrag selbst steht nur noch `bild_ablauf` und sagt, dass er Fotos trägt —
+  daran hängt die Prüfregel, dass ein Beitrag Text oder Fotos braucht
 - `antraege` — Spesen und Ferien in einer Tabelle, unterschieden durch `art`;
   eine Prüfregel hält auseinander, was nur zur einen Art gehört. `status` geht
   von `eingereicht` zu `genehmigt` oder `abgelehnt` und nie zurück. Der Trigger
@@ -608,24 +618,56 @@ Löschen darf, wer geschrieben hat, und zusätzlich die erweiterte Stufe
 gleichermassen. Wer einen ganzen Beitrag entfernen darf, soll nicht den Umweg
 gehen müssen, den Beitrag zu löschen, um einen Kommentar loszuwerden.
 
+**Ein Beitrag trägt beliebig viele Fotos**, bis zu zehn. Sie stehen in
+`feed_bilder` und nicht als Spalten am Beitrag: eine Spalte pro Foto wäre eine
+Grenze, die man einmal festlegt und danach bereut. Im Feed liegen sie
+nebeneinander in einer Spur, durch die man wischt; darunter zeigen Punkte, wo
+man gerade ist, und am Schreibtisch gibt es zwei Pfeile dazu, weil dort niemand
+wischt. Beiträge, die vor dieser Änderung ein einzelnes Foto trugen, sind mit
+der Migration in dieselbe Tabelle gewandert und sehen aus wie vorher.
+
 **Fotos leben 30 Tage, genau wie im Chat.** Und zwar über denselben Ablauf:
 `api/_bilder.js` enthält ihn einmal, `api/chat-aufraeumen.js` und
 `api/feed-aufraeumen.js` rufen ihn mit ihren eigenen Namen auf. Zwei Kopien
 wären zwei Orte, an denen jemand später etwas ändert und den anderen vergisst.
+Die Frist steht deshalb an jeder Fotozeile und trägt dieselben Spaltennamen wie
+im Chat — so genügte beim Umbau auf mehrere Fotos der andere Tabellenname.
 
-**Drei Wege gehen durch `api/push.js`:** ein Gespräch, ein wichtiger
-Feed-Beitrag und ein entschiedener Antrag. Welcher gilt, sagt genau eines der
-Felder `chat`, `beitrag` oder `antrag`; wer melden darf und an wen, liest die
-Funktion jedes Mal selbst nach.
+**Erwähnungen stehen im Text selbst,** als `@[Name](Kennung)`. Nicht in einer
+eigenen Tabelle daneben: der Text ist die Wahrheit, und wer nachsehen will, wer
+wirklich erwähnt wurde — `api/push.js` tut das —, liest dieselbe Zeichenkette
+wie der Bildschirm. Eine zweite Tabelle liefe früher oder später auseinander,
+etwa wenn jemand den Namen aus dem Text löscht. Der Name steht mit drin, obwohl
+die Kennung genügte: damit der Text auch dort lesbar bleibt, wo niemand das
+Adressbuch zur Hand hat, etwa in der Meldung auf dem Sperrbildschirm.
 
-**Nur ein wichtiger Beitrag meldet sich.** Wer etwas mit der Kategorie
-«Wichtig» postet, löst bei allen anderen im Adressbuch eine Push-Meldung aus —
-über dieselbe Funktion und dieselbe Tabelle `push_geraete` wie der Chat. Ein
-Update oder eine Umfrage lösen nichts aus; stünde alles auf dem Telefon, wäre
-«Wichtig» nach zwei Wochen nichts mehr wert. Entschieden wird das in
-`api/push.js` und nicht in der App: die Funktion sieht selbst nach, ob der
-Beitrag der aufrufenden Person gehört und welche Kategorie er trägt. Wer den
-Aufruf von Hand nachbaut, kommt damit nicht weiter.
+Im Eingabefeld selbst steht immer nur der Name. Wer `@` tippt, bekommt eine
+Auswahlliste; was daraus gewählt wurde, merkt sich die App und setzt beim
+Absenden die Klammern. Niemand soll beim Schreiben Kennungen vor sich haben.
+
+**Vier Wege gehen durch `api/push.js`:** ein Gespräch, ein Feed-Beitrag, ein
+Feed-Kommentar und ein entschiedener Antrag. Welcher gilt, sagt genau eines der
+Felder `chat`, `beitrag`, `kommentar` oder `antrag`; wer melden darf und an
+wen, liest die Funktion jedes Mal selbst nach.
+
+**Zwei Gründe melden sich: «Wichtig» und eine Erwähnung.** Wer etwas mit der
+Kategorie «Wichtig» postet, löst bei allen anderen im Adressbuch eine
+Push-Meldung aus — über dieselbe Funktion und dieselbe Tabelle `push_geraete`
+wie der Chat. Ein Update oder ein Kommentar melden sich nur bei den Personen,
+die darin erwähnt werden. Eine Umfrage meldet nie, auch nicht mit einer
+Erwähnung darin: sie richtet sich an alle, sonst wäre es keine. Stünde jedes
+Update auf dem Telefon, wäre «Wichtig» nach zwei Wochen nichts mehr wert.
+
+Beides zugleich ergibt trotzdem nur eine Meldung: bei einem wichtigen Beitrag
+mit Erwähnung sind die Erwähnten schon unter «alle», und zwei Meldungen zum
+selben Beitrag wären eine zu viel.
+
+Entschieden wird das alles in `api/push.js` und nicht in der App: die Funktion
+sieht selbst nach, ob der Beitrag oder der Kommentar der aufrufenden Person
+gehört, welche Kategorie er trägt und wer im gespeicherten Text wirklich
+erwähnt wird. Die Kennungen werden zusätzlich mit dem Adressbuch geschnitten —
+an eine frei erfundene Kennung geht nichts. Wer den Aufruf von Hand nachbaut,
+kommt damit nicht weiter.
 
 **Der Feed läuft in Echtzeit,** wie der Chat. Neue Beiträge, Umfragen, Herzen
 und Kommentare erscheinen ohne Neuladen. Eine Besonderheit gibt es bei den

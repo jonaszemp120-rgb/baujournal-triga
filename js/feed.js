@@ -36,7 +36,9 @@
     bild: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     uhr: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    weg: '<path d="M18 6 6 18M6 6l12 12"/>'
+    weg: '<path d="M18 6 6 18M6 6l12 12"/>',
+    zurueck: '<path d="m15 18-6-6 6-6"/>',
+    weiter: '<path d="m9 18 6-6-6-6"/>'
   };
   const svg = (d, g = 16) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
@@ -53,6 +55,7 @@
   let leute = [];            // Mitarbeitende mit Konto
   let projekte = [];
   let beitraege = [];
+  let bilder = [];           // Fotos, mehrere je Beitrag möglich
   let optionen = [];
   let ergebnisse = [];       // { beitrag_id, option_id, stimmen }
   let meineStimmen = [];     // nur die eigenen
@@ -66,6 +69,50 @@
   const nameVon = u => leute.find(l => l.user_id === u)?.name || 'Unbekannt';
   const projektName = id => projekte.find(p => p.id === id)?.name || '';
 
+  /* --- Erwähnungen ---------------------------------------------------------- */
+
+  /* Was jemand beim Tippen aus der Liste gewählt hat, Name → Kennung. Ein
+     Eintrag je Feld: für den Dialog unter "neu", für jeden Kommentar
+     unter der Kennung seines Beitrags. Die Einträge überleben das
+     Neuzeichnen der Liste, genau wie der angefangene Text selbst. */
+  const gemerkt = {};
+  const merkeFuer = id => (gemerkt[id] ||= new Map());
+
+  /* Aus "@Thomas Zürcher" wird beim Absenden "@[Thomas Zürcher](kennung)".
+     Im Feld selbst bleibt der Name stehen — niemand soll beim Schreiben
+     Klammern und Kennungen vor sich haben.
+     Die längeren Namen zuerst, sonst verschluckt "Adrian Zemp" den
+     Anfang von "Adrian Zemper". */
+  function markiere(text, karte) {
+    let raus = String(text || '');
+    const namen = [...karte.keys()].sort((a, b) => b.length - a.length);
+    for (const name of namen) {
+      const marke = `@[${name}](${karte.get(name)})`;
+      if (raus.includes(marke)) continue;
+      const stelle = raus.indexOf(`@${name}`);
+      if (stelle < 0) continue;
+      raus = raus.slice(0, stelle) + marke + raus.slice(stelle + name.length + 1);
+    }
+    return raus;
+  }
+
+  /* Der Text fürs Auge: die Erwähnung wird hervorgehoben und führt auf
+     die Person im Adressbuch. Escapet wird stückweise und nicht am
+     Schluss — sonst stünde das eingesetzte Markup als Text da. */
+  function mitErwaehnungen(text) {
+    const roh = String(text || '');
+    let raus = '', i = 0;
+    for (const m of roh.matchAll(ERWAEHNUNG)) {
+      raus += esc(roh.slice(i, m.index));
+      const person = leute.find(l => String(l.user_id).toLowerCase() === m[2].toLowerCase());
+      raus += person
+        ? `<a class="fd-erwaehnt" href="mitarbeiter.html?person=${encodeURIComponent(person.id)}">@${esc(m[1])}</a>`
+        : `<span class="fd-erwaehnt">@${esc(m[1])}</span>`;
+      i = m.index + m[0].length;
+    }
+    return raus + esc(roh.slice(i));
+  }
+
   /* Jede eigene Änderung kommt über die Echtzeit noch einmal zurück, und
      zwar nicht unbedingt danach: die Meldung kann eintreffen, bevor die
      Antwort auf das Einfügen da ist. Wer etwas in eine dieser Listen
@@ -75,6 +122,101 @@
     return liste.some(x => gleich(x, zeile)) ? liste : [...liste, zeile];
   }
   const gleicheId = (a, b) => a.id === b.id;
+
+  /* Die Auswahlliste beim Tippen. Sie hängt an document.body und steht
+     fest im Fenster, nicht im Feld: sowohl das Blatt von unten als auch
+     die Feed-Karte scrollen und schneiden ab, und eine Liste, die halb
+     hinter dem Rand verschwindet, hilft niemandem.
+     Gesucht wird nur zwischen @ und dem Cursor, und nur wenn davor ein
+     Leerzeichen oder der Zeilenanfang steht — eine E-Mail-Adresse im Text
+     soll keine Liste aufklappen. */
+  const VOR_CURSOR = /(^|\s)@([\p{L}\p{N}.\-' ]{0,40})$/u;
+  let auswahl = null;        // das Element, solange es offen ist
+  let trefferListe = [];
+  let markiert = 0;
+  let feldOffen = null;
+
+  function erwaehnungSchliessen() {
+    auswahl?.remove();
+    auswahl = null;
+    trefferListe = [];
+    feldOffen = null;
+  }
+
+  function erwaehnungHelfer(feld, schluessel) {
+    const pruefe = () => {
+      const bis = feld.value.slice(0, feld.selectionStart ?? feld.value.length);
+      const treffer = VOR_CURSOR.exec(bis);
+      if (!treffer) return erwaehnungSchliessen();
+
+      const suche = treffer[2].trim().toLowerCase();
+      trefferListe = leute
+        .filter(l => l.user_id !== ich)
+        .filter(l => !suche || l.name.toLowerCase().includes(suche))
+        .slice(0, 6);
+      if (!trefferListe.length) return erwaehnungSchliessen();
+
+      markiert = 0;
+      feldOffen = { feld, schluessel, anfang: treffer.index + treffer[1].length };
+      zeichneAuswahl();
+    };
+
+    feld.addEventListener('input', pruefe);
+    feld.addEventListener('click', pruefe);
+    feld.addEventListener('blur', () => setTimeout(erwaehnungSchliessen, 150));
+    feld.addEventListener('keydown', e => {
+      if (!auswahl) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        markiert = (markiert + (e.key === 'ArrowDown' ? 1 : trefferListe.length - 1)) % trefferListe.length;
+        zeichneAuswahl();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        waehleErwaehnung(trefferListe[markiert]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        erwaehnungSchliessen();
+      }
+    });
+  }
+
+  function zeichneAuswahl() {
+    if (!auswahl) {
+      auswahl = document.createElement('div');
+      auswahl.className = 'fd-erwaehnliste';
+      document.body.appendChild(auswahl);
+    }
+    auswahl.innerHTML = trefferListe.map((l, i) => `
+      <button type="button" class="pressable${i === markiert ? ' an' : ''}" data-wer="${esc(l.user_id)}">
+        <span class="fd-avatar">${esc(initialen(l.name))}</span><span>${esc(l.name)}</span>
+      </button>`).join('');
+    $$('[data-wer]', auswahl).forEach(el => el.addEventListener('mousedown', e => {
+      e.preventDefault();      // sonst verliert das Feld vorher den Fokus
+      waehleErwaehnung(trefferListe.find(l => l.user_id === el.dataset.wer));
+    }));
+
+    const k = feldOffen.feld.getBoundingClientRect();
+    auswahl.style.left = `${Math.max(8, Math.min(k.left, innerWidth - 268))}px`;
+    auswahl.style.width = `${Math.min(260, innerWidth - 16)}px`;
+    // Passt die Liste unten nicht mehr hin, klappt sie nach oben auf.
+    const hoehe = auswahl.offsetHeight || 200;
+    auswahl.style.top = (k.bottom + hoehe + 8 > innerHeight)
+      ? `${Math.max(8, k.top - hoehe - 6)}px`
+      : `${k.bottom + 6}px`;
+  }
+
+  function waehleErwaehnung(person) {
+    if (!person || !feldOffen) return;
+    const { feld, schluessel, anfang } = feldOffen;
+    const stand = feld.selectionStart ?? feld.value.length;
+    feld.value = `${feld.value.slice(0, anfang)}@${person.name} ${feld.value.slice(stand)}`;
+    const neu = anfang + person.name.length + 2;
+    merkeFuer(schluessel).set(person.name, person.user_id);
+    erwaehnungSchliessen();
+    feld.focus();
+    try { feld.setSelectionRange(neu, neu); } catch { /* egal */ }
+  }
 
   /* --- Zeit ---------------------------------------------------------------- */
 
@@ -99,12 +241,13 @@
 
   async function ladeAlles() {
     if (!istOnline()) return;
-    const [ma, pj, bt, op, er, st, re, ko] = await Promise.all([
-      sb.from('mitarbeiter').select('user_id, name').not('user_id', 'is', null).is('geloescht_am', null).order('name'),
+    const [ma, pj, bt, bi, op, er, st, re, ko] = await Promise.all([
+      sb.from('mitarbeiter').select('id, user_id, name').not('user_id', 'is', null).is('geloescht_am', null).order('name'),
       sb.from('projekte').select('id, name').order('name'),
       sb.from('feed_beitraege')
-        .select('id, art, kategorie, text, bild_pfad, bild_ablauf, projekt_id, anonym, erstellt_von, erstellt_am')
+        .select('id, art, kategorie, text, bild_ablauf, projekt_id, anonym, erstellt_von, erstellt_am')
         .order('erstellt_am', { ascending: false }).limit(200),
+      sb.from('feed_bilder').select('id, beitrag_id, bild_pfad, bild_ablauf, reihenfolge').order('reihenfolge'),
       sb.from('feed_optionen').select('id, beitrag_id, text, reihenfolge').order('reihenfolge'),
       sb.rpc('feed_ergebnisse'),
       sb.from('feed_stimmen').select('beitrag_id, option_id').eq('user_id', ich),
@@ -114,6 +257,7 @@
     meckern('Team laden', ma.error);
     meckern('Projekte laden', pj.error);
     meckern('Feed laden', bt.error);
+    meckern('Fotos laden', bi.error);
     meckern('Umfragen laden', op.error);
     meckern('Ergebnisse laden', er.error);
     meckern('Kommentare laden', ko.error);
@@ -121,6 +265,7 @@
     leute = ma.data || [];
     projekte = pj.data || [];
     beitraege = bt.data || [];
+    bilder = bi.data || [];
     optionen = op.data || [];
     ergebnisse = er.data || [];
     meineStimmen = st.data || [];
@@ -175,6 +320,8 @@
      vorher gesichert und danach zurückgesetzt. Ohne das verlöre jemand
      seinen halben Satz, weil irgendwo ein Herz gesetzt wurde. */
   function zeichneListe() {
+    // Die Auswahlliste hängt an einem Feld, das es gleich nicht mehr gibt.
+    erwaehnungSchliessen();
     const entwuerfe = {};
     let warFokus = null;
     let stand = 0;
@@ -234,18 +381,49 @@
       </div>`;
   }
 
+  const fotosVon = id => bilder.filter(x => x.beitrag_id === id)
+    .slice().sort((x, y) => (x.reihenfolge ?? 0) - (y.reihenfolge ?? 0));
+
   /* Ein Foto lebt 30 Tage, genau wie im Chat. Danach bleibt die Stelle
      stehen und sagt, dass es das Foto einmal gab — keine Lücke, aus der
-     niemand schlau wird. */
-  function bild(b) {
+     niemand schlau wird.
+     Sind es mehrere, liegen sie nebeneinander in einer Spur, durch die
+     man wischt; darunter zeigen Punkte, wo man gerade ist. Am Schreibtisch
+     gibt es dazu zwei Pfeile, weil dort niemand wischt. */
+  function galerie(b) {
     if (!b.bild_ablauf) return '';
-    if (!b.bild_pfad) {
-      return `<div class="fd-bild"><div class="platzhalter">Foto nicht mehr verfügbar.<br>Fotos werden nach 30 Tagen entfernt.</div></div>`;
+    const eigene = fotosVon(b.id);
+
+    /* Die Fotozeilen zeigen auf den Beitrag und folgen ihm deshalb einen
+       Wimpernschlag später — über die Echtzeit genau wie beim Erfassen. */
+    if (!eigene.length) {
+      return '<div class="fd-bild"><div class="platzhalter">Fotos werden geladen…</div></div>';
     }
+
+    const da = eigene.filter(x => x.bild_pfad);
+    if (!da.length) {
+      return `<div class="fd-bild"><div class="platzhalter">${eigene.length === 1 ? 'Foto' : 'Fotos'} nicht mehr verfügbar.<br>Fotos werden nach 30 Tagen entfernt.</div></div>`;
+    }
+
     const bis = new Date(b.bild_ablauf).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' });
+    const hinweis = `<div class="fd-ablauf">${svg(IKON.uhr, 12)}<span>Verfügbar bis ${esc(bis)}, danach automatisch gelöscht</span></div>`;
+
+    if (da.length === 1) {
+      return `<div class="fd-bild" data-pfad="${esc(da[0].bild_pfad)}"><div class="platzhalter">Foto wird geladen…</div></div>${hinweis}`;
+    }
+
     return `
-      <div class="fd-bild" data-pfad="${esc(b.bild_pfad)}"><div class="platzhalter">Foto wird geladen…</div></div>
-      <div class="fd-ablauf">${svg(IKON.uhr, 12)}<span>Verfügbar bis ${esc(bis)}, danach automatisch gelöscht</span></div>`;
+      <div class="fd-galerie" data-galerie="${esc(b.id)}">
+        <div class="fd-rahmen">
+          <div class="fd-spur">${da.map((x, i) => `
+            <div class="fd-bild" data-pfad="${esc(x.bild_pfad)}"><div class="platzhalter">Foto ${i + 1} von ${da.length} wird geladen…</div></div>`).join('')}</div>
+          <button type="button" class="fd-pfeil links nur-desktop pressable" data-blaettern="-1" aria-label="Vorheriges Foto">${svg(IKON.zurueck, 18)}</button>
+          <button type="button" class="fd-pfeil rechts nur-desktop pressable" data-blaettern="1" aria-label="Nächstes Foto">${svg(IKON.weiter, 18)}</button>
+        </div>
+        <div class="fd-punkte" aria-label="${da.length} Fotos">${da.map((_, i) =>
+          `<span class="fd-punkt${i === 0 ? ' an' : ''}"></span>`).join('')}</div>
+      </div>
+      ${hinweis}`;
   }
 
   function umfrage(b) {
@@ -309,7 +487,7 @@
                 <span class="wer">${esc(nameVon(k.verfasser))}</span>
                 <span class="wann">${esc(wann(k.erstellt_am))}</span>
               </span>
-              <span class="was">${esc(k.text)}</span>
+              <span class="was">${mitErwaehnungen(k.text)}</span>
             </span>
             ${(k.verfasser === ich || darfModerieren)
               ? `<button type="button" class="fd-weg pressable" data-kweg="${esc(k.id)}" aria-label="Kommentar löschen">${svg(IKON.weg, 14)}</button>`
@@ -327,8 +505,8 @@
     return `
       <article class="fd-karte${wichtig ? ' wichtig' : ''}" data-beitrag="${esc(b.id)}">
         ${kopf(b)}
-        ${b.text ? `<div class="${b.art === 'umfrage' ? 'fd-frage' : 'fd-text'}">${esc(b.text)}</div>` : ''}
-        ${b.art === 'umfrage' ? umfrage(b) : bild(b)}
+        ${b.text ? `<div class="${b.art === 'umfrage' ? 'fd-frage' : 'fd-text'}">${mitErwaehnungen(b.text)}</div>` : ''}
+        ${b.art === 'umfrage' ? umfrage(b) : galerie(b)}
         ${fuss(b)}
         ${kommentarBlock(b)}
       </article>`;
@@ -360,9 +538,38 @@
       if (offen.has(id)) $(`#liste [data-kfeld="${CSS.escape(id)}"]`)?.focus();
     }));
     $$('#liste [data-ksenden]').forEach(el => el.addEventListener('click', () => kommentieren(el.dataset.ksenden)));
-    $$('#liste [data-kfeld]').forEach(el => el.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); kommentieren(el.dataset.kfeld); }
-    }));
+    $$('#liste [data-kfeld]').forEach(el => {
+      /* Der Helfer hängt vor dem Absenden: steht die Auswahlliste offen,
+         wählt Enter dort aus und schickt den Kommentar nicht ab. */
+      erwaehnungHelfer(el, el.dataset.kfeld);
+      el.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !auswahl) { e.preventDefault(); kommentieren(el.dataset.kfeld); }
+      });
+    });
+    blaetternBinden();
+  }
+
+  /* Gewischt wird mit dem Finger, das macht der Browser von selbst —
+     hier hängen nur die Punkte darunter daran und die beiden Pfeile für
+     die Maus. Welches Foto gerade vorne ist, wird nicht mitgezählt,
+     sondern aus der Position der Spur gelesen: gezählt liefe es nach dem
+     ersten schnellen Wisch auseinander. */
+  function blaetternBinden() {
+    $$('#liste .fd-galerie').forEach(g => {
+      const spur = $('.fd-spur', g);
+      const punkte = $$('.fd-punkt', g);
+      if (!spur || !punkte.length) return;
+
+      const setze = () => {
+        const i = Math.round(spur.scrollLeft / Math.max(1, spur.clientWidth));
+        punkte.forEach((p, n) => p.classList.toggle('an', n === Math.min(i, punkte.length - 1)));
+      };
+      spur.addEventListener('scroll', setze, { passive: true });
+
+      $$('[data-blaettern]', g).forEach(el => el.addEventListener('click', () => {
+        spur.scrollBy({ left: Number(el.dataset.blaettern) * spur.clientWidth, behavior: 'smooth' });
+      }));
+    });
   }
 
   /* --- Herz ---------------------------------------------------------------- */
@@ -419,17 +626,51 @@
 
   async function kommentieren(beitragId) {
     const feld = $(`#liste [data-kfeld="${CSS.escape(beitragId)}"]`);
-    const text = (feld?.value || '').trim();
-    if (!text) return;
+    const roh = (feld?.value || '').trim();
+    if (!roh) return;
     if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
+
+    const text = markiere(roh, merkeFuer(beitragId));
+
+    /* Das Feld wird vor dem Einfügen geleert, nicht danach. Die eigene
+       Zeile kommt über die Echtzeit zurück, und zwar unter Umständen
+       schon während des Wartens — die Liste wird dann neu gezeichnet,
+       zeichneListe() sichert dabei jeden angefangenen Kommentar und setzt
+       ihn zurück, und der gerade abgeschickte stünde gleich wieder da.
+       Danach zeigt feld ausserdem auf ein Element, das es nicht mehr
+       gibt; deshalb geht das Leeren über eine frische Abfrage. */
+    const setzeFeld = wert => {
+      const f = $(`#liste [data-kfeld="${CSS.escape(beitragId)}"]`);
+      if (f) f.value = wert;
+    };
+    setzeFeld('');
 
     const { data, error } = await sb.from('feed_kommentare')
       .insert({ beitrag_id: beitragId, verfasser: ich, text }).select().single();
-    if (error) return toast(error.message, true);
+    if (error) {
+      setzeFeld(roh);
+      return toast(error.message, true);
+    }
 
+    gemerkt[beitragId] = new Map();
     kommentare = merke(kommentare, data, gleicheId);
     zeichneListe();
+    setzeFeld('');
     $(`#liste [data-kfeld="${CSS.escape(beitragId)}"]`)?.focus();
+
+    /* Ein Kommentar geht sonst unter: er steht weit unten an einer Karte,
+       die vielleicht niemand mehr aufklappt. Wer darin erwähnt wird,
+       bekommt deshalb eine Meldung. Wer wirklich erwähnt wurde, liest
+       api/push.js selbst aus dem gespeicherten Text — diese Zeile hier
+       entscheidet es nicht. */
+    if (erwaehnungenAus(text).filter(u => u !== ich).length) {
+      pushSenden({
+        kommentar: data.id,
+        titel: `${nameVon(ich).split(' ')[0]} hat Sie erwähnt`,
+        text: erwaehnungKlartext(text),
+        ziel: 'feed.html'
+      });
+    }
   }
 
   async function kommentarLoeschen(id) {
@@ -467,14 +708,16 @@
     if (!ja) return;
     if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
 
-    if (b.bild_pfad) {
-      const { error } = await sb.storage.from('feed-bilder').remove([b.bild_pfad]);
+    const pfade = fotosVon(id).map(x => x.bild_pfad).filter(Boolean);
+    if (pfade.length) {
+      const { error } = await sb.storage.from('feed-bilder').remove(pfade);
       if (error) return toast(error.message, true);
     }
     const { error } = await sb.from('feed_beitraege').delete().eq('id', id);
     if (error) return toast(error.message, true);
 
     beitraege = beitraege.filter(x => x.id !== id);
+    bilder = bilder.filter(x => x.beitrag_id !== id);
     kommentare = kommentare.filter(k => k.beitrag_id !== id);
     reaktionen = reaktionen.filter(r => r.beitrag_id !== id);
     zeichneListe();
@@ -510,6 +753,17 @@
           if (!o?.id || optionen.some(x => x.id === o.id)) return;
           optionen = merke(optionen, o, gleicheId);
           if (beitraege.some(b => b.id === o.beitrag_id)) zeichneListe();
+        })
+      /* Dasselbe für die Fotos: der Beitrag kommt zuerst, seine Fotos
+         zeigen auf ihn und folgen als eigene Zeilen. Bis dahin sagt die
+         Karte, dass geladen wird. */
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feed_bilder' },
+        n => {
+          const f = n.new;
+          if (!f?.id || bilder.some(x => x.id === f.id)) return;
+          bilder = merke(bilder, f, gleicheId);
+          if (beitraege.some(b => b.id === f.beitrag_id)) zeichneListe();
         })
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'feed_kommentare' },
@@ -569,6 +823,7 @@
     kommentare = kommentare.filter(k => k.beitrag_id !== alt.id);
     reaktionen = reaktionen.filter(r => r.beitrag_id !== alt.id);
     optionen = optionen.filter(o => o.beitrag_id !== alt.id);
+    bilder = bilder.filter(x => x.beitrag_id !== alt.id);
     offen.delete(alt.id);
     zeichneListe();
   }
@@ -582,9 +837,9 @@
     let art = 'beitrag';
     let kategorie = 'update';
     let anonym = false;
-    let foto = null;
-    let vorschau = null;
+    let fotos = [];            // { datei, vorschau }
     let antworten = ['', ''];
+    const HOECHSTENS = 10;
 
     const s = sheet(`
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px;">
@@ -604,10 +859,11 @@
           <button type="button" class="pj-chip pressable" data-kat="wichtig" aria-pressed="false">Wichtig</button>
         </div>
         <textarea id="nb-text" class="fd-eingabe" placeholder="Was gibt's Neues?" aria-label="Text des Beitrags" maxlength="4000"></textarea>
+        <div id="nb-fotos" class="fd-fotos"></div>
         <button type="button" id="nb-foto" class="fd-ablage pressable">
-          ${svg(IKON.bild, 22)}<span>Foto hinzufügen</span>
+          ${svg(IKON.bild, 22)}<span>Fotos hinzufügen</span>
         </button>
-        <input id="nb-datei" type="file" accept="image/*" hidden>
+        <input id="nb-datei" type="file" accept="image/*" multiple hidden>
         <div class="fd-label" style="margin-top:16px;">Projekt zuordnen (optional)</div>
         <select id="nb-projekt" class="fd-eingabe" style="height:48px; padding:0 12px; background:var(--card);" aria-label="Projekt zuordnen">
           <option value="">Kein Projekt ausgewählt</option>
@@ -643,6 +899,12 @@
 
     $('#nb-projekt', s.el).innerHTML += projekte
       .map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+
+    /* Erwähnungen gibt es im Beitragstext. In der Frage einer Umfrage
+       nicht: dort ginge es nicht darum, jemanden anzusprechen, sondern
+       darum, von allen eine Antwort zu bekommen. */
+    gemerkt.neu = new Map();
+    erwaehnungHelfer($('#nb-text', s.el), 'neu');
 
     /* --- Umschalter --- */
     function setzeArt(neu) {
@@ -694,20 +956,39 @@
       knebel.setAttribute('aria-checked', String(anonym));
     });
 
-    /* --- Foto --- */
+    /* --- Fotos ---
+       Mehrere auf einmal, und jedes einzeln wieder wegzunehmen. Die
+       Reihenfolge hier ist die Reihenfolge im Feed. */
+    function zeichneFotos() {
+      $('#nb-fotos', s.el).innerHTML = fotos.map((f, i) => `
+        <div class="fd-vorschau">
+          <img src="${f.vorschau}" alt="Vorschau ${i + 1}">
+          <button type="button" class="pressable" data-fweg="${i}" aria-label="Foto ${i + 1} entfernen">${svg(IKON.weg, 13)}</button>
+        </div>`).join('');
+      $$('#nb-fotos [data-fweg]', s.el).forEach(el => el.addEventListener('click', () => {
+        const i = Number(el.dataset.fweg);
+        URL.revokeObjectURL(fotos[i].vorschau);
+        fotos.splice(i, 1);
+        zeichneFotos();
+      }));
+      $('#nb-foto', s.el).querySelector('span').textContent =
+        fotos.length ? `Weitere Fotos hinzufügen (${fotos.length})` : 'Fotos hinzufügen';
+    }
+
     const wahl = $('#nb-datei', s.el);
     $('#nb-foto', s.el).addEventListener('click', () => wahl.click());
     wahl.addEventListener('change', e => {
-      const datei = e.target.files?.[0];
+      const neue = [...(e.target.files || [])];
       e.target.value = '';
-      if (!datei) return;
-      if (!/^image\//.test(datei.type)) return zeigeFehler('Das ist kein Bild.');
-      if (datei.size > 10 * 1024 * 1024) return zeigeFehler('Das Bild ist grösser als 10 MB.');
-      foto = datei;
-      if (vorschau) URL.revokeObjectURL(vorschau);
-      vorschau = URL.createObjectURL(datei);
-      $('#nb-foto', s.el).innerHTML = `<img src="${vorschau}" alt="Vorschau"><span>Anderes Foto wählen</span>`;
-      fehler.hidden = true;
+      if (!neue.length) return;
+      for (const datei of neue) {
+        if (!/^image\//.test(datei.type)) { zeigeFehler('Eine der Dateien ist kein Bild.'); continue; }
+        if (datei.size > 10 * 1024 * 1024) { zeigeFehler(`„${datei.name}" ist grösser als 10 MB.`); continue; }
+        if (fotos.length >= HOECHSTENS) { zeigeFehler(`Mehr als ${HOECHSTENS} Fotos werden unübersichtlich.`); break; }
+        fotos.push({ datei, vorschau: URL.createObjectURL(datei) });
+        fehler.hidden = true;
+      }
+      zeichneFotos();
     });
 
     $('#nb-zu', s.el)?.addEventListener('click', () => s.schliessen());
@@ -718,13 +999,13 @@
       fehler.hidden = true;
       const text = art === 'umfrage'
         ? $('#nb-frage', s.el).value.trim()
-        : $('#nb-text', s.el).value.trim();
+        : markiere($('#nb-text', s.el).value.trim(), merkeFuer('neu'));
 
       if (art === 'umfrage') {
         if (!text) return zeigeFehler('Die Umfrage braucht eine Frage.');
         if (antworten.filter(t => t.trim()).length < 2)
           return zeigeFehler('Eine Umfrage braucht mindestens zwei Antwortmöglichkeiten.');
-      } else if (!text && !foto) {
+      } else if (!text && !fotos.length) {
         return zeigeFehler('Ein Beitrag braucht Text oder ein Foto.');
       }
       if (!istOnline()) return zeigeFehler('Dafür braucht es eine Verbindung.');
@@ -742,14 +1023,23 @@
          vor der Zeile hochgeladen werden. Geht danach etwas schief, wird
          die Datei gleich wieder entfernt. */
       const id = crypto.randomUUID();
-      let pfad = null, ablauf = null;
+      const pfade = [];
+      let ablauf = null;
 
-      if (art === 'beitrag' && foto) {
-        const endung = (foto.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-        pfad = `${id}/${crypto.randomUUID()}.${endung}`;
-        const { error } = await sb.storage.from('feed-bilder').upload(pfad, foto, { contentType: foto.type });
-        if (error) { zurueck(); return zeigeFehler(error.message); }
+      if (art === 'beitrag' && fotos.length) {
         ablauf = new Date(Date.now() + 30 * 86400000).toISOString();
+        for (const f of fotos) {
+          const endung = (f.datei.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const pfad = `${id}/${crypto.randomUUID()}.${endung}`;
+          const { error } = await sb.storage.from('feed-bilder')
+            .upload(pfad, f.datei, { contentType: f.datei.type });
+          if (error) {
+            if (pfade.length) await sb.storage.from('feed-bilder').remove(pfade);
+            zurueck();
+            return zeigeFehler(error.message);
+          }
+          pfade.push(pfad);
+        }
       }
 
       const zeile = {
@@ -757,14 +1047,33 @@
         kategorie: art === 'beitrag' ? kategorie : null,
         projekt_id: art === 'beitrag' ? ($('#nb-projekt', s.el).value || null) : null,
         anonym: art === 'umfrage' ? anonym : false,
-        bild_pfad: pfad, bild_ablauf: ablauf,
+        bild_ablauf: ablauf,
         erstellt_von: ich
       };
       const { data, error } = await sb.from('feed_beitraege').insert(zeile).select().single();
       if (error) {
-        if (pfad) await sb.storage.from('feed-bilder').remove([pfad]);
+        if (pfade.length) await sb.storage.from('feed-bilder').remove(pfade);
         zurueck();
         return zeigeFehler(error.message);
+      }
+
+      /* Die Fotozeilen zeigen auf den Beitrag und folgen ihm deshalb —
+         genau wie die Antwortmöglichkeiten einer Umfrage. Geht das
+         schief, wäre der Beitrag eine leere Hülle mit Dateien, auf die
+         nichts zeigt: dann lieber ganz zurück. */
+      if (pfade.length) {
+        const reihen = pfade.map((pfad, i) => ({
+          beitrag_id: id, bild_pfad: pfad, bild_ablauf: ablauf, reihenfolge: i
+        }));
+        const { data: bi, error: e3 } = await sb.from('feed_bilder').insert(reihen).select();
+        if (e3) {
+          await sb.from('feed_beitraege').delete().eq('id', id);
+          await sb.storage.from('feed-bilder').remove(pfade);
+          zurueck();
+          return zeigeFehler(e3.message);
+        }
+        // Ersetzen statt anhängen: die Echtzeit hat sie vielleicht schon gemeldet.
+        bilder = [...bilder.filter(x => x.beitrag_id !== id), ...(bi || [])];
       }
 
       if (art === 'umfrage') {
@@ -791,17 +1100,25 @@
       zeichneListe();
       toast(art === 'umfrage' ? 'Umfrage gepostet' : 'Beitrag gepostet');
 
-      /* Nur ein wichtiger Beitrag meldet sich auf den Telefonen der
-         anderen. Ein Update oder eine Umfrage stehen im Feed und warten
-         dort, bis jemand hinschaut — sonst wäre die Kategorie "Wichtig"
-         nach zwei Wochen nichts mehr wert.
-         Geprüft wird das trotzdem noch einmal in api/push.js: die eigene
-         Meldung soll nicht davon abhängen, dass diese Zeile hier stimmt. */
-      if (art === 'beitrag' && kategorie === 'wichtig') {
+      /* Zwei Gründe, warum sich ein Beitrag auf den Telefonen der anderen
+         meldet: er ist wichtig, oder er spricht jemanden direkt an. Ein
+         Update ohne Erwähnung steht im Feed und wartet dort, bis jemand
+         hinschaut — sonst wäre die Kategorie "Wichtig" nach zwei Wochen
+         nichts mehr wert.
+
+         Beides zugleich ergibt trotzdem nur eine Meldung: bei einem
+         wichtigen Beitrag sind die Erwähnten ohnehin unter "alle", und
+         zwei Meldungen zum selben Beitrag wären eine zu viel.
+
+         Geprüft wird das alles noch einmal in api/push.js: die Regel
+         soll nicht davon abhängen, dass diese Zeile hier stimmt. */
+      const erwaehnt = art === 'beitrag' ? erwaehnungenAus(text).filter(u => u !== ich) : [];
+      if (art === 'beitrag' && (kategorie === 'wichtig' || erwaehnt.length)) {
+        const vorname = nameVon(ich).split(' ')[0];
         pushSenden({
           beitrag: id,
-          titel: `Wichtig von ${nameVon(ich).split(' ')[0]}`,
-          text,
+          titel: kategorie === 'wichtig' ? `Wichtig von ${vorname}` : `${vorname} hat Sie erwähnt`,
+          text: erwaehnungKlartext(text),
           ziel: 'feed.html'
         });
       }
