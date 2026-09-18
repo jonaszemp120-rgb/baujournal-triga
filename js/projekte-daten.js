@@ -192,8 +192,14 @@ const PJ = (() => {
      Firma. Kein Fälligkeitsdatum, keine Priorität, keine Zuweisung an
      eine Person — das ist bewusst so, siehe Schritt 10.
      firmen ist die Unternehmerliste des Projekts, nicht der ganze Pool:
-     zuständig ist, wer auf diesem Projekt arbeitet. */
-  function pendenzFormular({ projektId, firmen = [], vorhanden = null }) {
+     zuständig ist, wer auf diesem Projekt arbeitet.
+
+     vorschlag füllt den Beschrieb vor, ändern lässt er sich trotzdem.
+     Das Sitzungsprotokoll nutzt das: dort entsteht eine Pendenz aus einem
+     Traktandum, und der Text dazu steht schon da.
+     Zurück kommt die gespeicherte Zeile, damit der Aufrufer sie
+     verknüpfen kann, oder null bei Abbruch. */
+  function pendenzFormular({ projektId, firmen = [], vorhanden = null, vorschlag = '' }) {
     return new Promise(fertig => {
       const s = sheet(`
         <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:18px;">${vorhanden ? 'Pendenz bearbeiten' : 'Pendenz erfassen'}</div>
@@ -201,7 +207,7 @@ const PJ = (() => {
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
           <label for="pd-text" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Beschrieb</label>
           <textarea id="pd-text" rows="3" placeholder="z.B. Fassadengerüst Haus Flora abbauen"
-                    style="border-radius:10px; border:1.5px solid var(--border); padding:11px 13px; font-size:14px; color:var(--text); box-sizing:border-box; resize:vertical;">${esc(vorhanden?.beschrieb || '')}</textarea>
+                    style="border-radius:10px; border:1.5px solid var(--border); padding:11px 13px; font-size:14px; color:var(--text); box-sizing:border-box; resize:vertical;">${esc(vorhanden?.beschrieb || vorschlag || '')}</textarea>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
@@ -240,17 +246,22 @@ const PJ = (() => {
         btn.innerHTML = '<span class="spin"></span>';
         try {
           if (!istOnline()) throw new Error('Pendenzen lassen sich nur online erfassen');
+          let zeile;
           if (vorhanden) {
-            const { error } = await sb.from('pendenzen').update(felder).eq('id', vorhanden.id);
+            const { data, error } = await sb.from('pendenzen')
+              .update(felder).eq('id', vorhanden.id).select().single();
             if (error) throw error;
+            zeile = data;
           } else {
             const sitzung = await session();
-            const { error } = await sb.from('pendenzen')
-              .insert({ ...felder, projekt_id: projektId, erstellt_von: sitzung.user.id });
+            const { data, error } = await sb.from('pendenzen')
+              .insert({ ...felder, projekt_id: projektId, erstellt_von: sitzung.user.id })
+              .select().single();
             if (error) throw error;
+            zeile = data;
           }
           s.schliessen();
-          fertig(true);
+          fertig(zeile);
         } catch (e) {
           fehler.textContent = e.message || 'Speichern hat nicht geklappt.';
           fehler.hidden = false;

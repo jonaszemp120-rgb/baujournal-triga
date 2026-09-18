@@ -20,6 +20,7 @@
   let pendenzen = [];
   let feed = [];
   let abnahmen = [];
+  let protokolle = [];
   let firmen = [];
   let mitarbeiter = [];
   let bkp = [];
@@ -28,6 +29,7 @@
     ort: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
     person: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>',
     ordner: '<path d="M4 4h5l2 3h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/>',
+    protokoll: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/>',
     stift: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
     weg: '<path d="M18 6 6 18M6 6l12 12"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -79,6 +81,14 @@
     return data || [];
   }
 
+  async function ladeProtokolle() {
+    if (!istOnline()) return [];
+    const { data, error } = await sb.from('protokolle')
+      .select('id, status').eq('projekt_id', projektId);
+    if (error) return [];
+    return data || [];
+  }
+
   async function ladeAuswahllisten() {
     if (!istOnline()) return;
     const [f, m, b] = await Promise.all([
@@ -95,9 +105,10 @@
   }
 
   async function allesLaden() {
-    [projekt, einsaetze, personen, ordner, journal, pendenzen, feed, abnahmen] = await Promise.all([
+    [projekt, einsaetze, personen, ordner, journal, pendenzen, feed, abnahmen, protokolle] = await Promise.all([
       PJ.projekt(projektId), PJ.einsaetze(projektId), PJ.personen(projektId),
-      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId), ladeFeed(), ladeAbnahmen()
+      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId), ladeFeed(), ladeAbnahmen(),
+      ladeProtokolle()
     ]);
   }
 
@@ -684,6 +695,20 @@
       : '<div class="pj-leer">Noch keine Abnahme. Dafür braucht es einen Grundriss als PDF in den Dokumenten dieses Projekts.</div>'}`;
   }
 
+  /* Eine Zeile, kein Block mit Auszug: was in einer Sitzung besprochen
+     wurde, lässt sich nicht in zwei Worten anreissen, und die Liste der
+     Protokolle steht einen Klick weiter ohnehin vollständig da. */
+  function zeichneProtokolle() {
+    const n = protokolle.length;
+    $('#protokolle').innerHTML = `
+      <a class="pj-zeile pressable" href="protokolle.html?projekt=${encodeURIComponent(projektId)}"
+         style="border:1px solid var(--border); border-radius:14px; padding:15px 16px; background:var(--card);">
+        <span style="color:var(--navy); display:flex;">${svg(IKON.protokoll, 18)}</span>
+        <span class="wer"><span class="titel" style="font-size:15px;">Sitzungsprotokolle${n ? ` · ${n}` : ''}</span></span>
+        <span class="pj-mehr">Ansehen →</span>
+      </a>`;
+  }
+
   function zeichneDokumente() {
     $('#dokumente').innerHTML = `
       <div class="kopf">
@@ -723,6 +748,7 @@
     zeichnePendenzen();
     zeichneAbnahmen();
     zeichneJournal();
+    zeichneProtokolle();
     zeichneFeed();
     zeichneDokumente();
   })();

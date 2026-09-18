@@ -460,6 +460,169 @@ async function abnahmeProtokoll({ projekt, abnahme, maengel, planBild, fotos,
   return doc.output('blob');
 }
 
+/* --- Sitzungsprotokoll ----------------------------------------------------- */
+
+/* Das Protokoll einer Sitzung als PDF: Kopfdaten, Teilnehmerliste mit
+   Status, alle Traktanden mit Text und Foto und am Schluss, was aus der
+   Sitzung hervorgegangen ist — die Beschlüsse und die neuen Pendenzen.
+   Steht hier aus demselben Grund wie das Abnahmeprotokoll: Logo,
+   Zeichenumsetzung und Seitenumbruch liegen schon da. Liefert den Blob,
+   wohin er gehört, entscheidet der Aufrufer. */
+async function sitzungsProtokoll({ projekt, protokoll, titel: kopftitel,
+                                   teilnehmer, traktanden, fotos, wann }) {
+  await ladeSkript('vendor/jspdf-2.5.2.umd.min.js');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  let logo = null, logoBreite = 0;
+  const LOGO_H = 12;
+  try {
+    logo = await logoDatenUrl();
+    const masse = doc.getImageProperties(logo);
+    logoBreite = LOGO_H * masse.width / masse.height;
+  } catch (e) {
+    console.warn('[TRIGA] Logo fuers Protokoll nicht verfuegbar:', e.message);
+  }
+
+  const L = 18, R = 192, BREITE = R - L;
+  let y = 0;
+
+  const kopf = () => {
+    doc.setFillColor(0, 35, 63);
+    doc.rect(0, 0, 210, 26, 'F');
+    if (logo) doc.addImage(logo, 'PNG', L, (26 - LOGO_H) / 2, logoBreite, LOGO_H);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold').setFontSize(13);
+    doc.text('Sitzungsprotokoll', R, 15, { align: 'right' });
+    y = 38;
+  };
+  const platz = h => { if (y + h > 280) { doc.addPage(); kopf(); } };
+  const titel = t => {
+    platz(14);
+    doc.setFont('helvetica', 'bold').setFontSize(9);
+    doc.setTextColor(178, 0, 0);
+    doc.text(pdfText(t).toUpperCase(), L, y);
+    y += 2.5;
+    doc.setDrawColor(223, 228, 230).setLineWidth(0.3);
+    doc.line(L, y, R, y);
+    y += 5;
+  };
+  const absatz = (text, einzug = 0) => {
+    doc.setFont('helvetica', 'normal').setFontSize(10);
+    doc.setTextColor(18, 24, 27);
+    for (const zeile of doc.splitTextToSize(pdfText(text), BREITE - einzug)) {
+      platz(6);
+      doc.text(zeile, L + einzug, y);
+      y += 5;
+    }
+  };
+
+  kopf();
+
+  doc.setFont('helvetica', 'bold').setFontSize(16);
+  doc.setTextColor(0, 35, 63);
+  const zeilen = doc.splitTextToSize(pdfText(kopftitel), BREITE);
+  doc.text(zeilen, L, y);
+  y += 7 * zeilen.length;
+
+  doc.setFont('helvetica', 'normal').setFontSize(9.5);
+  doc.setTextColor(92, 106, 112);
+  for (const z of [
+    projekt?.name,
+    [fmtDatum(protokoll?.datum), protokoll?.ort].filter(Boolean).join(' · '),
+    [projekt?.standort, projekt?.bauherrschaft && `Bauherrschaft: ${projekt.bauherrschaft}`]
+      .filter(Boolean).join(' · ')
+  ].filter(Boolean)) {
+    doc.text(pdfText(z), L, y);
+    y += 5;
+  }
+  y += 4;
+
+  titel('Teilnehmer');
+  if (!teilnehmer.length) {
+    absatz('Keine Teilnehmenden erfasst.');
+  }
+  for (const p of teilnehmer) {
+    platz(6);
+    doc.setFont('helvetica', 'bold').setFontSize(10);
+    doc.setTextColor(18, 24, 27);
+    doc.text(pdfText(p.name), L, y);
+    doc.setFont('helvetica', 'normal').setFontSize(9.5);
+    doc.setTextColor(92, 106, 112);
+    if (p.firma) doc.text(pdfText(p.firma), L + 62, y);
+    doc.text(pdfText(p.status_titel || ''), R, y, { align: 'right' });
+    y += 5.5;
+  }
+  y += 3;
+
+  titel('Traktanden');
+  if (!traktanden.length) absatz('Keine Traktanden erfasst.');
+  for (const t of traktanden) {
+    platz(16);
+    doc.setFont('helvetica', 'bold').setFontSize(11);
+    doc.setTextColor(0, 35, 63);
+    doc.text(`${t.nummer}.`, L, y);
+    const einzug = 8;
+    for (const zeile of doc.splitTextToSize(pdfText(t.titel), BREITE - einzug)) {
+      doc.text(zeile, L + einzug, y);
+      y += 5.5;
+    }
+    y += 1;
+
+    if (t.text && String(t.text).trim()) absatz(t.text, einzug);
+
+    if (fotos?.[t.id]) {
+      try {
+        const masse = doc.getImageProperties(fotos[t.id]);
+        const b = 60;
+        const h = Math.min(50, b * masse.height / masse.width);
+        platz(h + 4);
+        doc.addImage(fotos[t.id], 'JPEG', L + einzug, y + 1, h * masse.width / masse.height, h);
+        y += h + 4;
+      } catch { /* ein unlesbares Foto darf das Protokoll nicht aufhalten */ }
+    }
+
+    const marken = [t.beschluss ? 'Beschluss' : '', t.pendenz_text ? 'Pendenz erstellt' : '']
+      .filter(Boolean).join(' · ');
+    if (marken) {
+      platz(6);
+      doc.setFont('helvetica', 'bold').setFontSize(9);
+      doc.setTextColor(178, 0, 0);
+      doc.text(pdfText(marken), L + einzug, y);
+      y += 5;
+    }
+    y += 3;
+  }
+
+  /* Die beiden Listen am Schluss sind der Grund, warum jemand ein
+     Protokoll zwei Wochen später nochmals aufmacht: was wurde
+     entschieden, und was ist davon Arbeit geworden. */
+  const beschluesse = traktanden.filter(t => t.beschluss);
+  const pendenzen = traktanden.filter(t => t.pendenz_text);
+
+  titel('Beschluesse');
+  if (!beschluesse.length) absatz('Keine Beschluesse gefasst.');
+  for (const t of beschluesse) absatz(`${t.nummer}. ${t.titel}`);
+  y += 3;
+
+  titel('Neue Pendenzen');
+  if (!pendenzen.length) absatz('Keine neuen Pendenzen.');
+  for (const t of pendenzen) {
+    absatz(`${t.nummer}. ${t.pendenz_text}${t.pendenz_firma ? ` (${t.pendenz_firma})` : ''}`);
+  }
+
+  const seiten = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= seiten; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal').setFontSize(8);
+    doc.setTextColor(140, 152, 158);
+    doc.text(`Seite ${i} von ${seiten}`, R, 288, { align: 'right' });
+    doc.text(pdfText(`Erstellt am ${wann.toLocaleDateString('de-CH')} · TRIGA Baumanagement AG`), L, 288);
+  }
+
+  return doc.output('blob');
+}
+
 /* Zeichnet die nummerierten Nadeln auf den Plan. Dieselben Anteile wie am
    Bildschirm, nur eben einmal fest ins Bild gebrannt. */
 async function planMitNadeln(planBild, maengel) {

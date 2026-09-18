@@ -31,6 +31,13 @@ Baujournal-Einträge und die zugeordneten Dokumentenordner. Die Projektseite
 zeigt jeden dieser Teile als Auszug und verlinkt in den Bereich, der die volle
 Ansicht hat.
 
+Die **Sitzungsprotokolle** hängen ebenfalls am Projekt. Ein Protokoll trägt
+Datum, Ort, eine pro Projekt fortlaufende Nummer und eine Traktandenliste, dazu
+die Teilnehmenden mit Vorsitz, anwesend, abwesend oder Verteiler. Zu jedem
+Traktandum kommen Text und optional ein Foto; daraus wird auf Wunsch ein
+Beschluss oder eine Pendenz. Am Schluss entsteht ein PDF, und ab dann ist das
+Protokoll zu.
+
 Die **Pendenzen** sind bewusst vom Baujournal getrennt. Das Journal ist das
 Tagesprotokoll und gehört einem Datum; eine Pendenz bleibt über die Tage offen,
 bis jemand sie abhakt. Pro Punkt gibt es einen Beschrieb und optional eine
@@ -117,12 +124,14 @@ wurde.
 | `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren, in Echtzeit. |
 | `formulare.html` | Spesen- und Ferienanträge: einreichen, zurückziehen, entscheiden. |
 | `abnahme.html` | Die Bauabnahme eines Projekts: Plan, Mängel, Abschluss, `?projekt=` und optional `?abnahme=`. |
+| `protokolle.html` | Die Sitzungsprotokolle eines Projekts als Liste, `?projekt=`. |
+| `protokoll.html` | Ein Sitzungsprotokoll: Kopfdaten, Teilnehmende, Traktanden, Abschluss, `?protokoll=`. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
 | `chat.html` | Der Chat: Gespräche links, das offene rechts, `?chat=`. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
-| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Bauabnahmen, Journal, Feed-Beiträgen und Dokumenten. |
+| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Bauabnahmen, Journal, Sitzungsprotokollen, Feed-Beiträgen und Dokumenten. |
 | `pendenzen.html` | Alle Pendenzen eines Projekts, offene und erledigte, `?projekt=`. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
@@ -331,6 +340,9 @@ js/start.js          die Startseite mit der Bereichsauswahl
 js/feed.js           der Feed: Beiträge, Umfragen, Herz, Kommentare
 js/formulare.js      Spesen- und Ferienanträge
 js/abnahme.js        die Bauabnahme: Plan, Mängel, Abschluss
+js/protokolle.js     die Sitzungsprotokolle eines Projekts als Liste
+js/protokoll.js      ein Sitzungsprotokoll: Kopfdaten, Teilnehmende,
+                     Traktanden, Abschluss, Teilen
 js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
                      Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
@@ -357,6 +369,7 @@ api/_webpush.js       Web Push von Hand: Verschlüsselung nach RFC 8291,
                       VAPID nach RFC 8292. Der Unterstrich haelt die
                       Datei aus dem Routing von Vercel heraus
 api/chat-aufraeumen.js  taeglicher Cron: abgelaufene Bilder loeschen
+css/protokoll.css     die Übersicht und der Protokoll-Screen
 css/projekte.css      Statusmarken und Karten des Bereichs Projekte.
                       Liegt auch auf mitarbeiter.html, wegen der Marke
                       für die Berechtigungsstufe
@@ -447,6 +460,16 @@ alle acht Bereiche.
   Nadel auf dem Handy und am Bildschirm am selben Fleck sitzt. Sobald
   `abgeschlossen_am` steht, sperrt der Trigger `abnahme_gesperrt()` beide
   Tabellen: kein Mangel kommt dazu, keiner verschwindet, keiner ändert sich
+- `protokolle`, `protokoll_teilnehmer`, `protokoll_traktanden` — die
+  Sitzungsprotokolle. Die `nummer` läuft pro Projekt und vergibt der Trigger
+  `protokoll_nummer()`, nicht die App: zwei Geräte, die im selben Moment
+  anlegen, bekämen sonst beide die 13. Ein Traktandum trägt `reihenfolge` und
+  keine Nummer — die angezeigte Zahl ist die Position in der Liste, sonst
+  müsste beim Verschieben jede Zahl darunter mitwandern. Getauscht wird mit
+  `traktandum_schieben()`, in einem Zug. Teilnehmende tragen `name` und `firma`
+  zusätzlich als Momentaufnahme, damit ein Protokoll lesbar bleibt, wenn die
+  Person später umbenannt oder aus dem Adressbuch entfernt wird. Sobald
+  `abgeschlossen_am` steht, sperrt `protokoll_gesperrt()` alle drei Tabellen
 - `chats`, `chat_mitglieder`, `nachrichten` — der Chat. Ein Bild liegt im Bucket
   `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
   `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
@@ -669,6 +692,52 @@ und wird von zwei Orten gebraucht: unter «Mein Profil» für die eigene
 Unterschrift und bei der Abnahme für die Bauherrschaft, die kein Konto in dieser
 App hat. Zwei Fassungen desselben Felds liefen früher oder später auseinander,
 und dann sähe eine Unterschrift im Protokoll anders aus als im Profil.
+
+## Sitzungsprotokolle
+
+**Derselbe Gedanke wie bei der Abnahme:** vorbereiten, in der Sitzung füllen,
+am Schluss abschliessen — und danach ist es ein Nachweis. Die drei Zustände
+heissen *Vorbereitet*, *Entwurf* und *Abgeschlossen*.
+
+**Der Wechsel von Vorbereitet auf Entwurf hat bewusst keinen Knopf.** Sobald
+zum ersten Mal etwas festgehalten wird — Text, Beschluss, Foto, Pendenz oder
+die Anwesenheit einer Person —, hat die Sitzung offensichtlich stattgefunden.
+Ein eigener Schalter dafür wäre einer, den man vergisst, und dann stünde in der
+Übersicht «noch nicht durchgeführt», während das Protokoll voller Text ist.
+
+**Eine Pendenz aus einem Traktandum geht in die bestehende Pendenzenliste des
+Projekts**, nicht in eine zweite daneben. Am Traktandum bleibt nur der Verweis,
+damit das fertige Protokoll sagen kann, was aus der Sitzung an Arbeit
+hervorgegangen ist. Der Beschrieb wird aus dem Traktandumstext vorgeschlagen und
+bleibt änderbar.
+
+Daraus folgt eine einzige Lücke in der Sperre: verschwindet eine Pendenz aus der
+Projektliste, darf ihre Spur im Traktandum verblassen, auch wenn das Protokoll
+längst abgeschlossen ist. Ohne diese Ausnahme liesse sich eine Pendenz, die
+einmal aus einem fertigen Protokoll entstanden ist, nie mehr löschen — das
+Aufräumen des Fremdschlüssels würde an der Sperre scheitern. Erlaubt ist
+ausschliesslich dieser eine Schritt, geprüft als Erlaubnisliste wie bei
+`antrag_schutz()`.
+
+**Das PDF** entsteht vor dem Abschluss, aus demselben Grund wie beim
+Abnahmeprotokoll: die Datenbank sperrt ein abgeschlossenes Protokoll, die
+Kennung der Datei liesse sich sonst nicht mehr eintragen. Es enthält die
+Kopfdaten, die Teilnehmerliste mit Status, alle Traktanden mit Text und Foto und
+am Schluss die beiden Listen, wegen derer jemand ein Protokoll zwei Wochen
+später nochmals aufmacht: was wurde entschieden, und was ist davon Arbeit
+geworden. Erzeugt wird es von `sitzungsProtokoll()` in `js/export.js` und liegt
+im Bereich Dokumente des Projekts.
+
+**Geteilt wird über das Gerät, nicht über einen Mailversand.** Ein eingebauter
+Versand bräuchte eine bezahlte Infrastruktur, die für diese Testphase nicht
+gerechtfertigt ist. Die Web Share API reicht das PDF als Datei an jede App
+weiter, auch ans Mailprogramm. Wo es sie nicht gibt — mancher Browser am
+Schreibtisch kennt sie nicht —, wird die Datei heruntergeladen.
+
+**Gelöscht** wird ohne Papierkorb, wie bei den Pendenzen: ein vorbereitetes oder
+begonnenes Protokoll ist in Sekunden neu angelegt. Ein abgeschlossenes lässt
+sich gar nicht mehr löschen, das PDF ist der massgebende Nachweis. Dasselbe gilt
+für einzelne Traktanden.
 
 ## Chat und Benachrichtigungen
 
