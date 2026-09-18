@@ -18,6 +18,7 @@
   let ordner = [];
   let journal = [];
   let pendenzen = [];
+  let feed = [];
   let firmen = [];
   let mitarbeiter = [];
   let bkp = [];
@@ -52,11 +53,27 @@
     return data || [];
   }
 
+  /* Der Auszug aus dem Feed: die Beiträge, die jemand diesem Projekt
+     zugeordnet hat. Umfragen können das nicht sein, die tragen kein
+     Projekt — siehe die Prüfregel in der Migration. */
+  async function ladeFeed() {
+    if (!istOnline()) return [];
+    const { data, error } = await sb.from('feed_beitraege')
+      .select('id, kategorie, text, bild_ablauf, erstellt_von, erstellt_am')
+      .eq('projekt_id', projektId)
+      .order('erstellt_am', { ascending: false }).limit(5);
+    /* Kein meckern(): wer keinen Eintrag im Bereich Mitarbeiter hat, sieht
+       den Feed nicht, und das ist kein Fehler, sondern die Regel. Der
+       Block sagt dann einfach, dass nichts da ist. */
+    if (error) return [];
+    return data || [];
+  }
+
   async function ladeAuswahllisten() {
     if (!istOnline()) return;
     const [f, m, b] = await Promise.all([
       sb.from('firmen').select('id, name, plz_ort, bkp_codes').is('geloescht_am', null).order('name'),
-      sb.from('mitarbeiter').select('id, name, rolle').is('geloescht_am', null).order('name'),
+      sb.from('mitarbeiter').select('id, name, rolle, user_id').is('geloescht_am', null).order('name'),
       sb.from('bkp_liste').select('code, bezeichnung').is('geloescht_am', null).order('code')
     ]);
     meckern('Firmen laden', f.error);
@@ -68,9 +85,9 @@
   }
 
   async function allesLaden() {
-    [projekt, einsaetze, personen, ordner, journal, pendenzen] = await Promise.all([
+    [projekt, einsaetze, personen, ordner, journal, pendenzen, feed] = await Promise.all([
       PJ.projekt(projektId), PJ.einsaetze(projektId), PJ.personen(projektId),
-      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId)
+      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId), ladeFeed()
     ]);
   }
 
@@ -610,6 +627,32 @@
       : '<div class="pj-leer">Noch kein Eintrag im Baujournal.</div>'}`;
   }
 
+  /* Derselbe Auszug wie beim Baujournal darunter: Datum links, Text
+     rechts, alles Weitere im Bereich selbst. Ein Beitrag ohne Text ist
+     einer mit Foto. */
+  function zeichneFeed() {
+    const nameVon = u => mitarbeiter.find(m => m.user_id === u)?.name || 'Jemand';
+    const kurz = b => {
+      const t = (b.text || '').trim();
+      if (t) return t;
+      return b.bild_ablauf ? 'Foto gepostet.' : 'Ohne Text gepostet.';
+    };
+    $('#feed').innerHTML = `
+      <div class="kopf">
+        <h2>Feed — Beiträge zu diesem Projekt</h2>
+        <a class="pj-mehr" href="feed.html">Zum Feed →</a>
+      </div>
+      ${feed.length ? `<div class="pj-flach">${feed.map(b => `
+        <a class="pj-eintrag" href="feed.html">
+          <span class="wann">${esc(fmtDatum(b.erstellt_am))}</span>
+          <span class="was">
+            ${b.kategorie === 'wichtig' ? '<span class="pj-marke klein" style="background:#fdeaea; color:var(--red); margin-right:6px;">Wichtig</span>' : ''}
+            ${esc(nameVon(b.erstellt_von))}: ${esc(kurz(b))}
+          </span>
+        </a>`).join('')}</div>`
+      : '<div class="pj-leer">Noch kein Beitrag zu diesem Projekt. Im Feed lässt sich beim Schreiben ein Projekt zuordnen.</div>'}`;
+  }
+
   function zeichneDokumente() {
     $('#dokumente').innerHTML = `
       <div class="kopf">
@@ -648,6 +691,7 @@
     zeichnePersonen();
     zeichnePendenzen();
     zeichneJournal();
+    zeichneFeed();
     zeichneDokumente();
   })();
 })();

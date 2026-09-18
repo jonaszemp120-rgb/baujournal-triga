@@ -54,7 +54,23 @@
     chat:        { wert: gespraeche, eins: 'Gespräch', viele: 'Gespräche', desktop: 'Gespräche' }
   };
 
-  $('#raster').innerHTML = BEREICHE.map(b => {
+  /* Der Feed hat bewusst keine Kachel, er steht in der Seitenleiste. Auf
+     dem Handy gibt es die Seitenleiste aber nicht, und ohne einen Weg
+     dorthin wäre der Bereich auf dem Telefon schlicht nicht erreichbar.
+     Darum diese eine Zeile über den Kacheln: kein siebtes Feld im Raster,
+     sondern ein Einstieg, der sich davon deutlich unterscheidet. */
+  const feed = BEREICHE.find(b => b.id === 'feed');
+  $('#feed-einstieg').innerHTML = `
+    <a class="st-feed pressable" href="${feed.ziel}">
+      <span class="symbol">${bereichsIcon(feed.icon, 18)}</span>
+      <span class="wort">
+        <span class="titel">Feed</span>
+        <span class="unter">Neuigkeiten und Umfragen aus dem Betrieb</span>
+      </span>
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </a>`;
+
+  $('#raster').innerHTML = BEREICHE.filter(b => b.kachel !== false).map(b => {
     const z = zahlen[b.id];
     const mobilZeile = z.wert === null
       ? 'wird noch eingerichtet'

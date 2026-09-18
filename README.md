@@ -1,8 +1,8 @@
 # TRIGA App · TRIGA Baumanagement AG
 
-Die interne App der TRIGA Baumanagement AG. Sechs Bereiche, ein Login, eine
-Adresse: **Mitarbeiter**, **Projekte**, **Baujournal**, **Firmenpool**,
-**Dokumente**, **Chat**. Läuft
+Die interne App der TRIGA Baumanagement AG. Sieben Bereiche, ein Login, eine
+Adresse: **Feed**, **Mitarbeiter**, **Projekte**, **Baujournal**,
+**Firmenpool**, **Dokumente**, **Chat**. Läuft
 im Browser, lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert
 im Baujournal auch ohne Empfang, etwa in der Tiefgarage oder im Rohbau.
 
@@ -10,7 +10,14 @@ Kein Build-Schritt, kein Framework. Reines HTML, CSS und JavaScript, das Vercel
 direkt als statische Seiten ausliefert. Wer am Code etwas ändert, öffnet die
 Datei, speichert, fertig.
 
-## Die sechs Bereiche
+## Die sieben Bereiche
+
+**Feed** ist der Aushang des Betriebs. Ein Strom, chronologisch, sichtbar für
+alle. Zwei Arten stehen darin: ein Beitrag mit Text, optional einem Foto und
+optional einem Projekt, und eine Umfrage mit Frage und Antwortmöglichkeiten.
+Ein Beitrag trägt die Kategorie **Update** oder **Wichtig**; ein wichtiger
+bekommt einen roten Rahmen und fällt damit auf, was sonst nirgends in der App
+vorkommt. Herz und Kommentare gibt es an beidem.
 
 **Mitarbeiter** ist das Adressbuch des Teams, bewusst getrennt von den
 Login-Konten. Telefon und E-Mail sind direkt antippbar. Einen Eintrag hier zu
@@ -91,13 +98,14 @@ wurde.
 | Datei | Zweck |
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
-| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den sechs Bereichen, mit Zahlen aus der Datenbank. |
+| `start.html` | Die Startseite nach dem Login: die sechs Kacheln mit Zahlen aus der Datenbank, darüber auf dem Handy die Zeile zum Feed. |
+| `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
 | `chat.html` | Der Chat: Gespräche links, das offene rechts, `?chat=`. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
-| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal und Dokumenten. |
+| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal, Feed-Beiträgen und Dokumenten. |
 | `pendenzen.html` | Alle Pendenzen eines Projekts, offene und erledigte, `?projekt=`. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
@@ -135,6 +143,8 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Firma | `firmenpool.html` | dort | Papierkorb Firmenpool |
 | Ansprechperson | in der Firma | dort | direkt, ohne Papierkorb |
 | Notiz | in der Firma | dort | direkt, ohne Papierkorb |
+| Beitrag oder Umfrage | `feed.html` | gar nicht, ein Beitrag steht wie gepostet | direkt, ohne Papierkorb, eigene immer, fremde mit erweiterter Stufe |
+| Kommentar | unter einem Beitrag | gar nicht | direkt, ohne Papierkorb, wie beim Beitrag |
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
 | Eigene Kontaktdaten | — | `profil.html` | — |
 | Eigene Unterschrift | `profil.html` | dort neu erfassen | dort |
@@ -293,9 +303,12 @@ css/app.css          Schrift, Farben, Zustände, der gemeinsame Rahmen.
 js/logo.js           die einzige Logoquelle
 js/config.js         Supabase-URL und anon key
 js/app.js            Client, Session, Datumsformate, Sheets, Kontozeile
-js/shell.js          die Seitenleiste ab 1024px, die sechs Bereiche,
-                     das Test-Banner (ein einziger Schalter)
+js/shell.js          die Seitenleiste ab 1024px, die sieben Bereiche,
+                     das Test-Banner (ein einziger Schalter). Ein Bereich
+                     mit kachel:false steht nur in der Leiste, nicht im
+                     Raster der Startseite
 js/start.js          die Startseite mit der Bereichsauswahl
+js/feed.js           der Feed: Beiträge, Umfragen, Herz, Kommentare
 js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
                      Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
@@ -352,7 +365,7 @@ um dieses Polster aus dem Bild.
 ## Datenbank
 
 Supabase-Projekt `baujournal-triga`, Region `eu-central-1`. Eine Datenbank für
-alle sechs Bereiche.
+alle sieben Bereiche.
 
 - `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
   `beschrieb`, `status` (planung / laufend / abgeschlossen) und `archiviert`.
@@ -391,6 +404,15 @@ alle sechs Bereiche.
   JSON-Liste im Feld `bkp_codes`
 - `ansprechpersonen`, `notizen` — Unterdetails einer Firma. Eine Notiz darf ein
   `projekt_id` tragen; ohne gilt sie allgemein für die Firma
+- `feed_beitraege`, `feed_optionen`, `feed_stimmen`, `feed_reaktionen`,
+  `feed_kommentare` — der Feed. Beitrag und Umfrage stehen in derselben
+  Tabelle, unterschieden durch `art`; Prüfregeln halten auseinander, was nur zu
+  einer Art gehört. Der Primärschlüssel `(beitrag_id, user_id)` auf
+  `feed_stimmen` sorgt dafür, dass niemand zweimal abstimmt, und die Policy
+  darauf gibt bei einer anonymen Umfrage keine fremde Zeile heraus. Gezählt
+  wird mit `feed_ergebnisse()`, das nur Zahlen zurückgibt. Ein Foto liegt im
+  Bucket `feed-bilder` unter `<beitrag_id>/<zufall>`, mit derselben
+  30-Tage-Regel wie im Chat
 - `chats`, `chat_mitglieder`, `nachrichten` — der Chat. Ein Bild liegt im Bucket
   `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
   `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
@@ -499,6 +521,47 @@ zugeordnet, siehe `js/store.js`.
 `js/config.js` enthält URL und anon key. Beides ist öffentlich und gehört so in
 den Client, der Schutz kommt von RLS. Der `service_role` key darf nie ins Repo,
 der umgeht RLS vollständig.
+
+## Feed
+
+**Ein Beitrag und eine Umfrage stehen in derselben Tabelle.** `feed_beitraege`
+trägt beide, unterschieden durch `art`. Der Grund ist der gemeinsame Strom: sie
+stehen chronologisch nebeneinander, tragen dieselben Herzen und dieselben
+Kommentare. Zwei Tabellen hiessen jede Abfrage zweimal und die Sortierung von
+Hand zusammengesetzt. Die Prüfregeln in der Migration halten trotzdem sauber
+auseinander, was nur zur einen Art gehört: eine Kategorie hat nur der Beitrag,
+ein Projekt auch, `anonym` nur die Umfrage.
+
+**Die Anonymität kommt nicht daher, dass die App Namen verschweigt.**
+`feed_stimmen` muss festhalten, wer abgestimmt hat, sonst liesse sich eine
+zweite Stimme nicht verhindern — der Primärschlüssel `(beitrag_id, user_id)`
+macht genau das. Herausgegeben werden diese Zeilen aber nie: die Policy zeigt
+bei einer anonymen Umfrage jeder Person nur ihre eigene, auch der, die die
+Umfrage angelegt hat. Gezählt wird in der Datenbank, mit
+`feed_ergebnisse()`, und von dort kommen ausschliesslich Zahlen zurück. Auf der
+Datenbank nachgestellt und bestätigt: als erstellende Person 0 von 3
+Stimmzeilen sichtbar, die Auswertung trotzdem vollständig.
+
+**Hier wird wirklich gelöscht, ohne Papierkorb.** Das ist der einzige Bereich,
+in dem das so ist, und es ist gewollt: ein Beitrag ist kein Dokument mit
+Aufbewahrungsfrist, wer sich vertippt, postet neu. Die Regel auf `eintraege`
+bleibt davon unberührt, dort gibt es weiterhin keine Delete-Policy.
+Löschen darf, wer geschrieben hat, und zusätzlich die erweiterte Stufe
+(`ist_berechtigt()`) — als einfache Moderation, für Beiträge und Kommentare
+gleichermassen. Wer einen ganzen Beitrag entfernen darf, soll nicht den Umweg
+gehen müssen, den Beitrag zu löschen, um einen Kommentar loszuwerden.
+
+**Fotos leben 30 Tage, genau wie im Chat.** Und zwar über denselben Ablauf:
+`api/_bilder.js` enthält ihn einmal, `api/chat-aufraeumen.js` und
+`api/feed-aufraeumen.js` rufen ihn mit ihren eigenen Namen auf. Zwei Kopien
+wären zwei Orte, an denen jemand später etwas ändert und den anderen vergisst.
+
+**Der Feed hat keine Kachel auf der Startseite,** er steht zuoberst in der
+Seitenleiste. So zeigt es die Design-Referenz. Auf dem Handy gibt es die
+Seitenleiste aber nicht, und ohne einen Weg dorthin wäre der Bereich auf dem
+Telefon nicht erreichbar — deshalb die eine Zeile über den Kacheln
+(`.st-feed`). Kein siebtes Feld im Raster, sondern ein Einstieg, der sich davon
+deutlich unterscheidet.
 
 ## Chat und Benachrichtigungen
 

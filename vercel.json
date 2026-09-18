@@ -4,6 +4,10 @@
     {
       "path": "/api/chat-aufraeumen",
       "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/feed-aufraeumen",
+      "schedule": "47 3 * * *"
     }
   ],
   "headers": [

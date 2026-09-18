@@ -12,6 +12,16 @@
 
 const BEREICHE = [
   {
+    /* Der Feed steht zuoberst, weil er das Neueste zeigt und man dort
+       zuerst hinschaut.
+       kachel:false heisst: er erscheint in der Seitenleiste, aber nicht im
+       Kachelraster der Startseite. So steht es in der Design-Referenz, und
+       das Raster bleibt bei den sechs Bereichen, die dort abgebildet sind.
+       Den Weg dorthin auf dem Handy nimmt die Zeile über den Kacheln. */
+    id: 'feed', titel: 'Feed', ziel: 'feed.html', kachel: false,
+    icon: '<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/>'
+  },
+  {
     id: 'mitarbeiter', titel: 'Mitarbeiter', ziel: 'mitarbeiter.html',
     icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
   },
