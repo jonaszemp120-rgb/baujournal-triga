@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'triga-v14';
+const VERSION = 'triga-v15';
 
 const DATEIEN = [
   './',
