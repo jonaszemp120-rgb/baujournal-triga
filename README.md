@@ -536,6 +536,22 @@ Supabase nach den Mitgliedern — steht die Person nicht drin, liefert RLS eine
 leere Liste und es passiert nichts. Erst danach kommt der Dienstschlüssel zum
 Zug, und nur für die so ermittelten Geräte.
 
+**Jede Anfrage an Supabase trägt zwei Köpfe, und sie bedeuten Verschiedenes:**
+`apikey` weist das Projekt aus, `Authorization` die Person. Der `apikey` muss
+einer der Schlüssel des Projekts sein — anon key oder Dienstschlüssel. Ein
+Zugangs-Token ist keiner, und das Tor vor der Datenbank weist eine Anfrage mit
+einem solchen `apikey` ab. Genau das stand hier einmal in beiden Köpfen, mit
+der Folge, dass `api/push.js` „kein Zugriff auf dieses Gespräch" meldete,
+obwohl die Person das Gespräch gerade eben beschrieben hatte.
+
+**Jede Absage schreibt eine Zeile ins Log.** Eine Funktion, die 403 antwortet
+und sonst schweigt, sieht in den Vercel-Logs aus wie eine, die gar nicht erst
+gelaufen ist — „No logs found for this request". Deshalb nennt jeder Abbruch
+in `api/push.js` den Grund und, wo es einen gibt, den Status und die Antwort
+von Supabase. Auch der Browser schweigt nicht mehr: bleibt `/api/push` ohne
+Erfolg, steht das in der Konsole. Auf die Nachricht selbst hat das keinen
+Einfluss, die ist längst zugestellt.
+
 `api/_webpush.js` macht die Kryptografie von Hand: Verschlüsselung nach
 RFC 8291, VAPID-Token nach RFC 8292, beides mit der WebCrypto-Schnittstelle von
 Node. Es gäbe dafür ein fertiges npm-Paket, aber dieses Repo kommt seit jeher

@@ -111,7 +111,7 @@ function pushSenden({ chat, titel, text, ziel }) {
       if (!istOnline()) return;
       const s = await session();
       if (!s) return;
-      await fetch('/api/push', {
+      const antwort = await fetch('/api/push', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,6 +119,13 @@ function pushSenden({ chat, titel, text, ziel }) {
         },
         body: JSON.stringify({ chat, titel, text, ziel })
       });
+      /* Scheitert der Versand, ändert das für die Nachricht nichts — sie
+         steht längst in der Datenbank. Stillschweigen wäre trotzdem
+         falsch: ein Fehler, den niemand sieht, wird nicht gesucht. */
+      if (!antwort.ok) {
+        console.warn('Benachrichtigung nicht verschickt:', antwort.status,
+                     await antwort.text().catch(() => ''));
+      }
     } catch { /* ohne Meldung ist die Nachricht trotzdem da */ }
   })();
 }

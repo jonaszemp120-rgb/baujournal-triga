@@ -99,12 +99,15 @@
 /* Eine gelöschte Nachricht bleibt an ihrem Platz, sagt aber nichts mehr. */
 .ch-blase.geloescht .wort{ font-style:italic; opacity:.7; }
 
-/* Zeit, Haken und der Weg zum Löschen, klein unter der Nachricht. */
+/* Zeit, Haken und der Weg zum Löschen, klein unter der Nachricht.
+   Drei verschiedene Dinge auf engem Raum: mit zu wenig Luft dazwischen
+   liest man sie als ein einziges Gekritzel. Der Eimer steht deshalb
+   noch einmal deutlich weiter weg als der Haken von der Uhrzeit. */
 .ch-fuss{
-  display:flex; align-items:center; gap:5px; align-self:flex-end;
-  margin-top:4px; font-size:11px; line-height:1;
+  display:flex; align-items:center; gap:9px; align-self:flex-end;
+  margin-top:5px; font-size:11px; line-height:1;
 }
-.ch-fuss .wann{ white-space:nowrap; }
+.ch-fuss .wann{ white-space:nowrap; letter-spacing:.02em; }
 .ch-blase.andere .ch-fuss, .ch-bildblase .ch-fuss{ color:var(--text-dim); }
 .ch-blase.ich .ch-fuss{ color:rgba(255,255,255,.75); }
 .ch-fuss .haken{ display:flex; align-items:center; }
@@ -115,12 +118,23 @@
 .ch-bildblase .ch-fuss .haken.gelesen{ color:var(--navy); }
 .ch-weg{
   display:flex; align-items:center; justify-content:center;
-  width:26px; height:26px; margin:-6px -7px -6px 0;
+  width:26px; height:26px; margin:-6px -7px -6px 3px;
   border:none; border-radius:8px; background:transparent;
-  color:inherit; opacity:.7;
+  color:inherit; opacity:0; transition:opacity .15s ease;
 }
-.ch-weg:hover{ opacity:1; background:rgba(0,0,0,.07); }
+/* Am Rechner taucht der Eimer auf, wenn die Maus über der Nachricht
+   steht — sonst steht an jeder eigenen Zeile dauerhaft ein Symbol, das
+   man fast nie braucht. */
+.ch-blase:hover .ch-weg, .ch-bildblase:hover .ch-weg,
+.ch-weg:focus-visible{ opacity:.8; }
+.ch-weg:hover{ opacity:1 !important; background:rgba(0,0,0,.07); }
 .ch-blase.ich .ch-weg:hover{ background:rgba(255,255,255,.18); }
+/* Auf dem Handy gibt es kein Darüberfahren. Dort steht er immer da,
+   dafür mit genug Abstand, dass er nicht mit dem Haken verschmilzt. */
+@media (hover: none){
+  .ch-weg{ opacity:.65; margin-left:5px; }
+  .ch-fuss{ gap:11px; }
+}
 
 .ch-bildblase{ max-width:min(560px, 78%); align-self:flex-start; }
 .ch-bildblase.ich{ align-self:flex-end; }
