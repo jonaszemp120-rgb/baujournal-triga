@@ -1,0 +1,188 @@
+/* Bereich Projekte: Übersicht und Projektseite.
+   Geteilt von projekte-bereich.html und projekt-detail.html, damit die
+   Statusmarken und die Karten an beiden Orten gleich aussehen. */
+
+/* --- Statusmarken -------------------------------------------------------- */
+
+.pj-marke{
+  display:inline-flex; align-items:center; flex-shrink:0;
+  padding:5px 11px; border-radius:999px;
+  font-size:12px; font-weight:700; white-space:nowrap;
+}
+.pj-marke.klein{ padding:3px 9px; font-size:11.5px; }
+.pj-marke.gruen{ background:#e7f2e8; color:#1f5c22; }
+.pj-marke.gelb{ background:#fbf1de; color:#7d5a05; }
+.pj-marke.navy{ background:#e4eaf0; color:var(--navy); }
+.pj-marke.grau{ background:var(--bg); color:var(--text-dim); }
+
+/* --- Knöpfe -------------------------------------------------------------- */
+
+.pj-primaer{
+  display:flex; align-items:center; gap:8px; flex-shrink:0;
+  height:38px; padding:0 16px; border:none; border-radius:10px;
+  background:var(--red); color:#fff; font-weight:700; font-size:13.5px;
+}
+.pj-primaer:active, .pj-primaer:hover{ background:var(--red-dark); }
+
+.pj-umriss{
+  display:flex; align-items:center; gap:8px;
+  height:38px; padding:0 14px; border:1px solid var(--navy); border-radius:10px;
+  background:transparent; color:var(--navy); font-weight:700; font-size:13px;
+}
+.pj-umriss:hover{ background:var(--bg); }
+
+.pj-dazu{
+  display:flex; align-items:center; gap:8px; padding:10px 2px;
+  background:none; border:none; color:var(--navy); font-weight:700; font-size:13px;
+}
+
+/* --- Übersicht ----------------------------------------------------------- */
+
+.pj-flaeche{ padding:0 16px 24px; }
+.pj-chipzeile{
+  display:flex; gap:8px; overflow-x:auto; padding:14px 0 12px;
+  scrollbar-width:none;
+}
+.pj-chipzeile::-webkit-scrollbar{ display:none; }
+.pj-chip{
+  padding:9px 16px; border-radius:20px; background:var(--card); color:var(--text);
+  border:1px solid var(--border); font-size:13px; font-weight:600;
+  white-space:nowrap; flex-shrink:0;
+}
+.pj-chip[aria-pressed="true"]{ background:var(--navy); color:#fff; border-color:var(--navy); }
+
+.pj-raster{ display:grid; gap:14px; }
+.pj-karte{
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
+  padding:18px; display:flex; flex-direction:column; gap:10px;
+  text-align:left; width:100%; color:var(--text);
+}
+.pj-karte:hover{ border-color:var(--navy); }
+.pj-karte .oben{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.pj-karte .pname{ font-weight:700; font-size:17px; overflow-wrap:anywhere; }
+.pj-karte .zeile{ color:var(--text-dim); font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+.pj-karte .fuss{
+  display:flex; gap:18px; flex-wrap:wrap; padding-top:12px;
+  border-top:1px solid var(--border); color:var(--text-dim); font-size:12.5px;
+}
+.pj-karte .fuss span{ display:flex; align-items:center; gap:6px; }
+
+/* --- Projektseite -------------------------------------------------------- */
+
+.pj-titel{ display:flex; align-items:center; gap:12px; min-width:0; }
+.pj-titel h1{ margin:0; font-size:22px; font-weight:800; overflow-wrap:anywhere; }
+
+.pj-spalten{ display:block; }
+.pj-links, .pj-rechts{ display:flex; flex-direction:column; gap:18px; }
+
+.pj-block > .kopf{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-bottom:10px;
+}
+.pj-block > .kopf h2{ margin:0; font-size:15px; font-weight:700; }
+.pj-mehr{ color:var(--navy); font-size:12.5px; font-weight:700; white-space:nowrap; }
+
+.pj-stammdaten{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 18px; }
+.pj-stammdaten > div{ display:flex; align-items:flex-start; gap:10px; padding:6px 0; }
+.pj-stammdaten svg{ flex-shrink:0; margin-top:2px; color:var(--text-dim); }
+.pj-stammdaten .wert{ font-weight:600; font-size:13.5px; overflow-wrap:anywhere; }
+.pj-stammdaten .beschrieb{
+  display:block; color:var(--text-dim); font-size:12.5px; line-height:1.55;
+  padding:10px 0 2px; margin-top:6px; border-top:1px solid var(--border);
+}
+
+.pj-zeile{
+  display:flex; align-items:center; gap:12px;
+  padding:11px 2px; border-bottom:1px solid var(--border);
+}
+.pj-zeile:last-of-type{ border-bottom:none; }
+.pj-zeile .wer{ flex:1; min-width:0; }
+.pj-zeile .titel{ font-weight:700; font-size:13.5px; overflow-wrap:anywhere; }
+.pj-zeile .unter{ color:var(--text-dim); font-size:11.5px; overflow-wrap:anywhere; }
+.pj-zeile .tasten{ display:flex; gap:4px; flex-shrink:0; }
+.pj-zeile .tasten button{
+  width:28px; height:28px; border-radius:7px; border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+}
+.pj-zeile .tasten button.rot{ color:var(--red); }
+.pj-zeile .tasten button:hover{ background:var(--bg); }
+
+.pj-avatar{
+  width:30px; height:30px; border-radius:50%; background:var(--navy); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:11px; flex-shrink:0;
+}
+
+.pj-leer{ padding:14px 2px; font-size:13px; color:var(--text-dim); line-height:1.5; }
+
+/* Unternehmerliste: auf dem Handy Zeilen, auf dem Desktop eine Tabelle. */
+.pj-tabelle{ display:none; }
+.pj-tabelle .kopfzeile{
+  display:flex; gap:14px; padding:0 14px 8px;
+  font-size:11px; font-weight:700; letter-spacing:.05em;
+  text-transform:uppercase; color:var(--text-dim);
+}
+.pj-tabelle .reihe{
+  display:flex; align-items:center; gap:14px;
+  padding:12px 14px; border-top:1px solid var(--border);
+}
+.pj-tabelle .reihe:hover{ background:var(--bg); }
+.pj-tabelle .sp-firma{ flex:1 1 220px; min-width:0; font-weight:700; font-size:13.5px; overflow-wrap:anywhere; }
+.pj-tabelle .sp-gewerk{ width:170px; flex-shrink:0; color:var(--text-dim); font-size:12.5px; }
+.pj-tabelle .sp-status{ width:120px; flex-shrink:0; }
+.pj-tabelle .sp-summe{ width:130px; flex-shrink:0; font-size:12.5px; color:var(--text-dim); }
+.pj-tabelle .sp-tasten{ width:64px; flex-shrink:0; display:flex; gap:4px; justify-content:flex-end; }
+
+.pj-eintrag{
+  display:flex; gap:14px; padding:11px 14px; border-top:1px solid var(--border);
+  font-size:13px; line-height:1.45;
+}
+.pj-eintrag .wann{ width:66px; flex-shrink:0; color:var(--text-dim); font-size:12px; font-weight:600; }
+.pj-eintrag .was{ flex:1; min-width:0; overflow-wrap:anywhere; }
+.pj-flach{ background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+.pj-flach > .kopfzeile:first-child,
+.pj-flach > .reihe:first-child,
+.pj-flach > .pj-eintrag:first-child{ border-top:none; }
+.pj-flach > .kopfzeile{ padding-top:12px; }
+
+/* --- Breiten ------------------------------------------------------------- */
+
+@media (min-width:1024px){
+  .pj-flaeche{ padding:24px 32px 40px; max-width:1280px; }
+  .pj-raster{ grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:16px; }
+  .pj-chipzeile{ padding:0 0 18px; }
+
+  .pj-spalten{
+    display:flex; align-items:flex-start; gap:0;
+    min-height:calc(100dvh - 72px);
+  }
+  .pj-links{
+    box-sizing:border-box; width:380px; min-width:380px;
+    padding:24px 24px 40px; border-right:1px solid var(--border);
+    background:var(--card); align-self:stretch;
+  }
+  .pj-rechts{ flex:1; min-width:0; padding:24px 32px 40px; }
+  .pj-tabelle{ display:block; }
+  .pj-unternehmer-handy{ display:none; }
+}
+
+@media (max-width:1023px){
+  /* Auf dem Handy stehen die Blöcke in einer Spalte, aber in einer
+     anderen Reihenfolge als auf dem Desktop: zuerst die Stammdaten, dann
+     die Unternehmerliste, dann das Baujournal, zuletzt Mitarbeiter und
+     Dokumente. display:contents löst die beiden Spaltenkästen auf, so
+     dass order auf die Blöcke selbst wirkt. Ein zweites Markup dafür
+     wäre ein zweiter Ort zum Pflegen. */
+  .pj-spalten{ display:flex; flex-direction:column; background:var(--card); min-height:calc(100dvh - 60px); }
+  .pj-links, .pj-rechts{ display:contents; }
+  .pj-block{ padding:0 16px; }
+  #stammdaten{ order:1; padding-top:16px; }
+  #unternehmer{ order:2; }
+  #journal{ order:3; }
+  #personen{ order:4; }
+  #dokumente{ order:5; padding-bottom:24px; }
+  .pj-block + .pj-block{ margin-top:20px; }
+  .pj-flach{ border:none; border-radius:0; }
+  .pj-eintrag{ padding-left:2px; padding-right:2px; }
+  .pj-tabelle{ display:none; }
+}

@@ -33,15 +33,18 @@
     return count ?? null;
   }
 
-  const [mitarbeiter, projekte, firmen, ordner] = await Promise.all([
+  const [mitarbeiter, projekte, laufend, firmen, ordner] = await Promise.all([
     zaehle('mitarbeiter', f => f.is('geloescht_am', null)),
     zaehle('projekte', f => f.eq('archiviert', false)),
+    zaehle('projekte', f => f.eq('archiviert', false).eq('status', 'laufend')),
     zaehle('firmen', f => f.is('geloescht_am', null)),
     zaehle('ordner', f => f.is('geloescht_am', null))
   ]);
 
   const zahlen = {
     mitarbeiter: { wert: mitarbeiter, eins: 'Person', viele: 'Personen', desktop: 'im Team erfasst' },
+    projekte:    { wert: projekte, eins: 'Projekt', viele: 'Projekte',
+                   desktop: laufend === null ? 'im Überblick' : `${laufend} laufend` },
     baujournal:  { wert: projekte, eins: 'aktives Projekt', viele: 'aktive Projekte', desktop: 'Projekte aktiv' },
     firmenpool:  { wert: firmen, eins: 'Firma', viele: 'Firmen', desktop: 'Unternehmer im Pool' },
     dokumente:   { wert: ordner, eins: 'Ordner', viele: 'Ordner', desktop: 'Ordner angelegt' }
@@ -51,7 +54,9 @@
     const z = zahlen[b.id];
     const mobilZeile = z.wert === null
       ? 'wird noch eingerichtet'
-      : `${z.wert} ${z.wert === 1 ? z.eins : z.viele}`;
+      : b.id === 'projekte' && laufend !== null
+        ? `${laufend} laufend`
+        : `${z.wert} ${z.wert === 1 ? z.eins : z.viele}`;
     return `
       <a class="st-kachel pressable" href="${b.ziel}">
         <div class="kopf">

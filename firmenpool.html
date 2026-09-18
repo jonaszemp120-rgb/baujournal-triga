@@ -11,6 +11,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="TRIGA">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/projekte.css">
 <style>
   /* --- Liste: Kategorien links, Firmen rechts ---------------------------- */
 
@@ -160,6 +161,17 @@
   .fp-person .tasten .schlicht{ background:transparent; color:var(--text-dim); }
   .fp-person .tasten .rot{ background:transparent; color:var(--red); }
 
+  /* Projekte einer Firma: nur Anzeige. Gepflegt wird die Zuordnung auf
+     der Projektseite, damit es nicht zwei Orte zum Bearbeiten gibt. */
+  .fp-projekt{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 2px; border-bottom:1px solid var(--border); color:var(--text);
+  }
+  .fp-projekt:hover{ background:var(--bg); }
+  .fp-projekt .wer{ flex:1; min-width:0; }
+  .fp-projekt .pname{ font-weight:700; font-size:13.5px; overflow-wrap:anywhere; }
+  .fp-projekt .prolle{ color:var(--text-dim); font-size:11.5px; overflow-wrap:anywhere; }
+
   .fp-dazu{
     display:flex; align-items:center; gap:8px; padding:10px 2px;
     background:none; border:none; color:var(--navy); font-weight:700; font-size:13px;
@@ -192,8 +204,19 @@
   /* --- Breiten ----------------------------------------------------------- */
 
   @media (min-width:1024px){
-    .fp-layout{ display:flex; align-items:stretch; min-height:calc(100dvh - 72px); }
-    .fp-kat-liste{ max-height:calc(100dvh - 300px); }
+    .fp-layout{ display:flex; align-items:flex-start; min-height:calc(100dvh - 72px); }
+    /* Die Kategorienspalte bleibt stehen, während rechts die Firmen
+       scrollen. Ohne align-self:flex-start würde align-items die Spalte
+       auf die volle Höhe der Seite ziehen, und sticky hätte nichts mehr,
+       woran es kleben könnte. Die Kopfzeile ist 72px hoch, darunter
+       beginnt die Spalte. */
+    .fp-kategorien{
+      position:sticky; top:72px; align-self:flex-start;
+      height:calc(100dvh - 72px);
+    }
+    /* Nur die Kategorienliste selbst scrollt. Die beiden Knöpfe darunter
+       bleiben dadurch immer sichtbar, auch bei 41 Kategorien. */
+    .fp-kat-liste{ flex:1 1 auto; min-height:0; overflow-y:auto; }
     .fp-firma{ display:flex; align-items:stretch; min-height:calc(100dvh - 72px); }
     .fp-firma .fp-links{
       box-sizing:border-box; width:440px; min-width:440px;
@@ -244,7 +267,6 @@
     <aside id="kat-leiste" class="fp-kategorien nur-desktop">
       <div class="fp-titelchen">BKP-KATEGORIEN</div>
       <div id="kat-desktop" class="fp-kat-liste"></div>
-      <div style="flex:1;"></div>
       <button type="button" id="kat-neu" class="fp-gestrichelt pressable" style="margin-bottom:8px;"></button>
       <button type="button" id="firma-neu" class="fp-voll pressable"></button>
     </aside>
@@ -273,6 +295,7 @@
 <script src="js/app.js"></script>
 <script src="js/store.js"></script>
 <script src="js/shell.js"></script>
+<script src="js/projekte-daten.js"></script>
 <script src="js/firmenpool.js"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@
   const BUCKET = 'dokumente';
 
   let ordner = [];
+  let projekte = [];
   let dateien = [];
   let offenerOrdner = null;      // der geöffnete Ordner
   let letzteHochgeladen = [];
@@ -60,23 +61,70 @@
 
   /* --- Ordner ------------------------------------------------------------- */
 
+  /* Ein Ordner darf zu einem Projekt gehören, muss aber nicht. Ohne
+     Zuordnung bleibt er allgemein, wie bisher. Die Dateien darin erben
+     die Zuordnung über den Ordner und tragen bewusst kein eigenes Feld:
+     eine Datei kann nur an einem Ort liegen. */
+  const projektName = id => (projekte.find(p => p.id === id) || {}).name || '';
+
   async function ordnerAnlegen() {
-    const name = await textFrage({ titel: 'Ordner anlegen', label: 'Name', knopf: 'Anlegen' });
-    if (!name) return;
+    const werte = await ordnerFrage({ titel: 'Ordner anlegen', knopf: 'Anlegen' });
+    if (!werte) return;
     const s = await session();
-    const { error } = await sb.from('ordner').insert({ name, erstellt_von: s.user.id });
+    const { error } = await sb.from('ordner')
+      .insert({ name: werte.name, projekt_id: werte.projekt_id, erstellt_von: s.user.id });
     if (error) return toast(error.message, true);
     await allesLaden();
     toast('Ordner angelegt');
   }
 
   async function ordnerUmbenennen(o) {
-    const name = await textFrage({ titel: 'Ordner umbenennen', label: 'Name', wert: o.name, knopf: 'Speichern' });
-    if (!name || name === o.name) return;
-    const { error } = await sb.from('ordner').update({ name }).eq('id', o.id);
+    const werte = await ordnerFrage({
+      titel: 'Ordner bearbeiten', knopf: 'Speichern', wert: o.name, projekt: o.projekt_id || null
+    });
+    if (!werte) return;
+    if (werte.name === o.name && (werte.projekt_id || null) === (o.projekt_id || null)) return;
+    const { error } = await sb.from('ordner')
+      .update({ name: werte.name, projekt_id: werte.projekt_id }).eq('id', o.id);
     if (error) return toast(error.message, true);
     await allesLaden();
-    toast('Umbenannt');
+    toast('Gespeichert');
+  }
+
+  /* Name und Projekt in einem Dialog. textFrage bleibt daneben bestehen,
+     die Dateien brauchen weiterhin nur ein Feld. */
+  function ordnerFrage({ titel, knopf, wert = '', projekt = null }) {
+    return new Promise(ok => {
+      const s = sheet(`
+        <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:16px;">${esc(titel)}</div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+          <label for="of-name" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Name</label>
+          <input id="of-name" type="text" value="${esc(wert)}" style="height:46px; border-radius:10px; border:1.5px solid var(--border); padding:0 13px; font-size:14.5px; color:var(--text); box-sizing:border-box;">
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+          <label for="of-projekt" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Projekt (optional)</label>
+          <select id="of-projekt" style="height:46px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-size:14px; padding:0 10px; box-sizing:border-box;">
+            <option value=""${projekt ? '' : ' selected'}>Ohne Projekt, allgemein</option>
+            ${projekte.map(p => `<option value="${esc(p.id)}"${p.id === projekt ? ' selected' : ''}>${esc(p.name)}${p.archiviert ? ' (archiviert)' : ''}</option>`).join('')}
+          </select>
+        </div>
+        <button id="of-ja" class="btn-primary pressable" style="width:100%; height:50px; border:none; border-radius:14px; background:var(--red); color:#fff; font-weight:700; font-size:15px; margin-bottom:10px;">${esc(knopf)}</button>
+        <button id="of-nein" class="pressable" style="width:100%; height:50px; border-radius:14px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Abbrechen</button>
+      `);
+      s.el.style.maxHeight = '86dvh';
+      s.el.style.overflowY = 'auto';
+      const feld = $('#of-name', s.el);
+      feld.focus(); feld.select();
+      const fertig = () => {
+        const v = feld.value.trim();
+        if (!v) return feld.focus();
+        s.schliessen();
+        ok({ name: v, projekt_id: $('#of-projekt', s.el).value || null });
+      };
+      $('#of-ja', s.el).addEventListener('click', fertig);
+      feld.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); fertig(); } });
+      $('#of-nein', s.el).addEventListener('click', () => { s.schliessen(); ok(null); });
+    });
   }
 
   async function ordnerInPapierkorb(o) {
@@ -211,7 +259,8 @@
       <div class="dk-ordnerzeile pressable" data-id="${esc(o.id)}" role="button" tabindex="0"
            aria-current="${offenerOrdner?.id === o.id}">
         <span class="symbol">${svg(IK.ordner)}</span>
-        <span class="name">${esc(o.name)}</span>
+        <span class="name">${esc(o.name)}${o.projekt_id && projektName(o.projekt_id)
+          ? `<span class="dk-projekt">${esc(projektName(o.projekt_id))}</span>` : ''}</span>
         <button type="button" class="dk-mini" data-um="${esc(o.id)}" aria-label="${esc(o.name)} umbenennen">${svg(IK.stift, 12)}</button>
         <button type="button" class="dk-mini rot" data-weg="${esc(o.id)}" aria-label="${esc(o.name)} in den Papierkorb">${svg(IK.eimer, 12)}</button>
         <span class="nur-mobil" style="color:var(--mute); display:flex;">${svg(IK.pfeil, 15)}</span>
@@ -267,7 +316,12 @@
 
     $('#detail').innerHTML = `
       <div class="dk-kopfzeile" style="display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:14px; padding:16px 16px 0;">
-        <div style="font-weight:700; font-size:16px; min-width:0; overflow-wrap:anywhere;">${esc(offenerOrdner.name)}</div>
+        <div style="min-width:0;">
+          <div style="font-weight:700; font-size:16px; overflow-wrap:anywhere;">${esc(offenerOrdner.name)}</div>
+          ${offenerOrdner.projekt_id && projektName(offenerOrdner.projekt_id)
+            ? `<a href="projekt-detail.html?projekt=${esc(offenerOrdner.projekt_id)}" style="display:inline-block; margin-top:3px; font-size:12px; font-weight:600; color:var(--navy);">${esc(projektName(offenerOrdner.projekt_id))} →</a>`
+            : ''}
+        </div>
         <button type="button" id="d-hoch" class="dk-hoch pressable">
           ${svg(IK.rauf, 15)}<span>Datei hochladen</span>
         </button>
@@ -308,7 +362,7 @@
     }
     $('#hinweis').hidden = true;
 
-    ordner = await ladeOrdner();
+    [ordner, projekte] = await Promise.all([ladeOrdner(), PJ.projekte()]);
     if (offenerOrdner) offenerOrdner = ordner.find(o => o.id === offenerOrdner.id) || null;
     dateien = offenerOrdner ? await ladeDateien(offenerOrdner.id) : [];
     letzteHochgeladen = offenerOrdner ? [] : (await ladeDateien(null)).slice(0, 5);
@@ -335,6 +389,10 @@
       e.target.value = '';
       if (file) await hochladen(file);
     });
+
+    /* Sprung von der Projektseite direkt in einen Ordner. */
+    const gewuenscht = new URLSearchParams(location.search).get('ordner');
+    if (gewuenscht) offenerOrdner = { id: gewuenscht };
 
     beiStatuswechsel(allesLaden);
   })();

@@ -277,5 +277,13 @@
     alle = await ladeMitarbeiter();
     zeichneListe();
     leeresDetail();
+
+    /* Sprung aus der globalen Suche direkt auf eine Person. */
+    const gewuenscht = new URLSearchParams(location.search).get('person');
+    if (gewuenscht) {
+      const treffer = alle.find(m => m.id === gewuenscht);
+      if (treffer) waehle(treffer);
+      else toast('Diesen Eintrag gibt es nicht mehr.', true);
+    }
   })();
 })();

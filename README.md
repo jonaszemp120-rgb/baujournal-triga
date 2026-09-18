@@ -1,7 +1,8 @@
 # TRIGA App · TRIGA Baumanagement AG
 
-Die interne App der TRIGA Baumanagement AG. Vier Bereiche, ein Login, eine
-Adresse: **Mitarbeiter**, **Baujournal**, **Firmenpool**, **Dokumente**. Läuft
+Die interne App der TRIGA Baumanagement AG. Fünf Bereiche, ein Login, eine
+Adresse: **Mitarbeiter**, **Projekte**, **Baujournal**, **Firmenpool**,
+**Dokumente**. Läuft
 im Browser, lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert
 im Baujournal auch ohne Empfang, etwa in der Tiefgarage oder im Rohbau.
 
@@ -9,12 +10,18 @@ Kein Build-Schritt, kein Framework. Reines HTML, CSS und JavaScript, das Vercel
 direkt als statische Seiten ausliefert. Wer am Code etwas ändert, öffnet die
 Datei, speichert, fertig.
 
-## Die vier Bereiche
+## Die fünf Bereiche
 
 **Mitarbeiter** ist das Adressbuch des Teams, bewusst getrennt von den
 Login-Konten. Telefon und E-Mail sind direkt antippbar. Einen Eintrag hier zu
 löschen berührt kein Konto — die Tabelle kennt `auth.users` gar nicht als
 Person. Konten legt weiterhin nur die Geschäftsleitung im Supabase-Dashboard an.
+
+**Projekte** ist die Klammer um alles andere. Ein Projekt führt seine
+Stammdaten, die Unternehmerliste mit Gewerk, Status und Auftragssumme, die
+zuständigen Mitarbeiter mit ihrer Rolle, die letzten Baujournal-Einträge und
+die zugeordneten Dokumentenordner. Die Projektseite zeigt jeden dieser Teile
+als Auszug und verlinkt in den Bereich, der die volle Ansicht hat.
 
 **Baujournal** ist das Bautagebuch: Projekte, Rundgänge, Checkliste,
 Korrekturprotokoll, Export als PDF und Word. Der Bereich mit dem meisten
@@ -33,8 +40,11 @@ hochladender Person.
 | Datei | Zweck |
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
-| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den vier Bereichen, mit Zahlen aus der Datenbank. |
+| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den fünf Bereichen, mit Zahlen aus der Datenbank. |
+| `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
+| `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
+| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Journal und Dokumenten. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
 | `projekt.html` | Projekt anlegen und bearbeiten. Ohne `?id=` neu, mit `?id=` bestehend. |
@@ -55,7 +65,11 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 
 | Was | Anlegen | Ändern | Entfernen |
 |---|---|---|---|
-| Projekt | `projekte.html` | `projekt.html?id=` | archivieren, kein Löschen |
+| Projekt | `projekte-bereich.html` | dort oder `projekt.html?id=` | archivieren, kein Löschen |
+| Firma auf einem Projekt | `projekt-detail.html` | dort (Gewerk, Status, Summe) | direkt, ohne Papierkorb |
+| Mitarbeiter auf einem Projekt | `projekt-detail.html` | dort (Rolle) | direkt, ohne Papierkorb |
+| Projekt eines Ordners | `dokumente.html` | dort | Feld leeren |
+| Projekt einer Notiz | in der Firma | dort | Auswahl zurücksetzen |
 | Kontrollpunkte eines Projekts | `projekt.html` | dort | dort |
 | Gebäude und Bauteile | `projekt.html` | dort | dort |
 | Eintrag | `journal.html` | korrigieren in `eintrag.html`, mit Protokoll | Papierkorb des Projekts |
@@ -69,10 +83,16 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
 
 Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
-der Garantie- und Verjährungsfristen. **Ansprechpersonen und Notizen** hängen an
-genau einer Firma, sind kein eigenständiger Datensatz mit Beweischarakter und
-werden darum direkt gelöscht; eine falsch gelöschte Person ist in Sekunden neu
-erfasst. Die Rückfrage sagt das jeweils auch so.
+der Garantie- und Verjährungsfristen. **Unterdetails** — Ansprechpersonen,
+Notizen und die beiden Projektzuordnungen — hängen an genau einem Datensatz,
+haben keinen Beweischarakter und werden direkt gelöscht; eine falsch entfernte
+Zuordnung ist mit zwei Klicks wieder gesetzt. Die Rückfrage sagt das jeweils
+auch so.
+
+**Jede Angabe hat genau einen Ort zum Pflegen.** Die Unternehmerliste wird auf
+der Projektseite gepflegt; im Firmenpool steht dieselbe Zuordnung, aber nur zum
+Lesen. Die Adresse eines Projekts steht in einer Spalte, nicht in zweien. Wo es
+zwei Orte gäbe, laufen die Angaben früher oder später auseinander.
 
 **Der Papierkorb funktioniert überall gleich.** Löschen setzt `geloescht_am`,
 nichts verschwindet. Jeder Bereich hat seine eigene Papierkorb-Ansicht mit Name,
@@ -183,6 +203,14 @@ js/verlauf.js        Eintragszeile und Filter, geteilt von Startseite
 js/export.js         PDF und Word
 js/mitarbeiter.js js/firmenpool.js js/dokumente.js
 js/papierkorb-bereich.js
+js/projekte-daten.js  alles, was mehrere Seiten über Projekte wissen
+                      müssen: Statusnamen, Beträge, Abfragen, das
+                      Stammdaten-Formular. Hängt an einem globalen
+                      Namen (PJ), weil ladeProjekte() im Baujournal
+                      schon vergeben ist
+js/projekte-bereich.js js/projekt-detail.js
+js/suche.js           die globale Suche
+css/projekte.css      Statusmarken und Karten des Bereichs Projekte
 api/search-ch.js     Serverless-Function als Proxy zur Tel-API von
                      search.ch, hält den Schlüssel serverseitig
 vendor/              supabase-js, jsPDF, docx, SheetJS, lokal statt
@@ -203,7 +231,7 @@ läuft dann gar nicht. Genau das ist einmal passiert.
 `box-sizing` ist nicht global auf `border-box` gesetzt, weil die
 Baujournal-Screens ihre Masse inline tragen. Alles, was für die TRIGA App neu
 dazugekommen ist, trägt eine Klasse mit Präfix (`tr-`, `br-`, `dk-`, `fp-`,
-`pk-`, `st-`), und für genau diese Präfixe steht `border-box` an einer Stelle in
+`pj-`, `pk-`, `st-`), und für genau diese Präfixe steht `border-box` an einer Stelle in
 `css/app.css`. Ohne das läuft jede Zeile mit `width:100%` und seitlichem Polster
 um dieses Polster aus dem Bild.
 
@@ -213,7 +241,15 @@ Supabase-Projekt `baujournal-triga`, Region `eu-central-1`. Eine Datenbank für
 alle vier Bereiche.
 
 - `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
-  `archiviert`
+  `beschrieb`, `status` (planung / laufend / abgeschlossen) und `archiviert`.
+  Die Adresse steht in `standort`: die Spalte heisst historisch so, weil das
+  Baujournal sie als Untertitel führt, und ist im Formular seit jeher mit
+  «Standort / Adresse» beschriftet. Eine zweite Spalte dafür wäre ein zweiter
+  Ort zum Pflegen
+- `projekteinsaetze` — die Unternehmerliste: Projekt, Firma, `gewerk` als
+  BKP-Code, `status` (angefragt / offeriert / beauftragt / ausgeführt) und die
+  optionale `auftragssumme`
+- `projekt_mitarbeiter` — wer auf einem Projekt zuständig ist, mit `rolle`
 - `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
   Punkteliste, `betrifft_gebaeude` als JSON-Liste, `geloescht_am` und
   `geloescht_von` für den Papierkorb
@@ -223,14 +259,15 @@ alle vier Bereiche.
 - `mitarbeiter` — das Adressbuch des Teams, bewusst getrennt von den
   Login-Konten. Einen Eintrag zu löschen berührt kein Konto
 - `ordner`, `dateien` — die Dokumentenablage, die PDF selbst liegt im
-  Storage-Bucket `dokumente`
+  Storage-Bucket `dokumente`. Ein Ordner darf ein `projekt_id` tragen, die
+  Dateien darin erben die Zuordnung über ihren Ordner und haben bewusst kein
+  eigenes Feld: eine Datei liegt nur an einem Ort
 - `bkp_liste` — die BKP-Kategorien des Firmenpools, als Daten und nicht
   hart codiert
 - `firmen` — nur der Name ist Pflicht, die BKP-Codes stehen als
   JSON-Liste im Feld `bkp_codes`
-- `ansprechpersonen`, `notizen` — Unterdetails einer Firma
-- `projekteinsaetze` — welche Firma auf welchem Projekt im Einsatz war,
-  noch ohne eigene Oberfläche
+- `ansprechpersonen`, `notizen` — Unterdetails einer Firma. Eine Notiz darf ein
+  `projekt_id` tragen; ohne gilt sie allgemein für die Firma
 
 Auf allen Tabellen ist Row Level Security aktiv, jede Policy verlangt die
 Rolle `authenticated`. Ohne Login liefert jede Abfrage leer zurück. Alle
@@ -241,8 +278,9 @@ Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
 `geloescht_von` und haben schlicht keine Delete-Policy: ein DELETE über die
 API trifft dort null Zeilen. Wer und wann gelöscht hat, trägt der Trigger
 `setze_loeschspur()` serverseitig ein, der Client kann das nicht fälschen.
-Die einzigen Ausnahmen sind `ansprechpersonen` und `notizen`, die zu genau
-einer Firma gehören und bewusst direkt löschbar sind.
+Die Ausnahmen sind `ansprechpersonen`, `notizen`, `projekteinsaetze` und
+`projekt_mitarbeiter`: Unterdetails, die zu genau einem Datensatz gehören und
+bewusst direkt löschbar sind.
 
 Die Ampelfarbe einer Firma ist nirgends gespeichert. Sie ist die Farbe der
 jüngsten Notiz, ohne Notiz bleibt sie grau. Damit gibt es keine zweite

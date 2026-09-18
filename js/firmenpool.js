@@ -31,6 +31,7 @@
   let firmen = [];         // [{id, name, adresse, plz_ort, telefon, email, bkp_codes}]
   let ampel = {};          // firma_id -> 'rot' | 'gelb' | 'gruen'
   let wer = {};            // user_id -> Anzeigename
+  let projekte = [];       // für die Projektauswahl an einer Notiz
   let gewaehlteKat = null; // null = Alle, sonst ein BKP-Code
   let ampelFilter = 'alle';
   let offeneFirma = null;
@@ -166,8 +167,12 @@
   }
 
   async function ladeAlles() {
-    [bkp, firmen, ampel, wer] = await Promise.all([ladeBkp(), ladeFirmen(), ladeAmpel(), namen()]);
+    [bkp, firmen, ampel, wer, projekte] = await Promise.all([
+      ladeBkp(), ladeFirmen(), ladeAmpel(), namen(), PJ.projekte()
+    ]);
   }
+
+  const projektName = id => (projekte.find(p => p.id === id) || {}).name || '';
 
   /* --- Kopfzeile ---------------------------------------------------------- */
 
@@ -505,9 +510,11 @@
     $('#firma-links').innerHTML = `<div class="br-leer">Wird geladen …</div>`;
     $('#firma-rechts').innerHTML = '';
 
-    const [personen, notizen] = await Promise.all([ladePersonen(f.id), ladeNotizen(f.id)]);
+    const [personen, notizen, einsaetze] = await Promise.all([
+      ladePersonen(f.id), ladeNotizen(f.id), PJ.einsaetzeDerFirma(f.id)
+    ]);
     if (offeneFirma?.id !== f.id) return;
-    zeichneFirma(f, personen, notizen);
+    zeichneFirma(f, personen, notizen, einsaetze);
   }
 
   async function ladePersonen(firmaId) {
@@ -526,7 +533,7 @@
     return data || [];
   }
 
-  function zeichneFirma(f, personen, notizen) {
+  function zeichneFirma(f, personen, notizen, einsaetze = []) {
     const stand = notizen.length ? notizen[0].farbe : 'grau';
     const codes = codesVon(f);
     const adresse = [f.adresse, f.plz_ort].filter(Boolean).join(', ');
@@ -549,11 +556,22 @@
         ${personen.length ? personen.map(personZeile).join('')
           : '<div style="padding:12px 2px; font-size:13px; color:var(--text-dim);">Noch keine Ansprechperson erfasst.</div>'}
         <button type="button" id="person-neu" class="fp-dazu pressable">${svg(IKON.plus, 16)}<span>Ansprechperson hinzufügen</span></button>
+      </div>
+
+      <div>
+        <div class="fp-ueberschrift">Projekte${einsaetze.length ? ` · ${einsaetze.length}` : ''}</div>
+        ${einsaetze.length ? einsaetze.map(projektZeile).join('')
+          : '<div style="padding:12px 2px; font-size:13px; color:var(--text-dim); line-height:1.5;">Diese Firma ist auf keinem Projekt eingetragen.</div>'}
+        <div style="padding:8px 2px 0; font-size:11.5px; color:var(--text-dim); line-height:1.5;">Gepflegt wird die Zuordnung auf der Projektseite, damit es nur einen Ort dafür gibt.</div>
       </div>`;
 
     $('#firma-rechts').innerHTML = `
       <div class="fp-notizfeld">
         <input id="notiz-text" type="text" placeholder="Neue Notiz zu dieser Firma…" aria-label="Neue Notiz">
+        <select id="notiz-projekt" aria-label="Projekt, auf das sich die Notiz bezieht"
+                style="height:46px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; padding:0 8px; max-width:190px; flex:0 1 auto;">
+          ${projektOptionen(null)}
+        </select>
         <div class="fp-farben" role="group" aria-label="Einstufung der Notiz">
           ${['rot', 'gelb', 'gruen'].map(k => `
             <button type="button" class="fp-farbe pressable" data-farbe="${k}" aria-pressed="${k === 'gruen'}" aria-label="${esc(AMPELN[k].text)}" title="${esc(AMPELN[k].text)}"><span class="punkt ${k}"></span></button>`).join('')}
@@ -580,7 +598,7 @@
       $$('#firma-rechts .fp-farbe').forEach(x => x.setAttribute('aria-pressed', String(x === el)));
     }));
 
-    const speichern = () => notizAnlegen(f, $('#notiz-text').value.trim(), farbe);
+    const speichern = () => notizAnlegen(f, $('#notiz-text').value.trim(), farbe, $('#notiz-projekt').value || null);
     $('#notiz-speichern').addEventListener('click', speichern);
     $('#notiz-text').addEventListener('keydown', e => { if (e.key === 'Enter') speichern(); });
 
@@ -607,6 +625,31 @@
       </div>`;
   }
 
+  /* Ohne Auswahl gilt eine Notiz allgemein für die Firma, mit Auswahl
+     hält sie etwas Projektbezogenes fest. Archivierte Projekte stehen
+     weiterhin drin: alte Notizen sollen ihr Projekt behalten. */
+  function projektOptionen(gewaehlt) {
+    return `<option value=""${gewaehlt ? '' : ' selected'}>Ohne Projektbezug</option>` +
+      projekte.map(p => `<option value="${esc(p.id)}"${p.id === gewaehlt ? ' selected' : ''}>${esc(p.name)}${p.archiviert ? ' (archiviert)' : ''}</option>`).join('');
+  }
+
+  /* Nur Anzeige mit Sprung zur Projektseite. Geändert wird die
+     Zuordnung dort, nicht hier: zwei Bearbeitungsorte für dieselbe
+     Angabe sind zwei Orte, an denen sie auseinanderlaufen kann. */
+  function projektZeile(e) {
+    const p = e.projekte;
+    const unter = [e.gewerk ? katText(e.gewerk) : null, p.archiviert ? 'Archiviert' : null]
+      .filter(Boolean).join(' · ');
+    return `
+      <a class="fp-projekt" href="projekt-detail.html?projekt=${esc(p.id)}">
+        <span class="wer">
+          <span class="pname" style="display:block;">${esc(p.name)}</span>
+          ${unter ? `<span class="prolle" style="display:block;">${esc(unter)}</span>` : ''}
+        </span>
+        ${PJ.einsatzChip(e.status)}
+      </a>`;
+  }
+
   function notizZeile(n) {
     return `
       <div class="fp-notiz">
@@ -615,6 +658,9 @@
           <div class="kopf">
             <span class="autor">${esc(wer[n.autor_id] || 'Unbekannt')}</span>
             <span class="wann">${esc(datumKurz(n.erstellt_am))}</span>
+            ${n.projekt_id && projektName(n.projekt_id)
+              ? `<a class="pj-marke klein navy" href="projekt-detail.html?projekt=${esc(n.projekt_id)}">${esc(projektName(n.projekt_id))}</a>`
+              : ''}
           </div>
           <div class="text">${esc(n.text)}</div>
         </div>
@@ -627,8 +673,10 @@
 
   async function neuLaden(f) {
     ampel = await ladeAmpel();
-    const [personen, notizen] = await Promise.all([ladePersonen(f.id), ladeNotizen(f.id)]);
-    zeichneFirma(f, personen, notizen);
+    const [personen, notizen, einsaetze] = await Promise.all([
+      ladePersonen(f.id), ladeNotizen(f.id), PJ.einsaetzeDerFirma(f.id)
+    ]);
+    zeichneFirma(f, personen, notizen, einsaetze);
   }
 
   /* --- Ansprechpersonen --------------------------------------------------- */
@@ -692,13 +740,13 @@
 
   /* --- Notizen ------------------------------------------------------------ */
 
-  async function notizAnlegen(f, text, farbe) {
+  async function notizAnlegen(f, text, farbe, projektId) {
     if (!text) return toast('Ohne Text keine Notiz.', true);
     try {
       if (!istOnline()) throw new Error('Notizen lassen sich nur online erfassen');
       const s = await session();
       const { error } = await sb.from('notizen')
-        .insert({ firma_id: f.id, text, farbe, autor_id: s.user.id });
+        .insert({ firma_id: f.id, text, farbe, autor_id: s.user.id, projekt_id: projektId || null });
       if (error) throw error;
       await neuLaden(f);
       toast('Notiz gespeichert');
@@ -713,13 +761,14 @@
       titel: 'Notiz bearbeiten',
       felder: [{ id: 'text', label: 'Notiz', wert: n.text, mehrzeilig: true }],
       pflicht: ['text'],
-      farbe: n.farbe
+      farbe: n.farbe,
+      projekt: n.projekt_id || null
     });
     if (!werte) return;
     try {
       if (!istOnline()) throw new Error('Notizen lassen sich nur online bearbeiten');
       const { error } = await sb.from('notizen')
-        .update({ text: werte.text, farbe: werte.farbe }).eq('id', n.id);
+        .update({ text: werte.text, farbe: werte.farbe, projekt_id: werte.projekt_id }).eq('id', n.id);
       if (error) throw error;
       await neuLaden(f);
       toast('Notiz gespeichert');
@@ -1172,7 +1221,7 @@
 
   /* --- Ein Formular als Sheet, für die kleinen Dialoge -------------------- */
 
-  function formularSheet({ titel, felder, knopf = 'Speichern', pflicht = [], farbe = null }) {
+  function formularSheet({ titel, felder, knopf = 'Speichern', pflicht = [], farbe = null, projekt }) {
     return new Promise(ok => {
       const eingabe = f => f.mehrzeilig
         ? `<textarea id="fs-${f.id}" rows="4" placeholder="${esc(f.platzhalter || '')}" style="border-radius:10px; border:1.5px solid var(--border); padding:11px 13px; font-size:14px; color:var(--text); box-sizing:border-box; resize:vertical;">${esc(f.wert || '')}</textarea>`
@@ -1186,6 +1235,11 @@
               <label for="fs-${f.id}" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">${esc(f.label)}</label>
               ${eingabe(f)}
             </div>`).join('')}
+          ${projekt !== undefined ? `
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label for="fs-projekt" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Projekt</label>
+              <select id="fs-projekt" style="height:44px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-size:14px; padding:0 10px; box-sizing:border-box;">${projektOptionen(projekt)}</select>
+            </div>` : ''}
           ${farbe ? `
             <div style="display:flex; flex-direction:column; gap:8px;">
               <span style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Einstufung</span>
@@ -1222,6 +1276,7 @@
           return;
         }
         if (farbe) werte.farbe = gewaehlteFarbe;
+        if (projekt !== undefined) werte.projekt_id = $('#fs-projekt', s.el).value || null;
         s.schliessen();
         ok(werte);
       });
@@ -1263,5 +1318,14 @@
     zeichneKategorien();
     zeichneAmpelChips();
     zeichneListe();
+
+    /* Sprung aus der Projektseite oder der globalen Suche direkt auf eine
+       Firma. Gibt es sie nicht mehr, bleibt schlicht die Liste stehen. */
+    const gewuenscht = new URLSearchParams(location.search).get('firma');
+    if (gewuenscht) {
+      const treffer = firmen.find(f => f.id === gewuenscht);
+      if (treffer) zeigeFirma(treffer);
+      else toast('Diese Firma steht nicht mehr im Pool.', true);
+    }
   })();
 })();

@@ -16,6 +16,13 @@ const BEREICHE = [
     icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
   },
   {
+    /* Der Bereich heisst Projekte, die Datei aber nicht projekte.html:
+       den Namen trägt seit jeher die Projektübersicht des Baujournals.
+       Umbenennen hiesse an Bestehendem drehen, darum der Zusatz. */
+    id: 'projekte', titel: 'Projekte', ziel: 'projekte-bereich.html',
+    icon: '<path d="M3 21h18"/><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/><path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01"/>'
+  },
+  {
     id: 'baujournal', titel: 'Baujournal', ziel: 'projekte.html',
     icon: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h6M9 8h2"/>'
   },
@@ -54,6 +61,10 @@ function seitenleiste(aktiv) {
       <a class="marke" href="start.html" aria-label="Zur Startseite">
         <img src="${LOGO_BILD}" alt="TRIGA Baumanagement">
       </a>
+      <form class="tr-suche" action="suche.html" method="get" role="search">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="search" name="q" placeholder="Alles durchsuchen" aria-label="Alles durchsuchen">
+      </form>
       <nav style="display:flex; flex-direction:column; gap:4px;">${punkte}</nav>
       <button type="button" class="tr-konto pressable">
         <span class="kreis">–</span>

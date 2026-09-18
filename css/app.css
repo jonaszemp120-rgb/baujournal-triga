@@ -58,6 +58,7 @@ button{ cursor:pointer; }
 [class^="br-"], [class*=" br-"],
 [class^="dk-"], [class*=" dk-"],
 [class^="fp-"], [class*=" fp-"],
+[class^="pj-"], [class*=" pj-"],
 [class^="pk-"], [class*=" pk-"],
 [class^="st-"], [class*=" st-"]{ box-sizing:border-box; }
 
@@ -179,8 +180,24 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
     padding-left:calc(16px + env(safe-area-inset-left));
     padding-bottom:calc(24px + env(safe-area-inset-bottom));
   }
-  .tr-sidebar .marke{ padding:0 8px 28px; }
+  .tr-sidebar .marke{ padding:0 8px 24px; }
   .tr-sidebar .marke img{ width:150px; height:auto; display:block; }
+
+  /* Die globale Suche sitzt oben in der Leiste, über den Bereichen: sie
+     gehört zu keinem davon, sondern sucht über alle. */
+  .tr-suche{
+    display:flex; align-items:center; gap:8px; margin:0 0 16px;
+    padding:0 12px; height:38px; border-radius:10px;
+    background:rgba(255,255,255,.08); color:rgba(255,255,255,.55);
+  }
+  .tr-suche:focus-within{ background:rgba(255,255,255,.14); color:#fff; }
+  .tr-suche svg{ flex-shrink:0; }
+  .tr-suche input{
+    flex:1; min-width:0; height:100%; border:none; background:none;
+    color:#fff; font-size:13.5px; padding:0;
+  }
+  .tr-suche input:focus{ outline:none; }
+  .tr-suche input::placeholder{ color:rgba(255,255,255,.5); }
 
   .tr-nav{
     display:flex; align-items:center; gap:12px;
