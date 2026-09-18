@@ -67,19 +67,13 @@
      damit das Wählen auch bei "+41 (41) 660 56 00" funktioniert. */
   const telLink = t => 'tel:' + String(t).replace(/[^\d+]/g, '');
 
-  /* Die Berechtigungsstufe. Nicht zu verwechseln mit m.rolle, das ist die
-     Funktion im Betrieb ("Bauleiter", "Administration"). Hier geht es um
-     die zwei Stufen aus der Datenbank.
-     Die Stufe ist reine Anzeige: sie blendet nichts ein oder aus und
-     lässt sich in der App nirgends ändern, das macht Jonas direkt in der
-     Supabase-Tabelle. */
-  const STUFE = { mitarbeitend: 'Mitarbeitend', geschaeftsleitung: 'Geschäftsleitung' };
-  const stufeTitel = m => STUFE[m.berechtigung] || STUFE.mitarbeitend;
-
-  /* In der Liste nur bei der Geschäftsleitung — sonst stünde neben jedem
-     Namen dasselbe Wort und das Abzeichen sagt nichts mehr. */
-  const stufeMarke = m => m.berechtigung === 'geschaeftsleitung'
-    ? `<span class="pj-marke klein stufe">${esc(stufeTitel(m))}</span>` : '';
+  /* Die Berechtigungsstufe. Namen und Regel stehen in js/app.js, weil sie
+     künftig überall gebraucht werden und nicht nur hier.
+     Die Stufe ist vorerst reine Anzeige: sie blendet nichts ein oder aus
+     und lässt sich in der App nirgends ändern, das macht Jonas direkt in
+     der Supabase-Tabelle. */
+  const stufeMarke = m =>
+    `<span class="pj-marke klein stufe">${esc(stufeTitel(m.berechtigung))}</span>`;
 
   /* --- Liste -------------------------------------------------------------- */
 
@@ -98,13 +92,15 @@
       <div class="br-zeile pressable" data-id="${esc(m.id)}" role="button" tabindex="0"
            aria-current="${m.id === gewaehlt?.id}">
         <span class="avatar">${esc(initialen(m.name))}</span>
+        <!-- Name und Funktion sind das Einzige, was schrumpfen darf. Marke
+             und Knöpfe stehen fest; eine lange Funktion wie
+             "Bau-/Projektleitung, Inhaber" wird abgeschnitten statt sie
+             aus der Zeile zu schieben. -->
         <span style="min-width:0; flex:1;">
           <span class="titel" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.name)}</span>
-          <span class="unter" style="display:flex; align-items:center; gap:8px; min-width:0;">
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.rolle || '—')}</span>
-            ${stufeMarke(m)}
-          </span>
+          <span class="unter" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.rolle || '—')}</span>
         </span>
+        ${stufeMarke(m)}
         <span class="br-nur-handy" style="display:flex; gap:6px; flex-shrink:0;">
           ${m.telefon ? `<a class="br-knopf pressable" href="${esc(telLink(m.telefon))}" aria-label="${esc(m.name)} anrufen" data-stopp>${svg(IKON.telefon, 16)}</a>` : ''}
           ${m.email ? `<a class="br-knopf pressable" href="mailto:${esc(m.email)}" aria-label="${esc(m.name)} anschreiben" data-stopp>${svg(IKON.mail, 16)}</a>` : ''}
@@ -140,7 +136,7 @@
                  Platz, dass der Name buchstabenweise umbricht. -->
             <span style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:var(--text-dim); font-size:13.5px;">
               <span>${esc(m.rolle || 'Keine Funktion erfasst')}</span>
-              ${neu ? '' : `<span class="pj-marke klein stufe">${esc(stufeTitel(m))}</span>`}
+              ${neu ? '' : stufeMarke(m)}
             </span>
           </span>
           <button type="button" id="ma-bearbeiten" class="br-knopf pressable" aria-label="Bearbeiten" style="width:40px; height:40px;">${svg(IKON.stift, 17)}</button>

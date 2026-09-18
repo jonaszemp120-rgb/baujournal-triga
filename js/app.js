@@ -106,6 +106,33 @@ async function abmelden() {
   location.replace('index.html');
 }
 
+/* --- Berechtigungsstufen ------------------------------------------------- */
+
+/* Drei Stufen, gespeichert in mitarbeiter.berechtigung. Nicht zu verwechseln
+   mit mitarbeiter.rolle — das ist die Funktion im Betrieb ("Bauleiter",
+   "Administration"). Hier geht es darum, wer was darf.
+   Die Stufe steht hier und nicht im Bereich Mitarbeiter, weil sie künftig
+   überall gebraucht wird: Beiträge im Feed löschen, Formulare genehmigen. */
+const STUFEN = {
+  mitarbeiter: 'Mitarbeiter',
+  geschaeftsleitung: 'Geschäftsleitung',
+  entwickler: 'Entwickler'
+};
+const STUFE_STANDARD = 'mitarbeiter';
+
+function stufeTitel(wert) { return STUFEN[wert] || STUFEN[STUFE_STANDARD]; }
+
+/* Wer mehr darf als erfassen: Beiträge anderer löschen, Anträge genehmigen.
+   Entwickler steht der Geschäftsleitung dabei gleich.
+   Diese eine Stelle entscheidet das. Stünde an jedem Knopf einzeln
+   berechtigung === 'geschaeftsleitung', liefe die Regel früher oder später
+   auseinander und irgendein Bildschirm hätte die neue Stufe vergessen. */
+const STUFEN_ERWEITERT = ['geschaeftsleitung', 'entwickler'];
+
+function istBerechtigt(wert) {
+  return STUFEN_ERWEITERT.includes(wert || STUFE_STANDARD);
+}
+
 /* --- Online-Status ------------------------------------------------------ */
 
 function istOnline() { return navigator.onLine; }

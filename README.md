@@ -274,9 +274,9 @@ alle vier Bereiche.
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
 - `mitarbeiter` — das Adressbuch des Teams, bewusst getrennt von den
   Login-Konten. Einen Eintrag zu löschen berührt kein Konto. `berechtigung`
-  hält die Stufe (`mitarbeitend` oder `geschaeftsleitung`) und heisst absichtlich
-  nicht `rolle`: die Spalte `rolle` trägt schon die Funktion im Betrieb
-  («Bauleiter», «Administration»)
+  hält die Stufe (`mitarbeiter`, `geschaeftsleitung` oder `entwickler`) und
+  heisst absichtlich nicht `rolle`: die Spalte `rolle` trägt schon die Funktion
+  im Betrieb («Bauleiter», «Administration»)
 - `ordner`, `dateien` — die Dokumentenablage, die PDF selbst liegt im
   Storage-Bucket `dokumente`. Ein Ordner darf ein `projekt_id` tragen, die
   Dateien darin erben die Zuordnung über ihren Ordner und haben bewusst kein
@@ -294,6 +294,14 @@ Teammitglieder sehen alles und dürfen überall erfassen. `mitarbeiter.berechtig
 ändert daran vorläufig nichts: die Stufe wird nur angezeigt, als Marke neben dem
 Namen, und ist die Grundlage für einen späteren Schritt. Ändern lässt sie sich
 nur direkt in der Supabase-Tabelle, die App hat dafür keine Oberfläche.
+
+Drei Stufen: `mitarbeiter`, `geschaeftsleitung`, `entwickler`. **Entwickler darf
+dasselbe wie die Geschäftsleitung** — Beiträge anderer löschen, Anträge
+genehmigen, und was sonst noch dazukommt. Wer das abfragt, ruft `istBerechtigt()`
+aus `js/app.js` auf und schreibt nirgends `berechtigung === 'geschaeftsleitung'`
+hin. Stünde die Regel an jedem Knopf einzeln, hätte irgendein Bildschirm die
+dritte Stufe früher oder später vergessen. Die Namen der Stufen stehen daneben
+in `STUFEN`, damit «Mitarbeiter» nicht an fünf Orten getippt wird.
 
 Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
 `ordner`, `dateien`, `bkp_liste` und `firmen` tragen `geloescht_am` und
