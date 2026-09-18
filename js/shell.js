@@ -19,6 +19,7 @@ const BEREICHE = [
        das Raster bleibt bei den sechs Bereichen, die dort abgebildet sind.
        Den Weg dorthin auf dem Handy nimmt die Zeile über den Kacheln. */
     id: 'feed', titel: 'Feed', ziel: 'feed.html', kachel: false,
+    untertitel: 'Neuigkeiten und Umfragen aus dem Betrieb',
     icon: '<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5"/>'
   },
   {
@@ -47,6 +48,14 @@ const BEREICHE = [
   {
     id: 'chat', titel: 'Chat', ziel: 'chat.html',
     icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>'
+  },
+  {
+    /* Wie der Feed: in der Seitenleiste, aber nicht im Kachelraster.
+       Das Raster bleibt bei den sechs Bereichen aus der Design-Referenz,
+       den Weg auf dem Handy nehmen die Zeilen darüber. */
+    id: 'formulare', titel: 'Formulare', ziel: 'formulare.html', kachel: false,
+    untertitel: 'Spesen und Ferien beantragen',
+    icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/>'
   }
 ];
 

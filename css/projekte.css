@@ -14,6 +14,7 @@
 .pj-marke.gelb{ background:#fbf1de; color:#7d5a05; }
 .pj-marke.navy{ background:#e4eaf0; color:var(--navy); }
 .pj-marke.grau{ background:var(--bg); color:var(--text-dim); }
+.pj-marke.rot{ background:#fdeaea; color:var(--red); }
 /* Die Berechtigungsstufe bei den Mitarbeitern. Eigener Ton statt .grau:
    diese Marke steht mal auf der weissen Zeile, mal auf grauem Grund — auf
    der ausgewählten Zeile und im Kopf der Detailansicht. .grau hat genau

@@ -5,13 +5,15 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'triga-v26';
+const VERSION = 'triga-v27';
 
 const DATEIEN = [
   './',
   'index.html',
   'start.html',
   'feed.html',
+  'formulare.html',
+  'abnahme.html',
   'mitarbeiter.html',
   'firmenpool.html',
   'dokumente.html',
@@ -33,6 +35,8 @@ const DATEIEN = [
   'css/projekte.css',
   'css/chat.css',
   'css/feed.css',
+  'css/formulare.css',
+  'css/abnahme.css',
   'js/config.js',
   'js/logo.js',
   'js/shell.js',
@@ -48,6 +52,8 @@ const DATEIEN = [
   'js/profil.js',
   'js/chat.js',
   'js/feed.js',
+  'js/formulare.js',
+  'js/abnahme.js',
   'js/push.js',
   'js/papierkorb-bereich.js',
   'js/app.js',

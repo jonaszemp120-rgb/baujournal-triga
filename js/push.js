@@ -164,31 +164,37 @@ async function pushAbmelden() {
   }
 }
 
-/* Schickt eine Meldung — entweder an die anderen Mitglieder eines
-   Gesprächs (chat) oder, bei einem wichtigen Beitrag im Feed, an alle
-   anderen im Adressbuch (beitrag). Genau eines von beiden, nicht beides.
+/* Schickt eine Meldung. Genau eines von dreien sagt, worum es geht:
+
+     chat     an die anderen Mitglieder eines Gesprächs
+     beitrag  an alle anderen im Adressbuch, bei einem wichtigen Feed-Beitrag
+     antrag   an die einreichende Person, wenn ein Antrag entschieden wurde
 
    Wer die Meldung bekommt und ob sie überhaupt hinausgeht, entscheidet
-   api/push.js und nicht diese Zeile hier: die Funktion sieht selbst nach,
-   ob die Person im Gespräch steht beziehungsweise ob der Beitrag ihr
-   gehört und die Kategorie "wichtig" trägt.
+   api/push.js und nicht diese Zeile hier: die Funktion liest jedes Mal
+   selbst nach, ob die Person im Gespräch steht, ob der Beitrag ihr gehört
+   und "wichtig" ist, ob sie den Antrag entschieden hat.
 
    Der Aufruf wartet nicht: was gemeldet wird, steht längst in der
    Datenbank und ist bei den anderen angekommen. Die Meldung ist die
    Zugabe, nicht der Weg. */
-function pushSenden({ chat, beitrag, titel, text, ziel }) {
+function pushSenden({ chat, beitrag, antrag, titel, text, ziel }) {
   (async () => {
     try {
       if (!istOnline()) return;
       const s = await session();
       if (!s) return;
+      const rumpf = { titel, text, ziel };
+      if (chat) rumpf.chat = chat;
+      else if (beitrag) rumpf.beitrag = beitrag;
+      else if (antrag) rumpf.antrag = antrag;
       const antwort = await fetch('/api/push', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${s.access_token}`
         },
-        body: JSON.stringify(chat ? { chat, titel, text, ziel } : { beitrag, titel, text, ziel })
+        body: JSON.stringify(rumpf)
       });
       /* Scheitert der Versand, ändert das für die Nachricht nichts — sie
          steht längst in der Datenbank. Stillschweigen wäre trotzdem

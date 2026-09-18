@@ -11,15 +11,17 @@
  * Dienstschlüssel kommt erst danach zum Einsatz, und nur für die Abos der
  * so ermittelten Personen.
  *
- * Zwei Wege hinein, ein Weg hinaus:
+ * Drei Wege hinein, ein Weg hinaus:
  *
  *   { chat: <uuid> }     die anderen Mitglieder dieses Gesprächs
  *   { beitrag: <uuid> }  alle anderen im Adressbuch, aber nur bei einem
  *                        Beitrag der Kategorie "wichtig"
+ *   { antrag: <uuid> }   die Person, die den Antrag eingereicht hat, und
+ *                        nur, wenn er gerade entschieden wurde
  *
- * Dass nur ein wichtiger Beitrag meldet, entscheidet diese Funktion und
- * nicht die App. Ein Update oder eine Umfrage lösen nichts aus, auch dann
- * nicht, wenn jemand den Aufruf von Hand nachbaut.
+ * Wer melden darf und wann, entscheidet jedes Mal diese Funktion und nicht
+ * die App: ein Update, eine Umfrage oder ein noch offener Antrag lösen
+ * nichts aus, auch dann nicht, wenn jemand den Aufruf von Hand nachbaut.
  *
  * Umgebungsvariablen in Vercel:
  *   VAPID_PRIVAT        privater Schlüssel, Gegenstück zu BJ_CONFIG.vapid
@@ -130,14 +132,16 @@ module.exports = async (req, res) => {
   const daten = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const chat = String(daten.chat || '');
   const beitrag = String(daten.beitrag || '');
+  const antrag = String(daten.antrag || '');
   const istKennung = w => /^[0-9a-f-]{36}$/i.test(w);
 
-  if (istKennung(chat) === istKennung(beitrag)) {
-    console.error(`[push] Abbruch: es braucht genau eines von chat und beitrag (chat "${chat}", beitrag "${beitrag}").`);
-    return res.status(400).json({ fehler: 'Kein Gespräch und kein Beitrag angegeben.' });
+  const wege = [chat, beitrag, antrag].filter(istKennung);
+  if (wege.length !== 1) {
+    console.error(`[push] Abbruch: es braucht genau eines von chat, beitrag und antrag (chat "${chat}", beitrag "${beitrag}", antrag "${antrag}").`);
+    return res.status(400).json({ fehler: 'Weder Gespräch noch Beitrag noch Antrag angegeben.' });
   }
 
-  const kennung = istKennung(chat) ? chat : beitrag;
+  const kennung = wege[0];
   let ziele;
 
   if (istKennung(chat)) {
@@ -160,6 +164,38 @@ module.exports = async (req, res) => {
     ziele = mitglieder.daten.map(m => m.user_id).filter(u => u !== ich);
     if (!ziele.length) {
       console.log(`[push] ${chat}: ausser der sendenden Person ist niemand im Gespräch.`);
+      return res.status(200).json({ gesendet: 0 });
+    }
+  } else if (istKennung(antrag)) {
+    /* Ein Antrag meldet sich genau einmal: wenn er entschieden wurde, bei
+       der Person, die ihn eingereicht hat. Wer entschieden hat, steht in
+       der Zeile und wird vom Trigger gesetzt — diese Funktion glaubt der
+       App also nicht, sondern liest nach. */
+    const a = await hole(
+      `antraege?id=eq.${antrag}&select=art,status,erstellt_von,entschieden_von`, { apikey: ANON, token });
+
+    if (!a.ok) {
+      console.error(`[push] Abbruch: Supabase hat den Antrag ${antrag} nicht herausgegeben — Status ${a.status}, Antwort: ${a.roh}`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Antrag.' });
+    }
+    const zeile = Array.isArray(a.daten) ? a.daten[0] : null;
+    if (!zeile) {
+      console.error(`[push] Abbruch: ${ich} sieht den Antrag ${antrag} nicht, RLS liefert eine leere Liste.`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Antrag.' });
+    }
+    if (zeile.status === 'eingereicht') {
+      console.log(`[push] ${antrag}: noch nicht entschieden, es gibt nichts zu melden.`);
+      return res.status(200).json({ gesendet: 0, grund: 'nicht entschieden' });
+    }
+    if (zeile.entschieden_von !== ich) {
+      console.error(`[push] Abbruch: ${ich} hat den Antrag ${antrag} nicht entschieden.`);
+      return res.status(403).json({ fehler: 'Diesen Antrag haben Sie nicht entschieden.' });
+    }
+
+    // Wer den eigenen Antrag entscheidet, braucht dazu keine Meldung.
+    ziele = [zeile.erstellt_von].filter(u => u && u !== ich);
+    if (!ziele.length) {
+      console.log(`[push] ${antrag}: eigener Antrag, keine Meldung noetig.`);
       return res.status(200).json({ gesendet: 0 });
     }
   } else {
@@ -225,7 +261,9 @@ module.exports = async (req, res) => {
     titel: String(daten.titel || 'TRIGA App').slice(0, 80),
     text: String(daten.text || '').slice(0, 200),
     ziel: daten.ziel ? String(daten.ziel).slice(0, 200)
-      : (istKennung(chat) ? `chat.html?chat=${chat}` : 'feed.html')
+      : istKennung(chat) ? `chat.html?chat=${chat}`
+      : istKennung(antrag) ? 'formulare.html'
+      : 'feed.html'
   });
 
   let gesendet = 0;

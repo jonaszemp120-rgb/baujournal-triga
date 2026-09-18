@@ -1,0 +1,149 @@
+/* Bauabnahme: Mängel auf dem Grundriss.
+   Masse und Farben stammen aus den Screens auf Seite 37 und 38 der
+   Gesamtdesign-Referenz. */
+
+.ba-flaeche{ padding:0 16px 24px; }
+
+.ba-label{
+  font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--text-dim); margin:16px 0 10px;
+}
+
+/* --- Der Plan ------------------------------------------------------------- */
+
+/* Der Rahmen ist die Bezugsfläche der Stecknadeln: x und y stehen in der
+   Datenbank als Anteil zwischen 0 und 1, umgerechnet wird gegen genau
+   diesen Kasten. Deshalb sitzt das Bild darin ohne Rand und füllt ihn
+   vollständig. */
+.ba-plan{
+  position:relative; width:100%; border-radius:14px; overflow:hidden;
+  background:#e4e9eb; border:1px solid var(--border);
+  min-height:220px; display:flex; align-items:center; justify-content:center;
+}
+.ba-plan img{ display:block; width:100%; height:auto; }
+.ba-plan.setzen{ cursor:crosshair; }
+.ba-plan .laden{
+  padding:48px 20px; font-size:13px; color:var(--text-dim);
+  text-align:center; line-height:1.55;
+}
+
+/* Die Nadel steht mit ihrer Spitze auf dem Punkt, nicht mit ihrer Mitte —
+   deshalb wird sie um die halbe Breite und die volle Höhe verschoben. */
+.ba-nadel{
+  position:absolute; transform:translate(-50%, -100%);
+  width:28px; height:36px; border:none; background:none; padding:0;
+  display:flex; align-items:flex-start; justify-content:center;
+  color:var(--red);
+}
+.ba-nadel.erledigt{ color:var(--warn); }
+.ba-nadel .zahl{
+  position:absolute; top:5px; left:0; right:0; text-align:center;
+  color:#fff; font-size:11px; font-weight:800;
+}
+.ba-nadel[aria-current="true"] svg{ filter:drop-shadow(0 0 0 2px #fff); }
+
+.ba-hinweis{
+  margin-top:10px; font-size:12.5px; color:var(--text-dim); line-height:1.5;
+}
+
+/* --- Die Mängelliste ------------------------------------------------------ */
+
+.ba-kopfzeile{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-bottom:10px;
+}
+.ba-kopfzeile h2{ margin:0; font-size:15px; font-weight:700; }
+
+.ba-mangel{
+  display:flex; align-items:flex-start; gap:12px;
+  background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:12px 14px;
+}
+.ba-mangel + .ba-mangel{ margin-top:10px; }
+.ba-mangel .zahl{
+  width:26px; height:26px; border-radius:50%; background:var(--red); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:800; flex-shrink:0;
+}
+.ba-mangel[data-erledigt="1"] .zahl{ background:var(--warn); }
+.ba-mangel[data-erledigt="1"] .titel{ color:var(--text-dim); text-decoration:line-through; }
+.ba-mangel .was{ flex:1; min-width:0; }
+.ba-mangel .titel{ font-weight:700; font-size:14px; overflow-wrap:anywhere; }
+.ba-mangel .unter{ color:var(--text-dim); font-size:12.5px; margin-top:2px; overflow-wrap:anywhere; }
+.ba-mangel .tasten{ display:flex; gap:4px; flex-shrink:0; }
+.ba-mangel .tasten button{
+  width:30px; height:30px; border-radius:8px; border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+}
+.ba-mangel .tasten button.rot{ color:var(--red); }
+.ba-mangel .tasten button:hover{ background:var(--bg); }
+.ba-mangel .foto{
+  width:44px; height:44px; border-radius:8px; object-fit:cover; flex-shrink:0;
+  background:var(--bg);
+}
+
+/* --- Abschluss ------------------------------------------------------------ */
+
+.ba-zusammen{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:16px 18px; line-height:1.6; font-size:14px; color:var(--text-dim);
+}
+.ba-zusammen b{ display:block; color:var(--text); font-size:15px; margin-bottom:6px; }
+
+/* Die eigene Unterschrift kommt aus dem Profil und wird nur gezeigt —
+   graue Fläche, nichts zum Antippen. Die daneben ist leer und gestrichelt,
+   damit der Unterschied ohne Beschriftung erkennbar ist. */
+.ba-unterschrift{
+  position:relative; background:var(--bg); border-radius:12px;
+  padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;
+  min-height:110px;
+}
+.ba-unterschrift img{ max-height:80px; max-width:60%; display:block; }
+.ba-unterschrift .name{ font-weight:700; font-size:14px; }
+
+.ba-feld{
+  position:relative; border:1.5px dashed var(--border); border-radius:12px;
+  background:var(--card); min-height:170px; overflow:hidden;
+}
+.ba-feld canvas{ display:block; width:100%; height:170px; touch-action:none; }
+.ba-feld .wink{
+  position:absolute; right:14px; bottom:12px; font-size:12.5px; color:var(--text-dim);
+  pointer-events:none;
+}
+.ba-feld[data-voll="1"] .wink{ display:none; }
+
+.ba-tasten{ display:flex; gap:10px; margin-top:18px; }
+.ba-tasten .ja{
+  flex:1; height:52px; border:none; border-radius:13px;
+  background:var(--red); color:#fff; font-weight:700; font-size:15.5px;
+}
+.ba-tasten .ja:hover{ background:var(--red-dark); }
+.ba-tasten .nein{
+  flex:0 0 auto; padding:0 22px; height:52px; border-radius:13px;
+  background:var(--card); border:1.5px solid var(--border);
+  color:var(--navy); font-weight:700; font-size:15px;
+}
+
+.ba-fertig{
+  display:flex; align-items:center; gap:10px;
+  background:#e7f2e8; border:1px solid #cbe0cd; border-radius:12px;
+  padding:13px 16px; font-size:13.5px; font-weight:600; color:#1f5c22; line-height:1.5;
+}
+
+/* --- Desktop -------------------------------------------------------------- */
+
+@media (min-width:1024px){
+  .ba-flaeche{
+    display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 420px);
+    align-items:start; gap:28px;
+    padding:26px calc(40px + env(safe-area-inset-right)) 40px calc(40px + env(safe-area-inset-left));
+    max-width:1400px;
+  }
+  .ba-label{ margin-top:0; }
+  /* Der Abschluss braucht keine zwei Spalten, er ist ein Formular. */
+  .ba-flaeche.einspaltig{ display:block; max-width:760px; }
+}
+
+@media (max-width:1023px){
+  .ba-spalte-liste{ margin-top:22px; }
+}

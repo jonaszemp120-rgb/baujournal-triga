@@ -40,23 +40,23 @@
   .st-kachel .zahl{ display:none; }
   .tr-banner{ margin:12px 20px 0; }
 
-  /* Der Einstieg in den Feed, nur auf dem Handy. Bewusst eine Zeile und
-     keine Kachel: das Raster soll die sechs Bereiche zeigen, die im
-     Design abgebildet sind. */
-  .st-feed{
+  /* Die Einstiege in Feed und Formulare, nur auf dem Handy. Bewusst
+     Zeilen und keine Kacheln: das Raster soll die sechs Bereiche zeigen,
+     die im Design abgebildet sind. */
+  .st-einstieg{
     display:flex; align-items:center; gap:12px;
-    margin:16px 20px 0; padding:13px 14px;
+    margin:12px 20px 0; padding:13px 14px;
     background:var(--card); border:1px solid var(--border); border-radius:14px;
     color:var(--text);
   }
-  .st-feed .symbol{
+  .st-einstieg .symbol{
     width:36px; height:36px; border-radius:10px; background:var(--navy); color:#fff;
     display:flex; align-items:center; justify-content:center; flex-shrink:0;
   }
-  .st-feed .wort{ flex:1; min-width:0; }
-  .st-feed .titel{ display:block; font-weight:700; font-size:15px; }
-  .st-feed .unter{ display:block; color:var(--text-dim); font-size:12px; margin-top:1px; }
-  .st-feed svg:last-child{ color:var(--text-dim); flex-shrink:0; }
+  .st-einstieg .wort{ flex:1; min-width:0; }
+  .st-einstieg .titel{ display:block; font-weight:700; font-size:15px; }
+  .st-einstieg .unter{ display:block; color:var(--text-dim); font-size:12px; margin-top:1px; }
+  .st-einstieg svg:last-child{ color:var(--text-dim); flex-shrink:0; }
 
   @media (min-width:1024px){
     .st-gruss{ display:none; }
@@ -100,7 +100,7 @@
 
   <div id="banner-mobil" class="nur-mobil"></div>
 
-  <div id="feed-einstieg" class="nur-mobil"></div>
+  <div id="einstiege" class="nur-mobil"></div>
 
   <div class="st-kopfzeile nur-desktop">
     <div id="banner-desktop"></div>

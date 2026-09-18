@@ -1,8 +1,8 @@
 # TRIGA App · TRIGA Baumanagement AG
 
-Die interne App der TRIGA Baumanagement AG. Sieben Bereiche, ein Login, eine
+Die interne App der TRIGA Baumanagement AG. Acht Bereiche, ein Login, eine
 Adresse: **Feed**, **Mitarbeiter**, **Projekte**, **Baujournal**,
-**Firmenpool**, **Dokumente**, **Chat**. Läuft
+**Firmenpool**, **Dokumente**, **Chat**, **Formulare**. Läuft
 im Browser, lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert
 im Baujournal auch ohne Empfang, etwa in der Tiefgarage oder im Rohbau.
 
@@ -10,7 +10,7 @@ Kein Build-Schritt, kein Framework. Reines HTML, CSS und JavaScript, das Vercel
 direkt als statische Seiten ausliefert. Wer am Code etwas ändert, öffnet die
 Datei, speichert, fertig.
 
-## Die sieben Bereiche
+## Die acht Bereiche
 
 **Feed** ist der Aushang des Betriebs. Ein Strom, chronologisch, sichtbar für
 alle. Zwei Arten stehen darin: ein Beitrag mit Text, optional einem Foto und
@@ -69,6 +69,21 @@ dann als «Nachricht gelöscht» stehen bleibt, und das ganze Gespräch, das fü
 alle verschwindet. Ändern geht nicht — ein Verlauf, den man umschreiben kann,
 ist keiner mehr.
 
+**Formulare** sind die Anträge: Spesen mit Betrag, Beschrieb und optional einem
+fotografierten Beleg, Ferien mit Zeitraum und optionaler Bemerkung. Ein Antrag
+geht einen Weg und nur einen — eingereicht, dann genehmigt oder abgelehnt. Wer
+die erweiterte Stufe hat, sieht zusätzlich alle offenen Anträge der anderen und
+entscheidet direkt in der Liste. Solange niemand entschieden hat, lässt sich ein
+eigener Antrag zurückziehen; danach ist er ein Nachweis und bleibt stehen.
+
+Die **Bauabnahme** gehört keinem Bereich, sondern einem Projekt, und ist über
+die Projektseite erreichbar. Sie zeigt den Grundriss aus den Projekt-Dokumenten,
+und ein Tipp darauf setzt eine nummerierte Stecknadel: Beschrieb, zuständige
+Firma aus der Unternehmerliste, Frist, Foto. Am Schluss unterschreiben beide
+Seiten — die TRIGA-Person mit der im Profil hinterlegten Unterschrift, die
+Bauherrschaft oder Firma auf dem Gerät —, und daraus entsteht ein PDF-Protokoll,
+das im Bereich Dokumente des Projekts landet. Ab dann ist die Abnahme zu.
+
 Daneben steht **Mein Profil**, kein Bereich, sondern die eigene Seite jeder
 angemeldeten Person: erreichbar über das Konto-Feld unten in der Seitenleiste
 und über den Kreis mit den Initialen auf der Startseite. Dort pflegt jede Person
@@ -98,14 +113,16 @@ wurde.
 | Datei | Zweck |
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
-| `start.html` | Die Startseite nach dem Login: die sechs Kacheln mit Zahlen aus der Datenbank, darüber auf dem Handy die Zeile zum Feed. |
+| `start.html` | Die Startseite nach dem Login: die sechs Kacheln mit Zahlen aus der Datenbank, darüber auf dem Handy die Zeilen zu Feed und Formularen. |
 | `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren, in Echtzeit. |
+| `formulare.html` | Spesen- und Ferienanträge: einreichen, zurückziehen, entscheiden. |
+| `abnahme.html` | Die Bauabnahme eines Projekts: Plan, Mängel, Abschluss, `?projekt=` und optional `?abnahme=`. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
 | `chat.html` | Der Chat: Gespräche links, das offene rechts, `?chat=`. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
-| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal, Feed-Beiträgen und Dokumenten. |
+| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Bauabnahmen, Journal, Feed-Beiträgen und Dokumenten. |
 | `pendenzen.html` | Alle Pendenzen eines Projekts, offene und erledigte, `?projekt=`. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
@@ -143,6 +160,9 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Firma | `firmenpool.html` | dort | Papierkorb Firmenpool |
 | Ansprechperson | in der Firma | dort | direkt, ohne Papierkorb |
 | Notiz | in der Firma | dort | direkt, ohne Papierkorb |
+| Antrag | `formulare.html` | gar nicht, ein Antrag steht wie eingereicht | zurückziehen, solange niemand entschieden hat |
+| Bauabnahme | `abnahme.html` | bis zum Abschluss | bis zum Abschluss, danach nie mehr |
+| Mangel | auf dem Plan | bis zum Abschluss | direkt, solange er offen ist |
 | Beitrag oder Umfrage | `feed.html` | gar nicht, ein Beitrag steht wie gepostet | direkt, ohne Papierkorb, eigene immer, fremde mit erweiterter Stufe |
 | Kommentar | unter einem Beitrag | gar nicht | direkt, ohne Papierkorb, wie beim Beitrag |
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
@@ -303,12 +323,14 @@ css/app.css          Schrift, Farben, Zustände, der gemeinsame Rahmen.
 js/logo.js           die einzige Logoquelle
 js/config.js         Supabase-URL und anon key
 js/app.js            Client, Session, Datumsformate, Sheets, Kontozeile
-js/shell.js          die Seitenleiste ab 1024px, die sieben Bereiche,
+js/shell.js          die Seitenleiste ab 1024px, die acht Bereiche,
                      das Test-Banner (ein einziger Schalter). Ein Bereich
                      mit kachel:false steht nur in der Leiste, nicht im
                      Raster der Startseite
 js/start.js          die Startseite mit der Bereichsauswahl
 js/feed.js           der Feed: Beiträge, Umfragen, Herz, Kommentare
+js/formulare.js      Spesen- und Ferienanträge
+js/abnahme.js        die Bauabnahme: Plan, Mängel, Abschluss
 js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
                      Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
@@ -365,7 +387,7 @@ um dieses Polster aus dem Bild.
 ## Datenbank
 
 Supabase-Projekt `baujournal-triga`, Region `eu-central-1`. Eine Datenbank für
-alle sieben Bereiche.
+alle acht Bereiche.
 
 - `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
   `beschrieb`, `status` (planung / laufend / abgeschlossen) und `archiviert`.
@@ -413,6 +435,18 @@ alle sieben Bereiche.
   wird mit `feed_ergebnisse()`, das nur Zahlen zurückgibt. Ein Foto liegt im
   Bucket `feed-bilder` unter `<beitrag_id>/<zufall>`, mit derselben
   30-Tage-Regel wie im Chat
+- `antraege` — Spesen und Ferien in einer Tabelle, unterschieden durch `art`;
+  eine Prüfregel hält auseinander, was nur zur einen Art gehört. `status` geht
+  von `eingereicht` zu `genehmigt` oder `abgelehnt` und nie zurück. Der Trigger
+  `antrag_schutz()` lässt beim Entscheiden nur den Entscheid durch, nicht den
+  Inhalt — den Betrag eines fremden Antrags kann auch die Geschäftsleitung
+  nicht mitändern
+- `abnahmen`, `maengel` — die Bauabnahme. `plan_bild_pfad` zeigt auf die einmal
+  gerenderte Fassung des Grundrisses im Bucket `abnahme`; `x` und `y` eines
+  Mangels stehen als Anteil zwischen 0 und 1 und nicht in Pixeln, damit die
+  Nadel auf dem Handy und am Bildschirm am selben Fleck sitzt. Sobald
+  `abgeschlossen_am` steht, sperrt der Trigger `abnahme_gesperrt()` beide
+  Tabellen: kein Mangel kommt dazu, keiner verschwindet, keiner ändert sich
 - `chats`, `chat_mitglieder`, `nachrichten` — der Chat. Ein Bild liegt im Bucket
   `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
   `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
@@ -556,6 +590,11 @@ gehen müssen, den Beitrag zu löschen, um einen Kommentar loszuwerden.
 `api/feed-aufraeumen.js` rufen ihn mit ihren eigenen Namen auf. Zwei Kopien
 wären zwei Orte, an denen jemand später etwas ändert und den anderen vergisst.
 
+**Drei Wege gehen durch `api/push.js`:** ein Gespräch, ein wichtiger
+Feed-Beitrag und ein entschiedener Antrag. Welcher gilt, sagt genau eines der
+Felder `chat`, `beitrag` oder `antrag`; wer melden darf und an wen, liest die
+Funktion jedes Mal selbst nach.
+
 **Nur ein wichtiger Beitrag meldet sich.** Wer etwas mit der Kategorie
 «Wichtig» postet, löst bei allen anderen im Adressbuch eine Push-Meldung aus —
 über dieselbe Funktion und dieselbe Tabelle `push_geraete` wie der Chat. Ein
@@ -586,6 +625,50 @@ Seitenleiste aber nicht, und ohne einen Weg dorthin wäre der Bereich auf dem
 Telefon nicht erreichbar — deshalb die eine Zeile über den Kacheln
 (`.st-feed`). Kein siebtes Feld im Raster, sondern ein Einstieg, der sich davon
 deutlich unterscheidet.
+
+## Formulare und Bauabnahme
+
+**Ein Antrag und eine Abnahme laufen auf denselben Gedanken hinaus:** etwas
+wird erfasst, jemand entscheidet oder unterschreibt, und danach ist es ein
+Nachweis und kein Entwurf mehr. Das steht in der Datenbank und nicht nur in der
+Oberfläche — ein entschiedener Antrag und eine unterschriebene Abnahme lassen
+sich auch dann nicht mehr ändern, wenn jemand die App umgeht.
+
+Beim Antrag macht das der Trigger `antrag_schutz()` mit einer Erlaubnisliste,
+derselben Bauart wie `mitarbeiter_schutz()`: durch darf nur der Entscheid, und
+`entschieden_von` setzt der Trigger selbst auf `auth.uid()`. Wer entscheidet,
+kann den Betrag eines fremden Antrags damit nicht mitändern. Bei der Abnahme
+macht es `abnahme_gesperrt()` — als Trigger und nicht als Policy, weil eine
+Policy, die keine Zeile trifft, schweigt; hier soll eine Meldung erscheinen,
+damit klar wird, warum nichts passiert.
+
+**Warum der Grundriss als Bild und nicht als PDF:** auf ein PDF lässt sich keine
+Stecknadel zuverlässig setzen. Die Anzeige skaliert, scrollt und rendert je nach
+Gerät anders, und eine Position in Pixeln wäre morgen eine andere Stelle. Die
+gewählte Seite wird deshalb einmal zu einem PNG gerendert und liegt danach fest
+im Bucket `abnahme`. Jede Nadel steht als Anteil der Bildbreite und -höhe
+zwischen 0 und 1 und sitzt damit auf jedem Bildschirm am selben Fleck.
+
+Gerendert wird mit **pdf.js im Browser**, aus `vendor/`, beim ersten Öffnen der
+Abnahme. Der Spec sah dafür einen Server vor; diese App hat aber keinen
+Build-Schritt und keine npm-Abhängigkeiten, und ein PDF im Serverless-Umfeld zu
+rastern verlangt beides. Das Ergebnis ist dasselbe: ein Bild, einmal erzeugt,
+danach für alle und jedes Gerät gleich. `vendor/pdfjs-worker-…` liegt bewusst
+nicht im Vorab-Cache des Service Workers — es ist gut ein Megabyte, und ohne
+Verbindung liesse sich der Plan ohnehin nicht laden.
+
+**Das Protokoll** entsteht vor dem Abschluss und nicht danach: die Datenbank
+sperrt eine abgeschlossene Abnahme, die Kennung der Datei liesse sich sonst
+nicht mehr eintragen. Es liegt als PDF im Bereich Dokumente des Projekts, im
+vorhandenen Ordner oder in einem neu angelegten, mit dem Plan samt Nadeln,
+allen Mängeln mit Foto und Frist und beiden Unterschriften. Erzeugt wird es von
+`abnahmeProtokoll()` in `js/export.js`, wo die ganze PDF-Maschinerie schon liegt.
+
+Das **Feld zum Unterschreiben** steht in `js/app.js` als `unterschriftErfassen()`
+und wird von zwei Orten gebraucht: unter «Mein Profil» für die eigene
+Unterschrift und bei der Abnahme für die Bauherrschaft, die kein Konto in dieser
+App hat. Zwei Fassungen desselben Felds liefen früher oder später auseinander,
+und dann sähe eine Unterschrift im Protokoll anders aus als im Profil.
 
 ## Chat und Benachrichtigungen
 

@@ -129,7 +129,7 @@
   /* --- Unterschrift --------------------------------------------------------- */
 
   async function unterschreiben() {
-    const bild = await unterschriftSheet();
+    const bild = await unterschriftErfassen();
     if (!bild) return;
     try {
       if (!istOnline()) throw new Error('Die Unterschrift lässt sich nur online speichern');
@@ -168,130 +168,9 @@
     }
   }
 
-  /* Das Feld zum Unterschreiben. Liefert eine Data-URL oder null.
-     Gezeichnet wird mit Pointer-Ereignissen: die decken Finger, Stift und
-     Maus mit demselben Code ab. */
-  function unterschriftSheet() {
-    return new Promise(fertig => {
-      const s = sheet(`
-        <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:6px;">Unterschreiben</div>
-        <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:14px;">Mit dem Finger oder einem Stift ins Feld schreiben.</div>
-        <div id="us-rahmen" style="border:1.5px dashed var(--border); border-radius:14px; background:#fafbfb; padding:6px; margin-bottom:14px;">
-          <canvas id="us-feld" style="display:block; width:100%; height:190px; touch-action:none; cursor:crosshair;"></canvas>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button type="button" id="us-ja" class="btn-primary pressable" style="flex:1; height:48px; border:none; border-radius:12px; background:var(--red); color:#fff; font-weight:700; font-size:15px;">Übernehmen</button>
-          <button type="button" id="us-leer" class="pressable" style="flex:1; height:48px; border-radius:12px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Nochmal</button>
-          <button type="button" id="us-nein" class="pressable" style="flex:1; height:48px; border-radius:12px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Abbrechen</button>
-        </div>
-      `);
-
-      const feld = $('#us-feld', s.el);
-      const punkt = window.devicePixelRatio || 1;
-      let ctx = null;
-      let gezeichnet = false;
-
-      /* Erst nach der Einblendung messen: vorher ist das Sheet noch
-         ausserhalb des Bildes und clientWidth wäre 0. */
-      function aufspannen() {
-        const b = feld.getBoundingClientRect();
-        feld.width = Math.round(b.width * punkt);
-        feld.height = Math.round(b.height * punkt);
-        ctx = feld.getContext('2d');
-        ctx.scale(punkt, punkt);
-        ctx.lineWidth = 2.4;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#11223a';
-      }
-      setTimeout(aufspannen, 220);
-
-      let malt = false;
-      let letzter = null;
-      const stelle = e => {
-        const b = feld.getBoundingClientRect();
-        return { x: e.clientX - b.left, y: e.clientY - b.top };
-      };
-
-      /* Pro Bewegung ein kurzes Stück zeichnen, nicht den ganzen Zug neu.
-         Ein einziger langer Pfad würde bei jeder Bewegung komplett neu
-         gestrichen — das wird gegen Ende einer Unterschrift zäh. */
-      function strich(von, bis) {
-        ctx.beginPath();
-        ctx.moveTo(von.x, von.y);
-        ctx.lineTo(bis.x, bis.y);
-        ctx.stroke();
-      }
-
-      feld.addEventListener('pointerdown', e => {
-        if (!ctx) aufspannen();
-        malt = true;
-        gezeichnet = true;
-        feld.setPointerCapture(e.pointerId);
-        letzter = stelle(e);
-        // Ein einzelner Tipp soll auch einen Punkt hinterlassen.
-        strich(letzter, { x: letzter.x + 0.1, y: letzter.y });
-      });
-      feld.addEventListener('pointermove', e => {
-        if (!malt) return;
-        e.preventDefault();
-        const p = stelle(e);
-        strich(letzter, p);
-        letzter = p;
-      });
-      const loslassen = () => { malt = false; letzter = null; };
-      feld.addEventListener('pointerup', loslassen);
-      feld.addEventListener('pointercancel', loslassen);
-      feld.addEventListener('pointerleave', loslassen);
-
-      $('#us-leer', s.el).addEventListener('click', () => {
-        if (!ctx) return;
-        ctx.clearRect(0, 0, feld.width, feld.height);
-        gezeichnet = false;
-      });
-      $('#us-nein', s.el).addEventListener('click', () => { s.schliessen(); fertig(null); });
-      $('#us-ja', s.el).addEventListener('click', () => {
-        if (!gezeichnet) return toast('Das Feld ist noch leer', true);
-        const bild = zuschneiden(feld);
-        s.schliessen();
-        fertig(bild);
-      });
-    });
-  }
-
-  /* Auf den beschriebenen Bereich zuschneiden. Ohne das wäre die halbe
-     Datei leerer Rand, und die Unterschrift stünde später irgendwo im
-     Protokoll statt dort, wo sie hingehört. */
-  function zuschneiden(feld) {
-    const ctx = feld.getContext('2d');
-    const d = ctx.getImageData(0, 0, feld.width, feld.height).data;
-    let oben = feld.height, unten = 0, links = feld.width, rechts = 0;
-
-    for (let y = 0; y < feld.height; y++) {
-      for (let x = 0; x < feld.width; x++) {
-        if (d[(y * feld.width + x) * 4 + 3] > 8) {
-          if (y < oben) oben = y;
-          if (y > unten) unten = y;
-          if (x < links) links = x;
-          if (x > rechts) rechts = x;
-        }
-      }
-    }
-    if (rechts < links || unten < oben) return feld.toDataURL('image/png');
-
-    const rand = Math.round(8 * (window.devicePixelRatio || 1));
-    links = Math.max(0, links - rand);
-    oben = Math.max(0, oben - rand);
-    rechts = Math.min(feld.width - 1, rechts + rand);
-    unten = Math.min(feld.height - 1, unten + rand);
-
-    const aus = document.createElement('canvas');
-    aus.width = rechts - links + 1;
-    aus.height = unten - oben + 1;
-    aus.getContext('2d').drawImage(feld, links, oben, aus.width, aus.height,
-                                   0, 0, aus.width, aus.height);
-    return aus.toDataURL('image/png');
-  }
+  /* Das Feld zum Unterschreiben steht in js/app.js, siehe
+     unterschriftErfassen(). Die Bauabnahme braucht dasselbe Feld: dort
+     unterschreibt die Bauherrschaft, die kein Konto in dieser App hat. */
 
   /* --- Start ---------------------------------------------------------------- */
 

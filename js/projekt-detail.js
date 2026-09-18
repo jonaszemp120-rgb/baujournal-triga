@@ -19,6 +19,7 @@
   let journal = [];
   let pendenzen = [];
   let feed = [];
+  let abnahmen = [];
   let firmen = [];
   let mitarbeiter = [];
   let bkp = [];
@@ -69,6 +70,15 @@
     return data || [];
   }
 
+  async function ladeAbnahmen() {
+    if (!istOnline()) return [];
+    const { data, error } = await sb.from('abnahmen')
+      .select('id, titel, abgeschlossen_am, erstellt_am')
+      .eq('projekt_id', projektId).order('erstellt_am', { ascending: false });
+    if (error) return [];
+    return data || [];
+  }
+
   async function ladeAuswahllisten() {
     if (!istOnline()) return;
     const [f, m, b] = await Promise.all([
@@ -85,9 +95,9 @@
   }
 
   async function allesLaden() {
-    [projekt, einsaetze, personen, ordner, journal, pendenzen, feed] = await Promise.all([
+    [projekt, einsaetze, personen, ordner, journal, pendenzen, feed, abnahmen] = await Promise.all([
       PJ.projekt(projektId), PJ.einsaetze(projektId), PJ.personen(projektId),
-      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId), ladeFeed()
+      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId), ladeFeed(), ladeAbnahmen()
     ]);
   }
 
@@ -653,6 +663,27 @@
       : '<div class="pj-leer">Noch kein Beitrag zu diesem Projekt. Im Feed lässt sich beim Schreiben ein Projekt zuordnen.</div>'}`;
   }
 
+  /* Die Bauabnahmen dieses Projekts. Eine offene führt weiter, wo man
+     aufgehört hat; eine abgeschlossene ist ein Nachweis und lässt sich nur
+     noch ansehen. */
+  function zeichneAbnahmen() {
+    const ziel = `abnahme.html?projekt=${encodeURIComponent(projektId)}`;
+    $('#abnahmen').innerHTML = `
+      <div class="kopf">
+        <h2>Bauabnahme${abnahmen.length ? ` · ${abnahmen.length}` : ''}</h2>
+        <a class="pj-mehr" href="${ziel}">${abnahmen.some(a => !a.abgeschlossen_am) ? 'Weiterführen →' : 'Zur Bauabnahme →'}</a>
+      </div>
+      ${abnahmen.length ? abnahmen.map(a => `
+        <a class="pj-zeile" href="abnahme.html?projekt=${encodeURIComponent(projektId)}&abnahme=${encodeURIComponent(a.id)}">
+          <span class="wer">
+            <span class="titel" style="display:block;">${esc(a.titel)}</span>
+            <span class="unter" style="display:block;">${esc(fmtDatum(a.erstellt_am))}</span>
+          </span>
+          <span class="pj-marke klein ${a.abgeschlossen_am ? 'gruen' : 'gelb'}">${a.abgeschlossen_am ? 'Abgeschlossen' : 'Offen'}</span>
+        </a>`).join('')
+      : '<div class="pj-leer">Noch keine Abnahme. Dafür braucht es einen Grundriss als PDF in den Dokumenten dieses Projekts.</div>'}`;
+  }
+
   function zeichneDokumente() {
     $('#dokumente').innerHTML = `
       <div class="kopf">
@@ -690,6 +721,7 @@
     zeichneUnternehmer();
     zeichnePersonen();
     zeichnePendenzen();
+    zeichneAbnahmen();
     zeichneJournal();
     zeichneFeed();
     zeichneDokumente();

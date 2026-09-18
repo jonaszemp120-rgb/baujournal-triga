@@ -1,0 +1,120 @@
+/* Bereich Formulare: Spesen- und Ferienanträge.
+   Masse und Farben stammen aus den Screens auf Seite 35 und 36 der
+   Gesamtdesign-Referenz. Auf dem Handy liegt das Formular in einem Blatt
+   von unten, auf dem Desktop steht es fest in der linken Spalte — das
+   spart dort einen Klick, den es auf dem Handy mangels Platz braucht. */
+
+.fm-flaeche{ padding:0 16px 24px; }
+
+.fm-label{
+  font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--text-dim); margin:20px 0 10px;
+}
+.fm-label:first-child{ margin-top:16px; }
+
+/* --- Anträge zum Entscheiden --------------------------------------------- */
+
+.fm-karte{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:16px;
+}
+.fm-karte + .fm-karte{ margin-top:10px; }
+.fm-karte .wer{ display:block; font-weight:700; font-size:16px; overflow-wrap:anywhere; }
+.fm-karte .was{ display:block; color:var(--text-dim); font-size:14px; margin-top:2px; overflow-wrap:anywhere; }
+
+.fm-entscheid{ display:flex; gap:12px; margin-top:14px; }
+.fm-entscheid button{
+  flex:1; height:48px; border-radius:11px; font-weight:700; font-size:15px;
+}
+.fm-entscheid .nein{
+  background:var(--card); border:1.5px solid var(--border); color:var(--text-dim);
+}
+.fm-entscheid .nein:hover{ border-color:var(--red); color:var(--red); }
+/* Genehmigen ist grün und nicht rot: Rot ist in dieser App die Farbe der
+   Marke und der gefährlichen Handlung, und beides trifft hier nicht zu. */
+.fm-entscheid .ja{ background:#1f5c22; border:none; color:#fff; }
+.fm-entscheid .ja:hover{ background:#184a1b; }
+
+/* --- Eigene Anträge ------------------------------------------------------- */
+
+.fm-liste{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  overflow:hidden;
+}
+.fm-zeile{
+  display:flex; align-items:center; gap:12px; padding:15px 16px;
+  border-bottom:1px solid var(--border);
+}
+.fm-zeile:last-child{ border-bottom:none; }
+.fm-zeile .titel{ display:block; font-weight:700; font-size:15px; overflow-wrap:anywhere; }
+.fm-zeile .unter{ display:block; color:var(--text-dim); font-size:13px; margin-top:1px; overflow-wrap:anywhere; }
+.fm-zeile .mitte{ flex:1; min-width:0; }
+.fm-zeile .rechts{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.fm-zeile .zurueck{
+  width:28px; height:28px; border-radius:8px; border:none; background:transparent;
+  color:var(--text-dim); display:flex; align-items:center; justify-content:center;
+}
+.fm-zeile .zurueck:hover{ background:var(--bg); color:var(--red); }
+
+.fm-beleg{
+  display:inline-flex; align-items:center; gap:6px; margin-top:6px;
+  font-size:12.5px; font-weight:700; color:var(--navy);
+}
+
+/* --- Das Formular --------------------------------------------------------- */
+
+.fm-umschalter{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.fm-umschalter button{
+  height:46px; border:none; border-radius:11px;
+  background:var(--bg); color:var(--text-dim); font-weight:700; font-size:14.5px;
+}
+.fm-umschalter button[aria-pressed="true"]{ background:var(--navy); color:#fff; }
+
+.fm-feld{ margin-bottom:14px; }
+.fm-eingabe{
+  width:100%; height:48px; border-radius:11px; border:1.5px solid var(--border);
+  padding:0 14px; font-size:15px; color:var(--text); background:var(--card);
+  box-sizing:border-box;
+}
+textarea.fm-eingabe{ height:auto; min-height:80px; padding:12px 14px; line-height:1.5; resize:vertical; }
+
+.fm-ablage{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+  width:100%; min-height:110px; margin-bottom:16px;
+  border:1.5px dashed var(--border); border-radius:11px;
+  background:transparent; color:var(--text-dim); font-size:13.5px;
+}
+.fm-ablage:hover{ border-color:var(--navy); color:var(--navy); }
+.fm-ablage img{ max-width:100%; max-height:170px; border-radius:9px; display:block; }
+
+.fm-senden{
+  width:100%; height:50px; border:none; border-radius:13px;
+  background:var(--red); color:#fff; font-weight:700; font-size:15px;
+}
+.fm-senden:hover{ background:var(--red-dark); }
+
+/* --- Desktop -------------------------------------------------------------- */
+
+@media (min-width:1024px){
+  .fm-flaeche{
+    display:grid; grid-template-columns:minmax(0, 420px) minmax(0, 1fr);
+    align-items:start; gap:0;
+    padding:0; max-width:1280px;
+  }
+  /* Links das Formular, rechts die Listen, getrennt durch eine Linie —
+     genau die Aufteilung aus dem Design. */
+  .fm-spalte-form{
+    padding:28px calc(32px + env(safe-area-inset-left)) 40px;
+    border-right:1px solid var(--border);
+    min-height:calc(100dvh - 72px);
+  }
+  .fm-spalte-liste{ padding:28px calc(40px + env(safe-area-inset-right)) 40px 32px; }
+  .fm-spalte-form h2{ margin:0 0 16px; font-size:16px; font-weight:800; color:var(--navy); }
+  .fm-label:first-child{ margin-top:0; }
+}
+
+@media (max-width:1023px){
+  /* Auf dem Handy steckt das Formular im Blatt von unten, die feste
+     Spalte entfällt. */
+  .fm-spalte-form{ display:none; }
+}

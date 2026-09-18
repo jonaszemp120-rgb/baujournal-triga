@@ -286,3 +286,212 @@ async function exportWord(eintraege, projekt) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
+
+/* --- Abnahmeprotokoll ----------------------------------------------------- */
+
+/* Das Protokoll einer Bauabnahme als PDF: Projekt, Datum, anwesende
+   Personen, der Plan mit den Nadeln, alle Mängel mit Foto und Frist und
+   beide Unterschriften.
+   Es steht hier und nicht in js/abnahme.js, weil hier die ganze
+   PDF-Maschinerie schon liegt — Logo, Zeichenumsetzung, Seitenumbruch.
+   Liefert den Blob; wohin er gehört, entscheidet der Aufrufer.
+
+   Der Plan bekommt die Nadeln nicht als Bild mitgeliefert, sondern sie
+   werden hier auf eine Leinwand darübergezeichnet. So steht im Protokoll
+   dasselbe Bild wie am Schirm, samt Nummern — und ohne dass irgendwo eine
+   zweite Fassung des Plans abgelegt werden müsste. */
+async function abnahmeProtokoll({ projekt, abnahme, maengel, planBild, fotos,
+                                  anwesend, gastName, unterschriftTriga,
+                                  unterschriftGast, wann }) {
+  await ladeSkript('vendor/jspdf-2.5.2.umd.min.js');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  let logo = null, logoBreite = 0;
+  const LOGO_H = 12;
+  try {
+    logo = await logoDatenUrl();
+    const masse = doc.getImageProperties(logo);
+    logoBreite = LOGO_H * masse.width / masse.height;
+  } catch (e) {
+    console.warn('[TRIGA] Logo fuers Protokoll nicht verfuegbar:', e.message);
+  }
+
+  const L = 18, R = 192, BREITE = R - L;
+  let y = 0;
+
+  const kopf = () => {
+    doc.setFillColor(0, 35, 63);
+    doc.rect(0, 0, 210, 26, 'F');
+    if (logo) doc.addImage(logo, 'PNG', L, (26 - LOGO_H) / 2, logoBreite, LOGO_H);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold').setFontSize(13);
+    doc.text('Abnahmeprotokoll', R, 15, { align: 'right' });
+    y = 38;
+  };
+  const platz = h => { if (y + h > 280) { doc.addPage(); kopf(); } };
+  const titel = t => {
+    platz(14);
+    doc.setFont('helvetica', 'bold').setFontSize(9);
+    doc.setTextColor(178, 0, 0);
+    doc.text(pdfText(t).toUpperCase(), L, y);
+    y += 2.5;
+    doc.setDrawColor(223, 228, 230).setLineWidth(0.3);
+    doc.line(L, y, R, y);
+    y += 5;
+  };
+  const absatz = (text, breite = BREITE) => {
+    doc.setFont('helvetica', 'normal').setFontSize(10);
+    doc.setTextColor(18, 24, 27);
+    for (const zeile of doc.splitTextToSize(pdfText(text), breite)) {
+      platz(6);
+      doc.text(zeile, L, y);
+      y += 5;
+    }
+  };
+
+  kopf();
+
+  doc.setFont('helvetica', 'bold').setFontSize(16);
+  doc.setTextColor(0, 35, 63);
+  const name = pdfText(projekt?.name || 'Projekt');
+  const zeilen = doc.splitTextToSize(name, BREITE);
+  doc.text(zeilen, L, y);
+  y += 7 * zeilen.length;
+
+  doc.setFont('helvetica', 'normal').setFontSize(9.5);
+  doc.setTextColor(92, 106, 112);
+  for (const z of [
+    pdfText(abnahme?.titel || ''),
+    [projekt?.standort, projekt?.bauherrschaft && `Bauherrschaft: ${projekt.bauherrschaft}`]
+      .filter(Boolean).join(' · ')
+  ].filter(Boolean)) {
+    doc.text(pdfText(z), L, y);
+    y += 5;
+  }
+  y += 4;
+
+  titel('Abnahme');
+  absatz(`Datum: ${wann.toLocaleDateString('de-CH')}, ${wann.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}`);
+  absatz(`Anwesend: ${[anwesend, gastName].filter(Boolean).join(', ')}`);
+  absatz(`${maengel.length} ${maengel.length === 1 ? 'Mangel' : 'Maengel'} erfasst, davon ${maengel.filter(m => m.erledigt_am).length} bereits erledigt.`);
+  y += 3;
+
+  /* Der Plan mit den Nadeln. Passt er nicht mehr auf die Seite, kommt er
+     auf die naechste — lieber eine halbleere Seite als ein Plan, der auf
+     Briefmarkengroesse geschrumpft ist. */
+  if (planBild) {
+    const mitNadeln = await planMitNadeln(planBild, maengel);
+    const masse = doc.getImageProperties(mitNadeln);
+    const h = Math.min(150, BREITE * masse.height / masse.width);
+    const b = h * masse.width / masse.height;
+    titel('Grundriss');
+    platz(h + 6);
+    doc.addImage(mitNadeln, 'PNG', L, y, b, h);
+    y += h + 8;
+  }
+
+  titel('Maengel');
+  if (!maengel.length) {
+    absatz('Keine Maengel erfasst.');
+  }
+  for (const m of maengel) {
+    const foto = fotos?.[m.id] || null;
+    const hoch = foto ? 34 : 0;
+    platz(Math.max(18, hoch + 4));
+
+    const oben = y;
+    doc.setFont('helvetica', 'bold').setFontSize(10.5);
+    doc.setTextColor(0, 35, 63);
+    doc.text(`${m.nummer}.`, L, y);
+    const einzug = L + 8;
+    const textBreite = BREITE - 8 - (foto ? 40 : 0);
+
+    doc.setTextColor(18, 24, 27);
+    for (const zeile of doc.splitTextToSize(pdfText(m.beschrieb), textBreite)) {
+      doc.text(zeile, einzug, y);
+      y += 5;
+    }
+    doc.setFont('helvetica', 'normal').setFontSize(9);
+    doc.setTextColor(92, 106, 112);
+    const unter = [m.firma_name, m.frist ? `Frist ${fmtDatum(m.frist)}` : '',
+                   m.erledigt_am ? 'erledigt' : 'offen'].filter(Boolean).join(' · ');
+    if (unter) { doc.text(pdfText(unter), einzug, y); y += 5; }
+
+    if (foto) {
+      try {
+        const masse = doc.getImageProperties(foto);
+        const h = Math.min(32, 32 * masse.height / masse.width);
+        doc.addImage(foto, 'JPEG', R - 36, oben - 3.5, 36, h);
+        y = Math.max(y, oben - 3.5 + h);
+      } catch { /* ein unlesbares Foto darf das Protokoll nicht aufhalten */ }
+    }
+    y += 4;
+  }
+
+  /* Die Unterschriften gehoeren zusammen auf eine Seite — auseinander
+     gerissen sehen sie aus, als gehoerten sie zu verschiedenen Sachen. */
+  platz(64);
+  titel('Unterschriften');
+  const schriftHoehe = 22;
+  const spalte = (bild, beschriftung, x) => {
+    if (bild) {
+      try {
+        const masse = doc.getImageProperties(bild);
+        const h = Math.min(schriftHoehe, (BREITE / 2 - 8) * masse.height / masse.width);
+        doc.addImage(bild, 'PNG', x, y + (schriftHoehe - h), h * masse.width / masse.height, h);
+      } catch { /* dann eben nur die Linie */ }
+    }
+    doc.setDrawColor(150, 160, 165).setLineWidth(0.3);
+    doc.line(x, y + schriftHoehe + 3, x + BREITE / 2 - 8, y + schriftHoehe + 3);
+    doc.setFont('helvetica', 'normal').setFontSize(9);
+    doc.setTextColor(92, 106, 112);
+    doc.text(pdfText(beschriftung), x, y + schriftHoehe + 8);
+  };
+  spalte(unterschriftTriga, `TRIGA Baumanagement AG, ${anwesend}`, L);
+  spalte(unterschriftGast, gastName || 'Bauherrschaft / Firma', L + BREITE / 2 + 4);
+  y += schriftHoehe + 14;
+
+  doc.setFont('helvetica', 'normal').setFontSize(8);
+  doc.setTextColor(140, 152, 158);
+  doc.text(pdfText(`Erstellt am ${wann.toLocaleDateString('de-CH')} · TRIGA Baumanagement AG`),
+           R, 288, { align: 'right' });
+
+  return doc.output('blob');
+}
+
+/* Zeichnet die nummerierten Nadeln auf den Plan. Dieselben Anteile wie am
+   Bildschirm, nur eben einmal fest ins Bild gebrannt. */
+async function planMitNadeln(planBild, maengel) {
+  const bild = await new Promise((ok, fehler) => {
+    const i = new Image();
+    i.onload = () => ok(i);
+    i.onerror = () => fehler(new Error('Plan nicht lesbar'));
+    i.src = planBild;
+  });
+
+  const leinwand = document.createElement('canvas');
+  leinwand.width = bild.naturalWidth;
+  leinwand.height = bild.naturalHeight;
+  const f = leinwand.getContext('2d');
+  f.drawImage(bild, 0, 0);
+
+  const r = Math.max(14, Math.round(leinwand.width / 55));
+  f.font = `bold ${Math.round(r * 1.1)}px sans-serif`;
+  f.textAlign = 'center';
+  f.textBaseline = 'middle';
+  for (const m of maengel) {
+    const x = m.x * leinwand.width;
+    const y = m.y * leinwand.height;
+    f.beginPath();
+    f.arc(x, y, r, 0, Math.PI * 2);
+    f.fillStyle = m.erledigt_am ? '#c7910a' : '#b20000';
+    f.fill();
+    f.lineWidth = Math.max(2, r / 7);
+    f.strokeStyle = '#ffffff';
+    f.stroke();
+    f.fillStyle = '#ffffff';
+    f.fillText(String(m.nummer), x, y + r * 0.05);
+  }
+  return leinwand.toDataURL('image/png');
+}
