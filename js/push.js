@@ -164,10 +164,19 @@ async function pushAbmelden() {
   }
 }
 
-/* Schickt eine Meldung an die anderen Mitglieder eines Gesprächs.
-   Der Aufruf wartet nicht: die Nachricht steht längst in der Datenbank
-   und ist beim Gegenüber angekommen, die Meldung ist nur die Zugabe. */
-function pushSenden({ chat, titel, text, ziel }) {
+/* Schickt eine Meldung — entweder an die anderen Mitglieder eines
+   Gesprächs (chat) oder, bei einem wichtigen Beitrag im Feed, an alle
+   anderen im Adressbuch (beitrag). Genau eines von beiden, nicht beides.
+
+   Wer die Meldung bekommt und ob sie überhaupt hinausgeht, entscheidet
+   api/push.js und nicht diese Zeile hier: die Funktion sieht selbst nach,
+   ob die Person im Gespräch steht beziehungsweise ob der Beitrag ihr
+   gehört und die Kategorie "wichtig" trägt.
+
+   Der Aufruf wartet nicht: was gemeldet wird, steht längst in der
+   Datenbank und ist bei den anderen angekommen. Die Meldung ist die
+   Zugabe, nicht der Weg. */
+function pushSenden({ chat, beitrag, titel, text, ziel }) {
   (async () => {
     try {
       if (!istOnline()) return;
@@ -179,7 +188,7 @@ function pushSenden({ chat, titel, text, ziel }) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${s.access_token}`
         },
-        body: JSON.stringify({ chat, titel, text, ziel })
+        body: JSON.stringify(chat ? { chat, titel, text, ziel } : { beitrag, titel, text, ziel })
       });
       /* Scheitert der Versand, ändert das für die Nachricht nichts — sie
          steht längst in der Datenbank. Stillschweigen wäre trotzdem

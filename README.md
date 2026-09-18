@@ -99,7 +99,7 @@ wurde.
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
 | `start.html` | Die Startseite nach dem Login: die sechs Kacheln mit Zahlen aus der Datenbank, darüber auf dem Handy die Zeile zum Feed. |
-| `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren. |
+| `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren, in Echtzeit. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
 | `chat.html` | Der Chat: Gespräche links, das offene rechts, `?chat=`. |
@@ -555,6 +555,30 @@ gehen müssen, den Beitrag zu löschen, um einen Kommentar loszuwerden.
 `api/_bilder.js` enthält ihn einmal, `api/chat-aufraeumen.js` und
 `api/feed-aufraeumen.js` rufen ihn mit ihren eigenen Namen auf. Zwei Kopien
 wären zwei Orte, an denen jemand später etwas ändert und den anderen vergisst.
+
+**Nur ein wichtiger Beitrag meldet sich.** Wer etwas mit der Kategorie
+«Wichtig» postet, löst bei allen anderen im Adressbuch eine Push-Meldung aus —
+über dieselbe Funktion und dieselbe Tabelle `push_geraete` wie der Chat. Ein
+Update oder eine Umfrage lösen nichts aus; stünde alles auf dem Telefon, wäre
+«Wichtig» nach zwei Wochen nichts mehr wert. Entschieden wird das in
+`api/push.js` und nicht in der App: die Funktion sieht selbst nach, ob der
+Beitrag der aufrufenden Person gehört und welche Kategorie er trägt. Wer den
+Aufruf von Hand nachbaut, kommt damit nicht weiter.
+
+**Der Feed läuft in Echtzeit,** wie der Chat. Neue Beiträge, Umfragen, Herzen
+und Kommentare erscheinen ohne Neuladen. Eine Besonderheit gibt es bei den
+Stimmen: `feed_stimmen` steht bewusst nicht in der Veröffentlichung, denn die
+Echtzeit hält sich an dieselbe Policy wie jede Abfrage — bei einer anonymen
+Umfrage käme eine Stimme bei niemandem an ausser bei der Person, die sie
+abgegeben hat, und das Ergebnis stünde bei allen anderen still. Die App meldet
+eine neue Stimme deshalb als Rundruf über den Kanal, mit nichts als der Kennung
+der Umfrage, und jeder holt sich daraufhin das Ergebnis mit
+`feed_ergebnisse()`. Verraten wird damit nur, was die Balken ohnehin zeigen.
+
+Weil jede eigene Änderung über die Echtzeit zurückkommt — und nicht unbedingt
+erst nach der Antwort auf das Einfügen —, prüft jede Stelle, die etwas in die
+Listen legt, ob sie es nicht schon kennt (`merke()` in `js/feed.js`). Ohne das
+stand ein Beitrag zweimal da, mit allem, was daran hing.
 
 **Der Feed hat keine Kachel auf der Startseite,** er steht zuoberst in der
 Seitenleiste. So zeigt es die Design-Referenz. Auf dem Handy gibt es die

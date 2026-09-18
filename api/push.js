@@ -1,14 +1,25 @@
-/* Verschickt eine Benachrichtigung an die anderen Mitglieder eines Chats.
+/* Verschickt eine Benachrichtigung — aus dem Chat oder aus dem Feed.
  *
  * Warum überhaupt serverseitig: ein Push muss mit dem privaten
  * VAPID-Schlüssel signiert werden, und die Abos der anderen Leute darf ein
  * Browser nicht lesen. Beides gehört hinter diese Funktion.
  *
  * Wer darf senden: die Funktion nimmt das Zugangs-Token der angemeldeten
- * Person entgegen und fragt damit selbst bei Supabase nach den Mitgliedern
- * des Chats. Steht die Person nicht drin, liefert RLS eine leere Liste und
- * hier ist Schluss. Der Dienstschlüssel kommt erst danach zum Einsatz, und
- * nur für die Abos der so ermittelten Personen.
+ * Person entgegen und fragt damit selbst bei Supabase nach, wer die
+ * Empfänger sind. Steht die Person nicht im Gespräch oder gehört ihr der
+ * Beitrag nicht, liefert RLS eine leere Liste und hier ist Schluss. Der
+ * Dienstschlüssel kommt erst danach zum Einsatz, und nur für die Abos der
+ * so ermittelten Personen.
+ *
+ * Zwei Wege hinein, ein Weg hinaus:
+ *
+ *   { chat: <uuid> }     die anderen Mitglieder dieses Gesprächs
+ *   { beitrag: <uuid> }  alle anderen im Adressbuch, aber nur bei einem
+ *                        Beitrag der Kategorie "wichtig"
+ *
+ * Dass nur ein wichtiger Beitrag meldet, entscheidet diese Funktion und
+ * nicht die App. Ein Update oder eine Umfrage lösen nichts aus, auch dann
+ * nicht, wenn jemand den Aufruf von Hand nachbaut.
  *
  * Umgebungsvariablen in Vercel:
  *   VAPID_PRIVAT        privater Schlüssel, Gegenstück zu BJ_CONFIG.vapid
@@ -118,31 +129,79 @@ module.exports = async (req, res) => {
 
   const daten = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const chat = String(daten.chat || '');
-  if (!/^[0-9a-f-]{36}$/i.test(chat)) {
-    console.error(`[push] Abbruch: "${chat}" ist keine Gesprächskennung.`);
-    return res.status(400).json({ fehler: 'Kein Gespräch angegeben.' });
+  const beitrag = String(daten.beitrag || '');
+  const istKennung = w => /^[0-9a-f-]{36}$/i.test(w);
+
+  if (istKennung(chat) === istKennung(beitrag)) {
+    console.error(`[push] Abbruch: es braucht genau eines von chat und beitrag (chat "${chat}", beitrag "${beitrag}").`);
+    return res.status(400).json({ fehler: 'Kein Gespräch und kein Beitrag angegeben.' });
   }
 
-  /* Schritt eins, mit dem Token der Person: wer gehört zu diesem
-     Gespräch? Der anon key weist die Anfrage beim Projekt aus, das Token
-     die Person. Steht sie nicht im Gespräch, liefert RLS eine leere
-     Liste, und hier ist Schluss. */
-  const mitglieder = await hole(
-    `chat_mitglieder?chat_id=eq.${chat}&select=user_id`, { apikey: ANON, token });
+  const kennung = istKennung(chat) ? chat : beitrag;
+  let ziele;
 
-  if (!mitglieder.ok) {
-    console.error(`[push] Abbruch: Supabase hat die Mitgliederliste zu ${chat} nicht herausgegeben — Status ${mitglieder.status}, Antwort: ${mitglieder.roh}`);
-    return res.status(403).json({ fehler: 'Kein Zugriff auf dieses Gespräch.' });
-  }
-  if (!Array.isArray(mitglieder.daten) || !mitglieder.daten.length) {
-    console.error(`[push] Abbruch: ${ich} ist nicht Mitglied von ${chat}, RLS liefert eine leere Liste.`);
-    return res.status(403).json({ fehler: 'Kein Zugriff auf dieses Gespräch.' });
-  }
+  if (istKennung(chat)) {
+    /* Schritt eins, mit dem Token der Person: wer gehört zu diesem
+       Gespräch? Der anon key weist die Anfrage beim Projekt aus, das Token
+       die Person. Steht sie nicht im Gespräch, liefert RLS eine leere
+       Liste, und hier ist Schluss. */
+    const mitglieder = await hole(
+      `chat_mitglieder?chat_id=eq.${chat}&select=user_id`, { apikey: ANON, token });
 
-  const ziele = mitglieder.daten.map(m => m.user_id).filter(u => u !== ich);
-  if (!ziele.length) {
-    console.log(`[push] ${chat}: ausser der sendenden Person ist niemand im Gespräch.`);
-    return res.status(200).json({ gesendet: 0 });
+    if (!mitglieder.ok) {
+      console.error(`[push] Abbruch: Supabase hat die Mitgliederliste zu ${chat} nicht herausgegeben — Status ${mitglieder.status}, Antwort: ${mitglieder.roh}`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf dieses Gespräch.' });
+    }
+    if (!Array.isArray(mitglieder.daten) || !mitglieder.daten.length) {
+      console.error(`[push] Abbruch: ${ich} ist nicht Mitglied von ${chat}, RLS liefert eine leere Liste.`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf dieses Gespräch.' });
+    }
+
+    ziele = mitglieder.daten.map(m => m.user_id).filter(u => u !== ich);
+    if (!ziele.length) {
+      console.log(`[push] ${chat}: ausser der sendenden Person ist niemand im Gespräch.`);
+      return res.status(200).json({ gesendet: 0 });
+    }
+  } else {
+    /* Derselbe Gedanke für den Feed: erst mit dem Token der Person
+       nachsehen, ob es den Beitrag gibt, ob er ihr gehört und ob er
+       überhaupt melden darf. Erst danach die Empfänger. */
+    const b = await hole(
+      `feed_beitraege?id=eq.${beitrag}&select=art,kategorie,erstellt_von`, { apikey: ANON, token });
+
+    if (!b.ok) {
+      console.error(`[push] Abbruch: Supabase hat den Beitrag ${beitrag} nicht herausgegeben — Status ${b.status}, Antwort: ${b.roh}`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Beitrag.' });
+    }
+    const zeile = Array.isArray(b.daten) ? b.daten[0] : null;
+    if (!zeile) {
+      console.error(`[push] Abbruch: ${ich} sieht den Beitrag ${beitrag} nicht, RLS liefert eine leere Liste.`);
+      return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Beitrag.' });
+    }
+    if (zeile.erstellt_von !== ich) {
+      console.error(`[push] Abbruch: ${ich} hat den Beitrag ${beitrag} nicht geschrieben.`);
+      return res.status(403).json({ fehler: 'Das ist nicht Ihr Beitrag.' });
+    }
+    /* Die eine Regel, um die es hier geht. Sie steht hier und nicht in
+       der App: ein Update oder eine Umfrage soll niemandem aufs Telefon
+       poppen, auch dann nicht, wenn jemand den Aufruf selbst nachbaut. */
+    if (zeile.art !== 'beitrag' || zeile.kategorie !== 'wichtig') {
+      console.log(`[push] ${beitrag}: ${zeile.art}/${zeile.kategorie} meldet nicht, nur "wichtig" tut das.`);
+      return res.status(200).json({ gesendet: 0, grund: 'nicht wichtig' });
+    }
+
+    const leute = await hole(
+      'mitarbeiter?user_id=not.is.null&geloescht_am=is.null&select=user_id', { apikey: ANON, token });
+    if (!leute.ok) {
+      console.error(`[push] Abbruch: das Adressbuch liess sich nicht laden — Status ${leute.status}, Antwort: ${leute.roh}`);
+      return res.status(502).json({ fehler: 'Das Adressbuch liess sich nicht laden.' });
+    }
+
+    ziele = (leute.daten || []).map(m => m.user_id).filter(u => u && u !== ich);
+    if (!ziele.length) {
+      console.log(`[push] ${beitrag}: ausser der schreibenden Person hat niemand ein Konto.`);
+      return res.status(200).json({ gesendet: 0 });
+    }
   }
 
   // Schritt zwei, mit dem Dienstschlüssel: deren Geräte.
@@ -155,7 +214,7 @@ module.exports = async (req, res) => {
     return res.status(502).json({ fehler: 'Die Geräte liessen sich nicht laden.' });
   }
   if (!Array.isArray(geraete.daten) || !geraete.daten.length) {
-    console.log(`[push] ${chat}: keine Geräte für ${ziele.join(', ')} gefunden (Schlüsselrolle ${rolle}).`);
+    console.log(`[push] ${kennung}: keine Geräte für ${ziele.join(', ')} gefunden (Schlüsselrolle ${rolle}).`);
     if (rolle !== 'service_role') {
       console.error('[push] Das ist vermutlich kein leeres Ergebnis, sondern die Zeilensicherheit: mit einem Schlüssel ohne service_role sieht diese Funktion nur die eigenen Geräte.');
     }
@@ -165,7 +224,8 @@ module.exports = async (req, res) => {
   const text = JSON.stringify({
     titel: String(daten.titel || 'TRIGA App').slice(0, 80),
     text: String(daten.text || '').slice(0, 200),
-    ziel: daten.ziel ? String(daten.ziel).slice(0, 200) : `chat.html?chat=${chat}`
+    ziel: daten.ziel ? String(daten.ziel).slice(0, 200)
+      : (istKennung(chat) ? `chat.html?chat=${chat}` : 'feed.html')
   });
 
   let gesendet = 0;
@@ -192,6 +252,6 @@ module.exports = async (req, res) => {
     }).catch(e => console.error(`[push] Abgemeldete Geräte liessen sich nicht wegräumen: ${e.message}`));
   }
 
-  console.log(`[push] ${chat}: ${gesendet} von ${geraete.daten.length} Geräten erreicht, ${verfallen.length} abgemeldet.`);
+  console.log(`[push] ${kennung}: ${gesendet} von ${geraete.daten.length} Geräten erreicht, ${verfallen.length} abgemeldet.`);
   return res.status(200).json({ gesendet, aufgeraeumt: verfallen.length });
 };

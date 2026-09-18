@@ -16,6 +16,16 @@
  * herausgegeben werden — auch der erstellenden Person nicht. Gezählt wird
  * in der Datenbank, mit feed_ergebnisse(), und von dort kommen nur Zahlen
  * zurück.
+ *
+ * Der Feed läuft in Echtzeit, wie der Chat. Was hereinkommt, geht durch
+ * dieselben Listen wie das, was hier selbst geschrieben wird — und jede
+ * eigene Änderung kommt über die Echtzeit noch einmal zurück, oft bevor
+ * die Antwort auf das Einfügen da ist. Darum legt nichts blind etwas in
+ * eine Liste, alles geht über merke().
+ *
+ * Nur ein Beitrag der Kategorie "wichtig" meldet sich auf den Telefonen
+ * der anderen. Ob das zutrifft, entscheidet api/push.js und nicht diese
+ * Datei.
  */
 
 (() => {
@@ -50,10 +60,21 @@
   let kommentare = [];
   let filter = 'alle';
   let darfModerieren = false;
+  let kanal = null;          // Echtzeit
   const offen = new Set();   // Beiträge, deren Kommentare aufgeklappt sind
 
   const nameVon = u => leute.find(l => l.user_id === u)?.name || 'Unbekannt';
   const projektName = id => projekte.find(p => p.id === id)?.name || '';
+
+  /* Jede eigene Änderung kommt über die Echtzeit noch einmal zurück, und
+     zwar nicht unbedingt danach: die Meldung kann eintreffen, bevor die
+     Antwort auf das Einfügen da ist. Wer etwas in eine dieser Listen
+     legt, prüft deshalb zuerst, ob es schon drin ist — sonst steht ein
+     Beitrag zweimal da, mit allem, was daran hängt. */
+  function merke(liste, zeile, gleich) {
+    return liste.some(x => gleich(x, zeile)) ? liste : [...liste, zeile];
+  }
+  const gleicheId = (a, b) => a.id === b.id;
 
   /* --- Zeit ---------------------------------------------------------------- */
 
@@ -116,7 +137,11 @@
      auf 99 oder 101 summieren. Das ist so gewollt: eine künstlich
      geglättete Zahl wäre falscher als eine gerundete. */
   function auswertung(b) {
-    const eigene = optionen.filter(o => o.beitrag_id === b.id);
+    /* Nach reihenfolge sortiert und nicht nach Eintreffen: über die
+       Echtzeit kommen die Antwortmöglichkeiten einzeln herein, und die
+       Reihenfolge soll bei allen dieselbe sein wie beim Erfassen. */
+    const eigene = optionen.filter(o => o.beitrag_id === b.id)
+      .slice().sort((x, y) => (x.reihenfolge ?? 0) - (y.reihenfolge ?? 0));
     const zahlen = eigene.map(o =>
       ergebnisse.find(e => e.beitrag_id === b.id && e.option_id === o.id)?.stimmen || 0);
     const gesamt = zahlen.reduce((a, x) => a + Number(x), 0);
@@ -144,7 +169,20 @@
     }));
   }
 
+  /* Die Liste wird am Stück neu gezeichnet, auch wenn nur ein Herz
+     dazukommt. Seit der Feed in Echtzeit läuft, kann das mitten im Tippen
+     passieren — deshalb werden angefangene Kommentare und der Cursor
+     vorher gesichert und danach zurückgesetzt. Ohne das verlöre jemand
+     seinen halben Satz, weil irgendwo ein Herz gesetzt wurde. */
   function zeichneListe() {
+    const entwuerfe = {};
+    let warFokus = null;
+    let stand = 0;
+    $$('#liste [data-kfeld]').forEach(el => {
+      if (el.value) entwuerfe[el.dataset.kfeld] = el.value;
+      if (el === document.activeElement) { warFokus = el.dataset.kfeld; stand = el.selectionStart; }
+    });
+
     const passt = FILTER.find(f => f.id === filter).passt;
     const sichtbar = beitraege.filter(passt);
 
@@ -153,6 +191,15 @@
       : `<div class="br-leer">${filter === 'alle'
           ? 'Noch nichts im Feed.<br>Oben den ersten Beitrag schreiben.'
           : 'Zu diesem Filter gibt es nichts.'}</div>`;
+
+    $$('#liste [data-kfeld]').forEach(el => {
+      const t = entwuerfe[el.dataset.kfeld];
+      if (t) el.value = t;
+      if (el.dataset.kfeld === warFokus) {
+        el.focus();
+        try { el.setSelectionRange(stand, stand); } catch { /* egal */ }
+      }
+    });
 
     binde();
     bilderNachladen();
@@ -203,7 +250,7 @@
 
   function umfrage(b) {
     const a = auswertung(b);
-    if (!a.optionen.length) return '<div class="pj-leer">Diese Umfrage hat keine Antwortmöglichkeiten.</div>';
+    if (!a.optionen.length) return '<div class="pj-leer">Die Antwortmöglichkeiten werden geladen…</div>';
 
     /* Vor der eigenen Stimme Knöpfe, danach Balken. Das Ergebnis erst nach
        dem Abstimmen zu zeigen ist kein Geheimniskram, sondern verhindert,
@@ -220,12 +267,16 @@
             <span>${esc(o.text)}</span>
           </button>`).join('');
 
-    const wieViele = leute.length || a.gesamt;
+    /* Wie viele mitgemacht haben, steht auch vor der eigenen Stimme da.
+       Das verrät nichts über die Verteilung — die Balken bleiben ja
+       verdeckt — und beantwortet die Frage, die man sich sonst stellt:
+       hat sich überhaupt schon jemand gemeldet? */
+    const teilnahme = `${a.gesamt} von ${leute.length || a.gesamt} haben abgestimmt`;
     return `
       <div class="fd-optionen">${inhalt}</div>
       <div class="fd-abgestimmt">${a.meine
-        ? `${a.gesamt} von ${wieViele} haben abgestimmt`
-        : 'Noch nicht abgestimmt. Eine Stimme pro Person, und sie lässt sich nicht ändern.'}</div>`;
+        ? teilnahme
+        : `${teilnahme} · Eine Stimme pro Person, und sie lässt sich nicht ändern.`}</div>`;
   }
 
   function fuss(b) {
@@ -326,7 +377,8 @@
     } else {
       const { error } = await sb.from('feed_reaktionen').insert({ beitrag_id: id, user_id: ich });
       if (error) return toast(error.message, true);
-      reaktionen.push({ beitrag_id: id, user_id: ich });
+      reaktionen = merke(reaktionen, { beitrag_id: id, user_id: ich },
+        (a, b) => a.beitrag_id === b.beitrag_id && a.user_id === b.user_id);
     }
     zeichneListe();
   }
@@ -342,13 +394,25 @@
     if (error) return toast(error.message, true);
 
     meineStimmen.push({ beitrag_id: beitragId, option_id: optionId });
-    /* Das Ergebnis wird nicht von Hand hochgezählt, sondern neu geholt.
-       In der Zwischenzeit haben andere vielleicht auch abgestimmt, und
-       eine selbst gerechnete Zahl wiche ab, ohne dass es auffiele. */
-    const { data } = await sb.rpc('feed_ergebnisse');
-    ergebnisse = data || ergebnisse;
+    await holeErgebnisse();
     zeichneListe();
     toast('Stimme gezählt');
+
+    /* Den anderen Bescheid sagen, dass sich das Ergebnis geändert hat.
+       Als Rundruf und nicht über die Tabelle: bei einer anonymen Umfrage
+       gibt die Policy fremde Stimmzeilen nicht heraus, die Echtzeit hält
+       sich daran, und niemand sonst bekäme etwas mit. Der Rundruf trägt
+       nur die Kennung der Umfrage — wer gestimmt hat, verlässt die
+       Datenbank weiterhin nicht. */
+    kanal?.send({ type: 'broadcast', event: 'stimme', payload: { beitrag: beitragId } });
+  }
+
+  /* Das Ergebnis wird nie von Hand hochgezählt, sondern geholt. In der
+     Zwischenzeit haben vielleicht andere auch abgestimmt, und eine selbst
+     gerechnete Zahl wiche ab, ohne dass es auffiele. */
+  async function holeErgebnisse() {
+    const { data } = await sb.rpc('feed_ergebnisse');
+    if (data) ergebnisse = data;
   }
 
   /* --- Kommentare ----------------------------------------------------------- */
@@ -363,7 +427,7 @@
       .insert({ beitrag_id: beitragId, verfasser: ich, text }).select().single();
     if (error) return toast(error.message, true);
 
-    kommentare.push(data);
+    kommentare = merke(kommentare, data, gleicheId);
     zeichneListe();
     $(`#liste [data-kfeld="${CSS.escape(beitragId)}"]`)?.focus();
   }
@@ -415,6 +479,98 @@
     reaktionen = reaktionen.filter(r => r.beitrag_id !== id);
     zeichneListe();
     toast('Gelöscht');
+  }
+
+  /* --- Echtzeit --------------------------------------------------------------- */
+
+  /* Ein Kanal für den ganzen Bereich. Der Chat braucht zwei, weil dort ein
+     Gespräch offen ist und die Liste daneben weiterlaufen muss; hier gibt
+     es nur die eine Liste.
+
+     Die eigenen Änderungen kommen als Ereignis zurück, nachdem sie hier
+     schon eingetragen wurden. Jeder Zweig prüft deshalb zuerst, ob er das
+     Neue nicht längst kennt — sonst stünde jedes Herz doppelt. */
+  function horche() {
+    if (kanal) sb.removeChannel(kanal);
+    kanal = sb.channel('feed')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feed_beitraege' },
+        n => beitragEingetroffen(n.new))
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'feed_beitraege' },
+        n => beitragEntfernt(n.old))
+      /* Eine Umfrage kommt als Zeile herein, ihre Antwortmöglichkeiten
+         folgen einen Wimpernschlag später als eigene Zeilen — anders
+         geht es nicht, sie zeigen ja auf die Umfrage. Solange keine da
+         ist, sagt die Karte, dass geladen wird. */
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feed_optionen' },
+        n => {
+          const o = n.new;
+          if (!o?.id || optionen.some(x => x.id === o.id)) return;
+          optionen = merke(optionen, o, gleicheId);
+          if (beitraege.some(b => b.id === o.beitrag_id)) zeichneListe();
+        })
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feed_kommentare' },
+        n => {
+          if (!n.new?.id || kommentare.some(k => k.id === n.new.id)) return;
+          kommentare = merke(kommentare, n.new, gleicheId);
+          zeichneListe();
+        })
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'feed_kommentare' },
+        n => {
+          if (!n.old?.id || !kommentare.some(k => k.id === n.old.id)) return;
+          kommentare = kommentare.filter(k => k.id !== n.old.id);
+          zeichneListe();
+        })
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'feed_reaktionen' },
+        n => {
+          const r = n.new;
+          if (!r?.beitrag_id) return;
+          if (reaktionen.some(x => x.beitrag_id === r.beitrag_id && x.user_id === r.user_id)) return;
+          reaktionen = [...reaktionen, { beitrag_id: r.beitrag_id, user_id: r.user_id }];
+          zeichneListe();
+        })
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'feed_reaktionen' },
+        n => {
+          const r = n.old;
+          if (!r?.beitrag_id) return;
+          const vorher = reaktionen.length;
+          reaktionen = reaktionen.filter(x => !(x.beitrag_id === r.beitrag_id && x.user_id === r.user_id));
+          if (reaktionen.length !== vorher) zeichneListe();
+        })
+      /* Die Stimmen kommen nicht über die Tabelle, sondern als Rundruf —
+         siehe abstimmen() und die Migration dazu. Gemeldet wird nur, dass
+         sich an dieser Umfrage etwas geändert hat; die Zahlen holt sich
+         jeder selbst. */
+      .on('broadcast', { event: 'stimme' }, async m => {
+        const id = m?.payload?.beitrag;
+        if (!id || !beitraege.some(b => b.id === id)) return;
+        await holeErgebnisse();
+        zeichneListe();
+      })
+      .subscribe();
+  }
+
+  function beitragEingetroffen(b) {
+    if (!b?.id || beitraege.some(x => x.id === b.id)) return;
+    beitraege = merke(beitraege, b, gleicheId).sort((x, y) =>
+      new Date(y.erstellt_am) - new Date(x.erstellt_am));
+    zeichneListe();
+  }
+
+  function beitragEntfernt(alt) {
+    if (!alt?.id || !beitraege.some(b => b.id === alt.id)) return;
+    beitraege = beitraege.filter(b => b.id !== alt.id);
+    kommentare = kommentare.filter(k => k.beitrag_id !== alt.id);
+    reaktionen = reaktionen.filter(r => r.beitrag_id !== alt.id);
+    optionen = optionen.filter(o => o.beitrag_id !== alt.id);
+    offen.delete(alt.id);
+    zeichneListe();
   }
 
   /* --- Neuer Beitrag --------------------------------------------------------- */
@@ -622,15 +778,33 @@
           zurueck();
           return zeigeFehler(e2.message);
         }
-        optionen = [...optionen, ...(opt || [])];
+        /* Ersetzen statt anhängen: hat die Echtzeit die Umfrage schon
+           gemeldet, hat sie die Antwortmöglichkeiten bereits geholt. */
+        optionen = [...optionen.filter(o => o.beitrag_id !== id), ...(opt || [])];
       }
 
       s.schliessen();
-      beitraege = [data, ...beitraege];
+      beitraege = merke(beitraege, data, gleicheId).sort((x, y) =>
+        new Date(y.erstellt_am) - new Date(x.erstellt_am));
       filter = 'alle';
       zeichneFilter();
       zeichneListe();
       toast(art === 'umfrage' ? 'Umfrage gepostet' : 'Beitrag gepostet');
+
+      /* Nur ein wichtiger Beitrag meldet sich auf den Telefonen der
+         anderen. Ein Update oder eine Umfrage stehen im Feed und warten
+         dort, bis jemand hinschaut — sonst wäre die Kategorie "Wichtig"
+         nach zwei Wochen nichts mehr wert.
+         Geprüft wird das trotzdem noch einmal in api/push.js: die eigene
+         Meldung soll nicht davon abhängen, dass diese Zeile hier stimmt. */
+      if (art === 'beitrag' && kategorie === 'wichtig') {
+        pushSenden({
+          beitrag: id,
+          titel: `Wichtig von ${nameVon(ich).split(' ')[0]}`,
+          text,
+          ziel: 'feed.html'
+        });
+      }
     });
   }
 
@@ -676,6 +850,17 @@
     }
 
     zeichneListe();
+    horche();
     $$('[data-neu]').forEach(b => b.addEventListener('click', neuerBeitrag));
+
+    /* Einmal nach der Erlaubnis fragen, mit Begründung. Die Frage wird
+       nur ein einziges Mal gestellt, bereichsübergreifend — wer sie hier
+       beantwortet, bekommt sie im Chat nicht noch einmal. Darum nennt der
+       Grund beides. */
+    pushFragen({
+      grund: 'Damit ein wichtiger Beitrag auch ankommt, wenn die App gerade nicht offen ist — und damit Sie neue Nachrichten im Chat sehen. Ohne funktioniert alles genau gleich, es kommt nur keine Meldung auf den Bildschirm.'
+    });
+
+    addEventListener('beforeunload', () => { if (kanal) sb.removeChannel(kanal); });
   })();
 })();
