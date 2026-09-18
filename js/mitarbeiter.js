@@ -17,6 +17,14 @@
   let gewaehlt = null;
   let sheetOffen = null;
 
+  /* Ob diese Person den Bereich verwalten darf: anlegen, Name und Funktion
+     ändern, in den Papierkorb legen. Seit dem Schreibschutz auf der Tabelle
+     ist das keine Frage der Höflichkeit mehr — die Datenbank weist einen
+     solchen Schreibversuch ab. Einen Knopf hinzustellen, der verlässlich
+     scheitert, wäre die schlechtere Art, dasselbe zu sagen. */
+  let verwalten = false;
+  let eigenesKonto = null;
+
   const breit = () => matchMedia('(min-width:1024px)').matches;
 
   /* --- Daten -------------------------------------------------------------- */
@@ -146,14 +154,19 @@
               ${neu ? '' : stufeMarke(m)}
             </span>
           </span>
-          <button type="button" id="ma-bearbeiten" class="br-knopf pressable" aria-label="Bearbeiten" style="width:40px; height:40px;">${svg(IKON.stift, 17)}</button>
-          <button type="button" id="ma-weg" class="br-knopf rot pressable" aria-label="In den Papierkorb" style="width:40px; height:40px;">${svg(IKON.eimer, 17)}</button>
+          ${verwalten ? `
+            <button type="button" id="ma-bearbeiten" class="br-knopf pressable" aria-label="Bearbeiten" style="width:40px; height:40px;">${svg(IKON.stift, 17)}</button>
+            <button type="button" id="ma-weg" class="br-knopf rot pressable" aria-label="In den Papierkorb" style="width:40px; height:40px;">${svg(IKON.eimer, 17)}</button>` : ''}
         </div>
         <div style="background:var(--card); border:1px solid var(--border); border-radius:16px; padding:10px 24px; max-width:480px;">
           ${zeile(IKON.telefon, m.telefon, telLink(m.telefon || ''), `${m.name} anrufen`)}
           ${zeile(IKON.mail, m.email, 'mailto:' + (m.email || ''), `${m.name} anschreiben`)}
           ${!m.telefon && !m.email ? '<div style="padding:14px 4px; font-size:13.5px; color:var(--text-dim);">Keine Kontaktangaben erfasst.</div>' : ''}
         </div>
+        ${verwalten ? '' : `<div style="max-width:480px; margin-top:14px; font-size:12.5px; color:var(--text-dim); line-height:1.55;">${
+          m.user_id && m.user_id === eigenesKonto
+            ? 'Das sind Sie. Telefon und E-Mail ändern Sie unter <a href="profil.html" style="color:var(--red); font-weight:700;">Mein Profil</a>.'
+            : 'Einträge anlegen und ändern darf die Geschäftsleitung.'}</div>`}
       </div>`;
   }
 
@@ -213,6 +226,7 @@
 
   function zeigeAnsicht(m) {
     zeige(detailHtml(m), wurzel => {
+      if (!verwalten) return;
       $('#ma-bearbeiten', wurzel).addEventListener('click', () => zeigeFormular(m));
       $('#ma-weg', wurzel).addEventListener('click', async () => {
         const ja = await frage({
@@ -278,7 +292,8 @@
 
   function leeresDetail() {
     if (sheetOffen) { sheetOffen.schliessen(); sheetOffen = null; }
-    $('#detail').innerHTML = `<div class="br-leer">Links jemanden auswählen, oder oben rechts einen neuen Eintrag anlegen.</div>`;
+    $('#detail').innerHTML = `<div class="br-leer">Links jemanden auswählen${
+      verwalten ? ', oder oben rechts einen neuen Eintrag anlegen' : ''}.</div>`;
   }
 
   /* --- Start -------------------------------------------------------------- */
@@ -286,11 +301,17 @@
   (async () => {
     if (!await verlangeLogin()) return;
 
-    $$('[data-neu]').forEach(b => b.addEventListener('click', () => {
-      gewaehlt = null;
-      zeichneListe();
-      zeigeFormular({ name: '', rolle: '', telefon: '', email: '' });
-    }));
+    verwalten = await darfVerwalten();
+    eigenesKonto = (await session())?.user?.id || null;
+
+    $$('[data-neu]').forEach(b => {
+      if (!verwalten) { b.hidden = true; return; }
+      b.addEventListener('click', () => {
+        gewaehlt = null;
+        zeichneListe();
+        zeigeFormular({ name: '', rolle: '', telefon: '', email: '' });
+      });
+    });
     $('#suche').addEventListener('input', zeichneListe);
 
     function hinweisZeigen() {

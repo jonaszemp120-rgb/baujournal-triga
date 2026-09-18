@@ -108,7 +108,7 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Kontrollpunkte eines Projekts | `projekt.html` | dort | dort |
 | Gebäude und Bauteile | `projekt.html` | dort | dort |
 | Eintrag | `journal.html` | korrigieren in `eintrag.html`, mit Protokoll | Papierkorb des Projekts |
-| Mitarbeiter | `mitarbeiter.html` | dort | Papierkorb Mitarbeiter |
+| Mitarbeiter | `mitarbeiter.html`, Geschäftsleitung | dort | Papierkorb Mitarbeiter, Geschäftsleitung |
 | Ordner | `dokumente.html` | umbenennen | Papierkorb Dokumente |
 | Datei | hochladen | umbenennen | Papierkorb Dokumente |
 | BKP-Kategorie | `firmenpool.html` | dort | Papierkorb Firmenpool |
@@ -332,10 +332,53 @@ alle vier Bereiche.
 
 Auf allen Tabellen ist Row Level Security aktiv, jede Policy verlangt die
 Rolle `authenticated`. Ohne Login liefert jede Abfrage leer zurück. Alle
-Teammitglieder sehen alles und dürfen überall erfassen. `mitarbeiter.berechtigung`
-ändert daran vorläufig nichts: die Stufe wird nur angezeigt, als Marke neben dem
-Namen, und ist die Grundlage für einen späteren Schritt. Ändern lässt sie sich
-nur direkt in der Supabase-Tabelle, die App hat dafür keine Oberfläche.
+Teammitglieder sehen alles und dürfen überall erfassen — mit einer Ausnahme,
+`mitarbeiter`, siehe den nächsten Abschnitt.
+
+### Schreibschutz auf `mitarbeiter`
+
+Diese eine Tabelle hält mehr als Adressen: die Berechtigungsstufe steht darin.
+Wäre sie so offen wie die anderen, könnte sich jede angemeldete Person mit einem
+einzigen Aufruf gegen die API selbst auf `entwickler` setzen. Dass «Mein Profil»
+nur die eigene Zeile anfasst, ist eine Regel der Oberfläche — und eine Regel, die
+nur in der Oberfläche steht, gilt für niemanden, der die Oberfläche umgeht.
+
+Zwei Schranken, weil RLS und Spalten zwei verschiedene Dinge sind: die Policy
+entscheidet, **welche Zeile**, der Trigger `mitarbeiter_schutz()`, **welche
+Spalte**.
+
+| | ohne erweiterte Stufe | mit erweiterter Stufe |
+|---|---|---|
+| eigene Zeile: `telefon`, `email`, `unterschrift` | ja | ja |
+| eigene Zeile: `name`, `rolle`, `berechtigung`, Papierkorb | nein | ja |
+| fremde Zeile | nein, die Policy trifft sie gar nicht | ja |
+| Person anlegen | nein | ja |
+| lesen | alles | alles |
+
+Die Spaltenliste im Trigger zählt auf, **was erlaubt ist**, nicht was verboten
+ist. Kommt später eine Spalte dazu, ist sie damit von selbst geschützt; bei einer
+Verbotsliste wäre sie von selbst offen, und das fiele niemandem auf.
+
+`ist_berechtigt()` läuft als `security definer`. Das ist hier Pflicht und kein
+Nachlassen: die Funktion wird aus einer Policy auf `mitarbeiter` gerufen und liest
+dieselbe Tabelle — ohne den Umweg am RLS vorbei prüfte die Policy sich selbst.
+Der `search_path` steht fest, damit ihr niemand eine eigene Tabelle unterschiebt.
+
+Ohne angemeldetes Konto greift der Trigger bewusst nicht: aus dem
+Supabase-Dashboard und über den Service-Key bleibt alles möglich, sonst käme die
+Administration an die eigene Tabelle nicht mehr heran. Das ist auch der Weg für
+den Erstaufbau — in einer leeren Tabelle gibt es niemanden mit erweiterter Stufe,
+also legt die erste Person das Dashboard an. Genauso wie die Login-Konten, die
+ohnehin nur dort entstehen.
+
+Die Oberfläche zieht nach, statt Knöpfe hinzustellen, die verlässlich scheitern:
+ohne erweiterte Stufe zeigt der Bereich Mitarbeiter kein Plus, kein Bearbeiten
+und keinen Papierkorb, und der Papierkorb kein «Wiederherstellen». Auf der
+eigenen Zeile steht stattdessen der Weg zu «Mein Profil». Was die Oberfläche
+anbietet, entscheidet `darfVerwalten()` aus `js/app.js` — was wirklich zählt,
+entscheidet die Datenbank.
+
+### Die Stufen
 
 Drei Stufen: `mitarbeiter`, `geschaeftsleitung`, `entwickler`. **Entwickler darf
 dasselbe wie die Geschäftsleitung** — Beiträge anderer löschen, Anträge

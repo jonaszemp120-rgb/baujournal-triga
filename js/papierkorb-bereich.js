@@ -9,7 +9,12 @@
 const BEREICHE_PK = {
   mitarbeiter: {
     titel: 'Mitarbeiter', zurueck: 'mitarbeiter.html', bereich: 'mitarbeiter',
-    teile: [{ tabelle: 'mitarbeiter', spalte: 'name' }]
+    teile: [{ tabelle: 'mitarbeiter', spalte: 'name' }],
+    /* Diese eine Tabelle trägt seit dem Schreibschutz eine engere Policy:
+       zurückholen heisst geloescht_am leeren, und das darf nur, wer den
+       Bereich auch sonst verwaltet. Ohne diese Zeile stünde hier ein Knopf,
+       den die Datenbank jedes Mal abweist. */
+    nurVerwaltend: true
   },
   firmen: {
     titel: 'Firmenpool', zurueck: 'firmenpool.html', bereich: 'firmenpool',
@@ -40,6 +45,8 @@ const BEREICHE_PK = {
   $('#m-titel').textContent = `Papierkorb — ${b.titel}`;
   $('#zurueck').href = b.zurueck;
 
+  const darfZurueckholen = b.nurVerwaltend ? await darfVerwalten() : true;
+
   const PFEIL_ZURUECK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
 
   async function ladeTeil(t, wer) {
@@ -57,9 +64,10 @@ const BEREICHE_PK = {
         <div class="pk-name">${esc(felder.map(f => z[f]).filter(Boolean).join(' '))}</div>
         <div class="pk-wann">${esc(new Date(z.geloescht_am).toLocaleDateString('de-CH'))}</div>
         <div class="pk-wer">${esc(wer[z.geloescht_von] || 'Unbekannt')}</div>
+        ${darfZurueckholen ? `
         <button type="button" class="pk-zurueck pressable" data-tabelle="${esc(t.tabelle)}" data-id="${esc(z.id)}">
           ${PFEIL_ZURUECK}<span>Wiederherstellen</span>
-        </button>
+        </button>` : ''}
       </div>`).join('');
 
     return { anzahl: data?.length || 0, html: `
@@ -87,7 +95,8 @@ const BEREICHE_PK = {
 
     $('#inhalt').innerHTML = teile.every(t => t.anzahl === 0)
       ? `<div class="br-leer">Der Papierkorb ist leer.</div>`
-      : teile.map(t => t.html).join('');
+      : teile.map(t => t.html).join('') + (darfZurueckholen ? '' :
+          `<div style="font-size:12.5px; color:var(--text-dim); line-height:1.55;">Zurückholen darf die Geschäftsleitung.</div>`);
 
     $$('#inhalt button[data-id]').forEach(btn => btn.addEventListener('click', async () => {
       btn.disabled = true;

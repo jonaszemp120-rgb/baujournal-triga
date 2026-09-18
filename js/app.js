@@ -136,6 +136,35 @@ function istBerechtigt(wert) {
   return STUFEN_ERWEITERT.includes(wert || STUFE_STANDARD);
 }
 
+/* Die eigene Stufe. Einmal pro Seitenaufruf geholt und daneben im
+   localStorage abgelegt, damit die Oberfläche auch ohne Verbindung weiss,
+   was sie anbieten darf.
+   Das ist ausdrücklich nur für die Anzeige: was wirklich zählt, entscheidet
+   die Datenbank. Die Policy auf mitarbeiter und der Trigger
+   mitarbeiter_schutz() lassen einen Schreibversuch scheitern, auch wenn
+   hier jemand von Hand true hineinschreibt. */
+let STUFE_GEHOLT = null;
+
+async function meineStufe() {
+  if (STUFE_GEHOLT) return STUFE_GEHOLT;
+  const gemerkt = (() => { try { return localStorage.getItem('bj_meine_stufe'); } catch { return null; } })();
+
+  const s = await session();
+  if (!s) return STUFE_STANDARD;
+  if (!istOnline()) return gemerkt || STUFE_STANDARD;
+
+  const { data } = await sb.from('mitarbeiter')
+    .select('berechtigung').eq('user_id', s.user.id).is('geloescht_am', null).maybeSingle();
+
+  STUFE_GEHOLT = data?.berechtigung || STUFE_STANDARD;
+  try { localStorage.setItem('bj_meine_stufe', STUFE_GEHOLT); } catch { /* privates Fenster */ }
+  return STUFE_GEHOLT;
+}
+
+/* Darf diese Person den Bereich Mitarbeiter verwalten: anlegen, Name und
+   Funktion ändern, in den Papierkorb legen, zurückholen? */
+async function darfVerwalten() { return istBerechtigt(await meineStufe()); }
+
 /* --- Eigene Unterschrift ------------------------------------------------- */
 
 /* Die im Profil hinterlegte Unterschrift der angemeldeten Person.
