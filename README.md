@@ -55,9 +55,12 @@ an der Stelle steht danach der Hinweis, dass es das Bild einmal gab. Eine
 Galerie «alle Bilder dieses Chats» gibt es bewusst nicht: sie würde aus dem
 Gesprächsverlauf ein Fotoarchiv machen, und genau das soll er nicht sein.
 
-Nachrichten lassen sich vorerst weder ändern noch löschen. Das ist kein
-Versehen, sondern der beschlossene Umfang — entsprechend haben `nachrichten`
-in der Datenbank gar keine Update- und keine Delete-Policy.
+Jede Nachricht trägt ihre Uhrzeit, ältere zusätzlich das Datum. Eigene
+Nachrichten zeigen einen Haken, sobald sie in der Datenbank stehen, und zwei,
+sobald alle anderen gelesen haben. Löschen geht: die eigene Nachricht, die
+dann als «Nachricht gelöscht» stehen bleibt, und das ganze Gespräch, das für
+alle verschwindet. Ändern geht nicht — ein Verlauf, den man umschreiben kann,
+ist keiner mehr.
 
 Daneben steht **Mein Profil**, kein Bereich, sondern die eigene Seite jeder
 angemeldeten Person: erreichbar über das Konto-Feld unten in der Seitenleiste
@@ -135,14 +138,18 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
 | Eigene Kontaktdaten | — | `profil.html` | — |
 | Eigene Unterschrift | `profil.html` | dort neu erfassen | dort |
-| Gruppenchat | `chat.html` | Mitglieder, durch die erstellende Person | — |
-| Einzelchat | entsteht beim ersten Öffnen | — | — |
-| Nachricht | `chat.html` | — | — |
+| Gruppenchat | `chat.html` | Mitglieder, durch die erstellende Person | direkt, durch jedes Mitglied |
+| Einzelchat | entsteht beim ersten Öffnen | — | direkt, durch beide Seiten |
+| Nachricht | `chat.html` | — | direkt, nur durch die schreibende Person |
 
-Eine dritte Stelle weicht ab: **Nachrichten** im Chat lassen sich weder ändern
-noch löschen. Ein Gespräch, das sich nachträglich umschreiben lässt, ist kein
-Gesprächsverlauf mehr. Was verschwindet, sind allein die Bilder, und die nach
-einer festen Frist statt auf Zuruf.
+Eine dritte Stelle weicht ab: **Nachrichten** im Chat lassen sich löschen, aber
+nicht ändern. Ein Gespräch, das sich nachträglich umschreiben lässt, ist kein
+Gesprächsverlauf mehr. Gelöscht heisst deshalb: der Inhalt geht weg, die Zeile
+bleibt und trägt den Vermerk «Nachricht gelöscht». Ein ganzes Gespräch dagegen
+verschwindet wirklich, mit allen Nachrichten und Bildern und für alle
+Beteiligten — ein «nur bei mir ausblenden» wäre ein zweiter Zustand neben dem
+ersten, und niemand wüsste mehr, was die anderen sehen. Einen Papierkorb gibt
+es dafür nicht: ein Gespräch ist kein Dokument mit Beweischarakter.
 
 Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
 der Garantie- und Verjährungsfristen. **Unterdetails** — Ansprechpersonen,
@@ -246,6 +253,14 @@ Displayecke oder den Home-Indicator rutscht. Diese Abstände stehen in
 `css/app.css` und dürfen im Markup nicht durch ein `padding`-Kürzel
 überschrieben werden, sonst fallen sie lautlos wieder weg.
 
+Das gilt für jede Breite, nicht nur fürs Handy. Auf dem iPad steht die Uhr
+über der installierten App, und dort tragen die Kopfzeile **und die
+Seitenleiste** denselben Abstand — sonst blieb oben ein milchiger Streifen
+stehen, weil die Farbe der App gar nicht bis unter die Statusleiste reichte.
+Wer eine neue Kopfzeile baut, gibt ihr `padding-top:env(safe-area-inset-top)`
+und lässt ihren Hintergrund bis `top:0` laufen; ein Abstand *über* der Leiste
+löst das Problem nicht, er verschiebt es nur.
+
 ## Aufbau
 
 ```
@@ -285,7 +300,7 @@ js/projekte-bereich.js js/projekt-detail.js js/pendenzen.js
 js/suche.js           die globale Suche
 js/profil.js          Mein Profil: eigene Kontaktdaten, Unterschrift
                       auf einem Canvas erfassen und zuschneiden
-js/chat.js            der Chat: Liste, Gespräch, Echtzeit, Gruppen
+js/chat.js            der Chat: Liste, Gespräch, Echtzeit, Gruppen, Löschen
 js/push.js            Benachrichtigungen, ohne Bezug zu einem Bereich
 css/chat.css          die zwei Spalten des Chats
 api/push.js           verschickt eine Meldung an die anderen Mitglieder
@@ -481,6 +496,26 @@ lesen muss, geht über eine Funktion mit `security definer`.
 **Der Ungelesen-Zähler steht nirgends als Zahl.** Er ist die Anzahl Nachrichten
 nach `chat_mitglieder.zuletzt_gelesen`. Eine gepflegte Zahl daneben würde beim
 ersten verlorenen Update abweichen, und niemand merkte es.
+
+**Die Lesebestätigung rechnet aus derselben Spalte.** Ein Haken heisst: in der
+Datenbank angekommen. Zwei heissen: alle anderen Mitglieder haben gelesen,
+ihr `zuletzt_gelesen` liegt also nicht vor dem Sendezeitpunkt. In der Gruppe
+gilt das erst, wenn es auf **alle** zutrifft — sonst hiesse «gelesen» bei zwei
+Leuten etwas anderes als bei fünf. Eine Spalte pro Nachricht oder eine eigene
+Tabelle gibt es dafür bewusst nicht: das wäre ein zweiter Ort für dieselbe
+Wahrheit, und zwei Orte driften auseinander. Wer genau gelesen hat, steht
+nirgends; das ist eine Arbeitsgruppe und kein Leseprotokoll.
+
+**Löschen** gibt es in zwei Formen, und sie funktionieren verschieden. Eine
+einzelne Nachricht löscht nur, wer sie geschrieben hat: Policy
+`nachrichten_update` erlaubt die Änderung überhaupt, der Trigger
+`nachricht_nur_loeschen()` lässt genau eine davon durch — Inhalt raus,
+`geloescht_am` rein. Ohne den Trigger wäre aus dem Löschen ein Bearbeiten
+geworden. Ein ganzes Gespräch löscht jedes Mitglied (`chats_delete`), und die
+Fremdschlüssel nehmen Mitgliedschaften und Nachrichten mit. Die Bilder im
+Bucket gehen **zuerst**: danach ist die Mitgliedschaft weg, und ohne sie lässt
+die Storage-Policy keine Datei mehr entfernen — sie läge für immer dort, ohne
+dass noch eine Zeile auf sie zeigt.
 
 **Echtzeit** läuft über die Postgres-Publikation `supabase_realtime`, auf der
 `nachrichten` und `chat_mitglieder` liegen. Zwei Kanäle mit verschiedenen

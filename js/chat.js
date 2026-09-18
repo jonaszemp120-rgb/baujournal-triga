@@ -9,9 +9,15 @@
  * daneben würde beim ersten verlorenen Update abweichen und niemand
  * merkte es.
  *
- * Nachrichten lassen sich in diesem Schritt weder ändern noch löschen.
- * Das ist keine Lücke, sondern der beschlossene Umfang; entsprechend gibt
- * es in der Datenbank dafür auch gar keine Policy.
+ * Ändern lässt sich eine Nachricht nicht, löschen schon. Ein ganzes
+ * Gespräch verschwindet für alle, eine einzelne Nachricht nur bei der
+ * Person, die sie geschrieben hat — und hinterlässt einen Platzhalter
+ * statt einer Lücke im Verlauf. Was erlaubt ist, entscheidet die
+ * Datenbank; hier wird es nur bedienbar gemacht.
+ *
+ * Die Lesebestätigung rechnet sich aus chat_mitglieder.zuletzt_gelesen,
+ * derselben Angabe, die schon den Ungelesen-Zähler trägt. Ein zweiter
+ * Vermerk pro Nachricht wäre ein zweiter Ort für dieselbe Wahrheit.
  */
 
 (() => {
@@ -29,7 +35,10 @@
     mehr: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
     gruppe: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     uhr: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    haken: '<path d="M20 6 9 17l-5-5"/>'
+    haken: '<path d="M20 6 9 17l-5-5"/>',
+    eimer: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    einHaken: '<path d="M4 12.5 9 17.5 20 6.5"/>',
+    zweiHaken: '<path d="M1 12.5 6 17.5 17 6.5"/><path d="M8 12.5 11 15.5 22 4.5"/>'
   };
   const svg = (d, g = 16) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
@@ -42,6 +51,11 @@
   let nachrichten = [];
   let kanal = null;            // Echtzeit für das offene Gespräch
   let kanalListe = null;       // Echtzeit für die Liste
+  /* Wann hat wer zuletzt gelesen. Die Lesebestätigung rechnet sich daraus
+     aus, nicht aus einem Vermerk pro Nachricht — dieselbe Angabe, die
+     schon den Ungelesen-Zähler trägt. Ein zweiter Ort dafür würde früher
+     oder später abweichen. */
+  let lesestand = {};          // user_id -> zuletzt_gelesen (ISO)
 
   const nameVon = u => leute.find(l => l.user_id === u)?.name || 'Unbekannt';
 
@@ -71,7 +85,7 @@
       sb.from('chats').select('id, art, name, erstellt_von, erstellt_am').in('id', ids),
       sb.from('chat_mitglieder').select('chat_id, user_id').in('chat_id', ids),
       sb.from('nachrichten')
-        .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am')
+        .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am, geloescht_am')
         .in('chat_id', ids).order('erstellt_am', { ascending: false }).limit(500)
     ]);
 
@@ -131,8 +145,46 @@
   function vorschau(n) {
     if (!n) return 'Noch keine Nachricht';
     const wer = n.absender === ich ? 'Sie' : nameVon(n.absender).split(' ')[0];
-    const was = n.text ? n.text : 'Foto gesendet';
+    const was = n.geloescht_am ? 'Nachricht gelöscht' : (n.text ? n.text : 'Foto gesendet');
     return `${wer}: ${was}`;
+  }
+
+  /* Die Uhrzeit steht an jeder Nachricht. Bei allem, was nicht von heute
+     ist, zusätzlich der Tag — der Trenner darüber gilt zwar für den ganzen
+     Block, aber wer eine einzelne Zeile herauspickt, soll nicht scrollen
+     müssen, um zu wissen, wann sie kam. */
+  function nachrichtZeit(iso) {
+    const d = new Date(iso), jetzt = new Date();
+    const tag = x => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    const uhr = d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+    if (tag(jetzt).getTime() === tag(d).getTime()) return uhr;
+    return `${d.toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' })}, ${uhr}`;
+  }
+
+  /* Ein Haken heisst: in der Datenbank angekommen. Zwei heissen: von allen
+     anderen gelesen. In der Gruppe reicht es nicht, dass eine Person
+     hineingeschaut hat — sonst hiesse "gelesen" bei zwei Leuten etwas
+     anderes als bei fünf. */
+  function istGelesen(n) {
+    if (!offen) return false;
+    const andere = offen.mitglieder.filter(u => u !== ich);
+    if (!andere.length) return false;
+    const gesendet = new Date(n.erstellt_am);
+    return andere.every(u => lesestand[u] && new Date(lesestand[u]) >= gesendet);
+  }
+
+  /* Die Fusszeile einer Nachricht: Zeit, bei eigenen dazu die Haken und
+     der Weg zum Löschen. */
+  function fuss(n, meine) {
+    const haken = meine && !n.geloescht_am
+      ? (istGelesen(n)
+          ? `<span class="haken gelesen" role="img" aria-label="Gelesen">${svg(IKON.zweiHaken, 15)}</span>`
+          : `<span class="haken" role="img" aria-label="Gesendet">${svg(IKON.einHaken, 15)}</span>`)
+      : '';
+    const weg = meine && !n.geloescht_am
+      ? `<button type="button" class="ch-weg" data-loeschen="${esc(n.id)}" aria-label="Nachricht löschen">${svg(IKON.eimer, 13)}</button>`
+      : '';
+    return `<span class="ch-fuss"><span class="wann">${esc(nachrichtZeit(n.erstellt_am))}</span>${haken}${weg}</span>`;
   }
 
   /* --- Die Liste ------------------------------------------------------------- */
@@ -186,12 +238,10 @@
         <span class="titel">${esc(chatName(offen))}</span>
         <span class="wer">${esc(wer)}</span>
       </span>
-      ${offen.art === 'gruppe'
-        ? `<button type="button" id="g-mehr" class="br-knopf pressable" aria-label="Gruppe verwalten">${svg(IKON.mehr, 18)}</button>`
-        : ''}`;
+      <button type="button" id="g-mehr" class="br-knopf pressable" aria-label="${offen.art === 'gruppe' ? 'Gruppe verwalten' : 'Gespräch verwalten'}">${svg(IKON.mehr, 18)}</button>`;
 
     $('#g-zurueck')?.addEventListener('click', () => zeigeListe());
-    $('#g-mehr')?.addEventListener('click', gruppeVerwalten);
+    $('#g-mehr')?.addEventListener('click', gespraechMenue);
   }
 
   async function zeichneVerlauf() {
@@ -224,11 +274,20 @@
       }
       letzterAbsender = n.absender;
 
+      if (n.geloescht_am) {
+        teile.push(`<div class="ch-blase geloescht ${meine ? 'ich' : 'andere'}"><span class="wort">Nachricht gelöscht</span>${fuss(n, meine)}</div>`);
+        continue;
+      }
       if (n.bild_ablauf) teile.push(bildBlase(n, meine));
-      if (n.text) teile.push(`<div class="ch-blase ${meine ? 'ich' : 'andere'}">${esc(n.text)}</div>`);
+      if (n.text) teile.push(`<div class="ch-blase ${meine ? 'ich' : 'andere'}"><span class="wort">${esc(n.text)}</span>${fuss(n, meine)}</div>`);
     }
 
     v.innerHTML = teile.join('');
+    $$('#verlauf [data-loeschen]').forEach(el => el.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      nachrichtLoeschen(el.dataset.loeschen);
+    }));
     await bilderNachladen();
     v.scrollTop = v.scrollHeight;
   }
@@ -245,6 +304,7 @@
           ? '<div class="platzhalter">Bild nicht mehr verfügbar.<br>Bilder werden nach 30 Tagen entfernt.</div>'
           : '<div class="platzhalter">Bild wird geladen…</div>'}
         ${weg ? '' : `<div class="ch-ablauf">${svg(IKON.uhr, 13)}<span>Verfügbar bis ${esc(ablauf)}, danach automatisch gelöscht</span></div>`}
+        ${fuss(n, meine)}
       </div>`;
   }
 
@@ -281,11 +341,15 @@
     zeichneListe();
 
     $('#verlauf').innerHTML = `<div class="ch-laden"><span class="spin"></span>Nachrichten werden geladen…</div>`;
-    const { data, error } = await sb.from('nachrichten')
-      .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am')
-      .eq('chat_id', id).order('erstellt_am', { ascending: true });
+    const [{ data, error }, { data: staende }] = await Promise.all([
+      sb.from('nachrichten')
+        .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am, geloescht_am')
+        .eq('chat_id', id).order('erstellt_am', { ascending: true }),
+      sb.from('chat_mitglieder').select('user_id, zuletzt_gelesen').eq('chat_id', id)
+    ]);
     if (meckern('Nachrichten laden', error)) return;
     nachrichten = data || [];
+    lesestand = Object.fromEntries((staende || []).map(m => [m.user_id, m.zuletzt_gelesen]));
     await zeichneVerlauf();
 
     await alsGelesen(c);
@@ -301,6 +365,7 @@
     const jetzt = new Date().toISOString();
     c.zuletzt_gelesen = jetzt;
     c.ungelesen = 0;
+    if (offen && offen.id === c.id) lesestand[ich] = jetzt;
     zeichneListe();
     await sb.from('chat_mitglieder').update({ zuletzt_gelesen: jetzt })
       .eq('chat_id', c.id).eq('user_id', ich);
@@ -309,6 +374,7 @@
   function zeigeListe() {
     offen = null;
     nachrichten = [];
+    lesestand = {};
     if (kanal) { sb.removeChannel(kanal); kanal = null; }
     $('#spalte-liste').hidden = false;
     $('#spalte-gespraech').hidden = !breit();
@@ -344,6 +410,28 @@
           await zeichneVerlauf();
           if (n.absender !== ich) await alsGelesen(offen);
         })
+      /* Gelöscht wird nicht wirklich gelöscht, sondern geleert — für die
+         Echtzeit ist das eine Änderung, keine Entfernung. */
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'nachrichten', filter: `chat_id=eq.${id}` },
+        async nutzlast => {
+          const n = nutzlast.new;
+          const i = nachrichten.findIndex(x => x.id === n.id);
+          if (i < 0) return;
+          nachrichten[i] = { ...nachrichten[i], ...n };
+          await zeichneVerlauf();
+        })
+      /* Liest die Gegenseite mit, wandert ihr Lesestand weiter — daraus
+         werden aus einem Haken zwei, ohne Neuladen. */
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'chat_mitglieder', filter: `chat_id=eq.${id}` },
+        async nutzlast => {
+          const m = nutzlast.new;
+          if (!m?.user_id) return;
+          if (lesestand[m.user_id] === m.zuletzt_gelesen) return;
+          lesestand[m.user_id] = m.zuletzt_gelesen;
+          if (m.user_id !== ich) await zeichneVerlauf();
+        })
       .subscribe();
   }
 
@@ -361,9 +449,39 @@
           aktualisiereVorschau(n);
         })
       .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'nachrichten' },
+        nutzlast => {
+          const n = nutzlast.new;
+          const c = chats.find(x => x.id === n.chat_id);
+          if (!c || c.letzte?.id !== n.id) return;
+          c.letzte = { ...c.letzte, ...n };
+          zeichneListe();
+        })
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_mitglieder', filter: `user_id=eq.${ich}` },
         async () => { chats = await ladeChats(); zeichneListe(); })
+      /* Löscht jemand ein Gespräch, fallen die Mitgliedschaften mit ihm.
+         Die Datenbank meldet beim Entfernen nur den Schlüssel — chat_id
+         und user_id, mehr braucht es hier auch nicht. */
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'chat_mitglieder' },
+        nutzlast => gespraechWeg(nutzlast.old))
       .subscribe();
+  }
+
+  function gespraechWeg(alt) {
+    if (!alt?.chat_id) return;
+    const c = chats.find(x => x.id === alt.chat_id);
+    if (!c) return;
+    if (alt.user_id && alt.user_id !== ich) {
+      // Nur eine Person hat die Gruppe verlassen oder wurde entfernt.
+      c.mitglieder = c.mitglieder.filter(u => u !== alt.user_id);
+      if (offen?.id === c.id) { zeichneKopf(); zeichneVerlauf(); }
+      return;
+    }
+    chats = chats.filter(x => x.id !== c.id);
+    if (offen?.id === c.id) { toast('Das Gespräch wurde gelöscht'); zeigeListe(); }
+    else zeichneListe();
   }
 
   function aktualisiereVorschau(n) {
@@ -562,19 +680,27 @@
 
   /* Mitglieder pflegen darf, wer die Gruppe angelegt hat. Alle anderen
      sehen dieselbe Liste, aber nur zum Lesen — so steht es auch in der
-     Policy, hier wird es nur sichtbar gemacht. */
-  function gruppeVerwalten() {
-    if (!offen || offen.art !== 'gruppe') return;
+     Policy, hier wird es nur sichtbar gemacht.
+
+     Löschen darf dagegen jedes Mitglied, in der Gruppe wie im Einzelchat.
+     Wer mitredet, darf auch beenden; eine Rangordnung dafür hiesse, dass
+     ein Gespräch am einen Ende verschwindet und am anderen stehen bleibt. */
+  function gespraechMenue() {
+    if (!offen) return;
+    const gruppe = offen.art === 'gruppe';
     const meine = offen.erstellt_von === ich;
     const drin = new Set(offen.mitglieder);
     const andere = leute.filter(l => l.user_id !== ich);
 
+    const erklaerung = !gruppe
+      ? `Einzelgespräch mit ${esc(chatName(offen))}.`
+      : (meine ? 'Sie haben diese Gruppe erstellt und können Mitglieder hinzufügen oder entfernen.'
+               : `Angelegt von ${esc(nameVon(offen.erstellt_von))}. Mitglieder pflegt, wer die Gruppe erstellt hat.`);
+
     const s = sheet(`
-      <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:4px;">${esc(offen.name)}</div>
-      <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">
-        ${meine ? 'Sie haben diese Gruppe erstellt und können Mitglieder hinzufügen oder entfernen.'
-                : `Angelegt von ${esc(nameVon(offen.erstellt_von))}. Mitglieder pflegt, wer die Gruppe erstellt hat.`}
-      </div>
+      <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:4px;">${esc(chatName(offen))}</div>
+      <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">${erklaerung}</div>
+      ${gruppe ? `
       <div class="ch-wahl" style="max-height:46dvh; overflow-y:auto;">
         <div class="zeile" aria-checked="true" style="cursor:default;">
           <span class="kasten">${svg(IKON.haken, 14)}</span>
@@ -588,12 +714,23 @@
             <span class="kreis">${esc(initialen(l.name))}</span>
             <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(l.name)}</span>
           </button>`).join('')}
+      </div>` : ''}
+      <button type="button" id="g-weg" class="pressable" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:50px; border-radius:13px; background:var(--card); border:1.5px solid var(--red); color:var(--red); font-weight:700; font-size:14.5px; margin-top:16px;">
+        ${svg(IKON.eimer, 16)} Gespräch löschen
+      </button>
+      <div style="font-size:12px; color:var(--text-dim); line-height:1.5; margin-top:8px;">
+        Löscht das Gespräch mit allen Nachrichten und Bildern — auch bei den anderen Beteiligten.
       </div>
     `);
     s.el.style.maxHeight = '86dvh';
     s.el.style.overflowY = 'auto';
 
-    if (!meine) return;
+    $('#g-weg', s.el).addEventListener('click', async () => {
+      s.schliessen();
+      await gespraechLoeschen();
+    });
+
+    if (!gruppe || !meine) return;
 
     $$('[data-mit]', s.el).forEach(el => el.addEventListener('click', async () => {
       const u = el.dataset.mit;
@@ -620,6 +757,73 @@
         toast(e.message, true);
       }
     }));
+  }
+
+  /* --- Löschen -------------------------------------------------------------------- */
+
+  /* Die Dateien zuerst, die Zeile danach. Andersherum wäre das Gespräch
+     weg, mit ihm die Mitgliedschaft — und ohne Mitgliedschaft lässt die
+     Policy im Bucket kein Bild mehr entfernen. Die Bilder lägen für immer
+     dort, ohne dass irgendetwas noch auf sie zeigt. */
+  async function gespraechLoeschen() {
+    if (!offen) return;
+    const c = offen;
+    const ja = await frage({
+      titel: 'Gespräch löschen?',
+      text: `„${chatName(c)}“ verschwindet mit allen Nachrichten und Bildern, auch bei allen anderen Beteiligten. Das lässt sich nicht rückgängig machen.`,
+      knopf: 'Für alle löschen'
+    });
+    if (!ja) return;
+    if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
+
+    const pfade = nachrichten.filter(n => n.bild_pfad).map(n => n.bild_pfad);
+    if (pfade.length) {
+      const { error: bilder } = await sb.storage.from('chat-bilder').remove(pfade);
+      if (bilder) return toast(bilder.message, true);
+    }
+
+    const { error } = await sb.from('chats').delete().eq('id', c.id);
+    if (error) return toast(error.message, true);
+
+    chats = chats.filter(x => x.id !== c.id);
+    zeigeListe();
+    toast('Gespräch gelöscht');
+  }
+
+  /* Eine einzelne Nachricht verliert ihren Inhalt und behält ihren Platz.
+     Was dabei erlaubt ist, prüft der Trigger in der Datenbank; hier wird
+     nur gefragt und aufgeräumt. */
+  async function nachrichtLoeschen(id) {
+    const n = nachrichten.find(x => x.id === id);
+    if (!n || n.absender !== ich || n.geloescht_am) return;
+
+    const ja = await frage({
+      titel: 'Nachricht löschen?',
+      text: 'Der Inhalt verschwindet für alle. An der Stelle bleibt der Vermerk „Nachricht gelöscht“ stehen.',
+      knopf: 'Löschen'
+    });
+    if (!ja) return;
+    if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
+
+    if (n.bild_pfad) {
+      const { error: bild } = await sb.storage.from('chat-bilder').remove([n.bild_pfad]);
+      if (bild) return toast(bild.message, true);
+    }
+
+    const jetzt = new Date().toISOString();
+    const { error } = await sb.from('nachrichten')
+      .update({ text: null, bild_pfad: null, geloescht_am: jetzt }).eq('id', id);
+    if (error) return toast(error.message, true);
+
+    Object.assign(n, { text: null, bild_pfad: null, geloescht_am: jetzt });
+    await zeichneVerlauf();
+
+    const c = chats.find(x => x.id === n.chat_id);
+    if (c && c.letzte?.id === n.id) {
+      c.letzte = { ...c.letzte, text: null, bild_pfad: null, geloescht_am: jetzt };
+      zeichneListe();
+    }
+    toast('Nachricht gelöscht');
   }
 
   /* --- Emoji --------------------------------------------------------------------- */

@@ -187,6 +187,11 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
     display:flex; flex-direction:column; gap:4px;
     position:fixed; inset:0 auto 0 0; width:260px; z-index:40;
     background:var(--navy); padding:24px 16px;
+    /* Auf dem iPad steht die Uhr über der App, auch in der Seitenleiste.
+       Die Leiste selbst reicht als fixed-Element bis an die Kante, ihre
+       Farbe deckt den Streifen also — aber das Logo darf nicht darunter
+       liegen. */
+    padding-top:calc(24px + env(safe-area-inset-top));
     padding-left:calc(16px + env(safe-area-inset-left));
     padding-bottom:calc(24px + env(safe-area-inset-bottom));
   }
@@ -238,7 +243,13 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   /* Die weisse Kopfzeile der neuen Bereiche. */
   .tr-kopf{
     display:flex; align-items:center; justify-content:space-between; gap:16px;
-    height:72px; padding:0 32px;
+    /* Feste Höhe plus Sicherheitsbereich. Die Zeile klebt oben; ohne das
+       Polster läge ihr Inhalt auf dem iPad unter der Uhr und alles, was
+       daran vorbeiscrollt, schimmerte durch die Statusleiste. */
+    min-height:calc(72px + env(safe-area-inset-top));
+    padding:env(safe-area-inset-top) 32px 0;
+    padding-left:calc(32px + env(safe-area-inset-left));
+    padding-right:calc(32px + env(safe-area-inset-right));
     background:var(--card); border-bottom:1px solid var(--border);
     position:sticky; top:0; z-index:20;
   }
@@ -293,8 +304,8 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   .tr-inhalt .topbar{
     background:var(--card) !important;
     border-bottom:1px solid var(--border);
-    min-height:72px;
-    padding-top:0 !important; padding-bottom:0 !important;
+    min-height:calc(72px + env(safe-area-inset-top));
+    padding-top:env(safe-area-inset-top) !important; padding-bottom:0 !important;
     padding-left:calc(40px + env(safe-area-inset-left)) !important;
     padding-right:calc(40px + env(safe-area-inset-right)) !important;
     gap:16px !important;

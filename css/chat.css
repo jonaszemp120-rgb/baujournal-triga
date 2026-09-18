@@ -90,11 +90,37 @@
 
 .ch-blase{
   max-width:min(560px, 78%); padding:10px 14px; border-radius:16px;
-  font-size:14.5px; line-height:1.45; overflow-wrap:anywhere;
-  white-space:pre-wrap;
+  font-size:14.5px; line-height:1.45;
+  display:flex; flex-direction:column;
 }
+.ch-blase .wort{ white-space:pre-wrap; overflow-wrap:anywhere; }
 .ch-blase.andere{ background:var(--card); border:1px solid var(--border); align-self:flex-start; }
 .ch-blase.ich{ background:var(--navy); color:#fff; align-self:flex-end; }
+/* Eine gelöschte Nachricht bleibt an ihrem Platz, sagt aber nichts mehr. */
+.ch-blase.geloescht .wort{ font-style:italic; opacity:.7; }
+
+/* Zeit, Haken und der Weg zum Löschen, klein unter der Nachricht. */
+.ch-fuss{
+  display:flex; align-items:center; gap:5px; align-self:flex-end;
+  margin-top:4px; font-size:11px; line-height:1;
+}
+.ch-fuss .wann{ white-space:nowrap; }
+.ch-blase.andere .ch-fuss, .ch-bildblase .ch-fuss{ color:var(--text-dim); }
+.ch-blase.ich .ch-fuss{ color:rgba(255,255,255,.75); }
+.ch-fuss .haken{ display:flex; align-items:center; }
+/* Zwei Haken heissen gelesen, und das soll man sehen, ohne zu zählen. */
+.ch-fuss .haken.gelesen{ color:#7fd4ff; }
+.ch-bildblase .ch-fuss{ justify-content:flex-start; margin-top:5px; }
+.ch-bildblase.ich .ch-fuss{ justify-content:flex-end; }
+.ch-bildblase .ch-fuss .haken.gelesen{ color:var(--navy); }
+.ch-weg{
+  display:flex; align-items:center; justify-content:center;
+  width:26px; height:26px; margin:-6px -7px -6px 0;
+  border:none; border-radius:8px; background:transparent;
+  color:inherit; opacity:.7;
+}
+.ch-weg:hover{ opacity:1; background:rgba(0,0,0,.07); }
+.ch-blase.ich .ch-weg:hover{ background:rgba(255,255,255,.18); }
 
 .ch-bildblase{ max-width:min(560px, 78%); align-self:flex-start; }
 .ch-bildblase.ich{ align-self:flex-end; }
