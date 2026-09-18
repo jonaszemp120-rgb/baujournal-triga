@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'triga-v27';
+const VERSION = 'triga-v28';
 
 const DATEIEN = [
   './',
@@ -98,8 +98,23 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const namen = await caches.keys();
-    await Promise.all(namen.filter(n => n !== VERSION).map(n => caches.delete(n)));
+    const alte = namen.filter(n => n !== VERSION);
+    await Promise.all(alte.map(n => caches.delete(n)));
     await self.clients.claim();
+
+    /* Der Haken am Cache: das offene Fenster hat seine Dateien schon aus
+       der alten Fassung geladen, bevor diese hier fertig war. Es zeigt
+       also weiter die alte App, obwohl die neue bereitliegt — beim
+       nächsten Start dasselbe Spiel, weil auch dann zuerst der Cache
+       antwortet und der neue Worker erst danach übernimmt. Genau so ist
+       ein fertig ausgelieferter Bereich schon einmal tagelang unsichtbar
+       geblieben.
+       Darum sagt der Worker den offenen Fenstern Bescheid, sobald er eine
+       ältere Fassung abgelöst hat. Nur dann: bei der ersten Installation
+       gibt es nichts abzulösen und nichts neu zu laden. */
+    if (!alte.length) return;
+    const fenster = await self.clients.matchAll({ type: 'window' });
+    fenster.forEach(f => f.postMessage({ typ: 'neue-version', version: VERSION }));
   })());
 });
 

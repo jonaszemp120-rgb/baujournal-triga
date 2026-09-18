@@ -854,3 +854,16 @@ npx http-server . -p 8080 -c-1
 
 Nach einer Änderung an einer Datei aus der Liste in `sw.js` die `VERSION` dort
 hochzählen, sonst hält der Service Worker die alte Fassung fest.
+
+Die hochgezählte Version genügt jetzt auch. Früher lag zwischen dem Ausliefern
+und dem, was auf dem Gerät zu sehen war, noch mindestens ein Neuladen von Hand:
+das offene Fenster hatte seine Dateien schon aus dem alten Cache, und beim
+nächsten Start antwortete wieder zuerst der Cache. Auf dem Handy, wo die App als
+Symbol auf dem Startbildschirm tagelang offen bleibt, konnte ein fertiger
+Bereich so lange unsichtbar bleiben — beim Bereich Formulare ist genau das
+passiert. Heute meldet der Worker den offenen Fenstern, dass er eine ältere
+Fassung abgelöst hat, und die laden einmal neu. Nicht mitten im Tippen: läuft
+gerade eine Eingabe, wartet das Neuladen, bis das Feld den Fokus abgibt.
+
+Welche Fassung auf einem Gerät läuft, zeigen die Entwicklerwerkzeuge unter
+*Application → Service Workers*; den Namen dazu trägt `VERSION` oben in `sw.js`.

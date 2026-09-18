@@ -465,5 +465,55 @@ function kontoKreis(el) {
 /* --- Service Worker ----------------------------------------------------- */
 
 if ('serviceWorker' in navigator) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  addEventListener('load', async () => {
+    let reg;
+    try { reg = await navigator.serviceWorker.register('sw.js'); } catch { return; }
+
+    /* Der Worker meldet sich, wenn er eine ältere Fassung abgelöst hat.
+       Dann steht im Fenster noch die alte App und ein Neuladen holt die
+       neue. Ein zweites Mal kann das nicht passieren: die Meldung kommt
+       genau einmal pro neuer Fassung, und nach dem Neuladen ist sie die
+       laufende. Der Riegel schützt trotzdem vor einer Schleife, falls
+       eine Auslieferung einmal kaputt ist.
+       Wer gerade tippt, wird nicht unterbrochen — dann wartet das
+       Neuladen, bis die Seite wieder in den Hintergrund geht. */
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.typ !== 'neue-version') return;
+
+      const neuLaden = () => {
+        // Der Riegel erst hier, unmittelbar vor dem Neuladen: käme er
+        // schon beim Eintreffen der Meldung, bliebe die alte Fassung
+        // hängen, falls es zum Neuladen gar nicht mehr kommt.
+        try {
+          if (sessionStorage.getItem('triga-version') === e.data.version) return;
+          sessionStorage.setItem('triga-version', e.data.version);
+        } catch { /* Privater Modus: dann eben ohne Riegel */ }
+        location.reload();
+      };
+
+      // Mitten im Tippen wird niemand unterbrochen. Sobald das Feld die
+      // Eingabe abgibt, ist der Weg frei.
+      const tippt = () => {
+        const el = document.activeElement;
+        return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      };
+      if (!tippt()) { neuLaden(); return; }
+      document.addEventListener('focusout', function pruefe() {
+        // focusout kommt, bevor das nächste Feld den Fokus hat. Erst im
+        // nächsten Durchlauf steht fest, ob überhaupt jemand weitertippt.
+        setTimeout(() => {
+          if (tippt()) return;
+          document.removeEventListener('focusout', pruefe);
+          neuLaden();
+        }, 0);
+      });
+    });
+
+    /* Auf dem Handy bleibt die App als Symbol auf dem Startbildschirm oft
+       tagelang offen, ohne je neu zu laden. Ohne diesen Anstoss sucht der
+       Browser in dieser Zeit nie nach einer neuen Fassung. */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  });
 }
