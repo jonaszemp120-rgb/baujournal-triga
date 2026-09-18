@@ -5,7 +5,7 @@
    Die Versionsnummer bei jeder Änderung hochzählen, dann räumt der
    Worker die alte Fassung beim nächsten Start weg. */
 
-const VERSION = 'triga-v20';
+const VERSION = 'triga-v21';
 
 const DATEIEN = [
   './',
@@ -19,6 +19,7 @@ const DATEIEN = [
   'pendenzen.html',
   'suche.html',
   'profil.html',
+  'chat.html',
   'papierkorb-bereich.html',
   'projekte.html',
   'projekt.html',
@@ -29,6 +30,7 @@ const DATEIEN = [
   'manifest.json',
   'css/app.css',
   'css/projekte.css',
+  'css/chat.css',
   'js/config.js',
   'js/logo.js',
   'js/shell.js',
@@ -42,6 +44,8 @@ const DATEIEN = [
   'js/pendenzen.js',
   'js/suche.js',
   'js/profil.js',
+  'js/chat.js',
+  'js/push.js',
   'js/papierkorb-bereich.js',
   'js/app.js',
   'js/store.js',
@@ -123,5 +127,46 @@ self.addEventListener('fetch', e => {
              new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
     }
     return new Response('', { status: 504 });
+  })());
+});
+
+/* --- Benachrichtigungen --------------------------------------------------- */
+
+/* Der Push kommt verschlüsselt an und ist hier schon entschlüsselt: der
+   Browser erledigt das, bevor er dieses Ereignis auslöst. Im Rumpf steht
+   das JSON aus api/push.js.
+   Ein Push ohne lesbaren Inhalt ist kein Grund, gar nichts zu zeigen —
+   dann steht eben nur, dass es etwas Neues gibt. */
+self.addEventListener('push', e => {
+  let d = { titel: 'TRIGA App', text: 'Neue Nachricht', ziel: 'chat.html' };
+  try { if (e.data) d = { ...d, ...e.data.json() }; } catch { /* Rohtext oder leer */ }
+
+  e.waitUntil(self.registration.showNotification(d.titel, {
+    body: d.text,
+    icon: 'assets/icon-192.png',
+    badge: 'assets/icon-192.png',
+    // Gleiches Gespräch, gleiche Kennung: mehrere Nachrichten stapeln sich
+    // nicht zu einem Turm, sondern ersetzen einander.
+    tag: d.ziel,
+    data: { ziel: d.ziel }
+  }));
+});
+
+/* Antippen bringt die App nach vorne statt einen zweiten Tab zu öffnen.
+   Läuft schon ein Fenster, wandert es auf das Ziel und wird sichtbar. */
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const ziel = new URL(e.notification.data?.ziel || 'start.html', self.location.origin).href;
+
+  e.waitUntil((async () => {
+    const fenster = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const f of fenster) {
+      if (f.url.startsWith(self.location.origin)) {
+        await f.focus();
+        if ('navigate' in f) await f.navigate(ziel);
+        return;
+      }
+    }
+    await self.clients.openWindow(ziel);
   })());
 });

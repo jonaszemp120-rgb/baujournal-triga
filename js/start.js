@@ -22,7 +22,7 @@
   /* Welche Bereiche schon eine Tabelle haben. Die Liste wächst mit jedem
      Schritt. Eine Abfrage auf eine Tabelle, die es noch nicht gibt, wäre
      nur eine Fehlermeldung in der Konsole ohne Nutzen. */
-  const TABELLEN_DA = ['projekte', 'mitarbeiter', 'ordner', 'firmen'];
+  const TABELLEN_DA = ['projekte', 'mitarbeiter', 'ordner', 'firmen', 'chat_mitglieder'];
 
   async function zaehle(tabelle, filter = f => f) {
     if (!istOnline() || !TABELLEN_DA.includes(tabelle)) return null;
@@ -33,12 +33,15 @@
     return count ?? null;
   }
 
-  const [mitarbeiter, projekte, laufend, firmen, ordner] = await Promise.all([
+  const [mitarbeiter, projekte, laufend, firmen, ordner, gespraeche] = await Promise.all([
     zaehle('mitarbeiter', f => f.is('geloescht_am', null)),
     zaehle('projekte', f => f.eq('archiviert', false)),
     zaehle('projekte', f => f.eq('archiviert', false).eq('status', 'laufend')),
     zaehle('firmen', f => f.is('geloescht_am', null)),
-    zaehle('ordner', f => f.is('geloescht_am', null))
+    zaehle('ordner', f => f.is('geloescht_am', null)),
+    // Nur die eigenen: fremde Gespräche gehen niemanden etwas an, und die
+    // Policy gibt sie ohnehin nicht heraus.
+    zaehle('chat_mitglieder', f => f.eq('user_id', p?.id || ''))
   ]);
 
   const zahlen = {
@@ -47,7 +50,8 @@
                    desktop: laufend === null ? 'im Überblick' : `${laufend} laufend` },
     baujournal:  { wert: projekte, eins: 'aktives Projekt', viele: 'aktive Projekte', desktop: 'Projekte aktiv' },
     firmenpool:  { wert: firmen, eins: 'Firma', viele: 'Firmen', desktop: 'Unternehmer im Pool' },
-    dokumente:   { wert: ordner, eins: 'Ordner', viele: 'Ordner', desktop: 'Ordner angelegt' }
+    dokumente:   { wert: ordner, eins: 'Ordner', viele: 'Ordner', desktop: 'Ordner angelegt' },
+    chat:        { wert: gespraeche, eins: 'Gespräch', viele: 'Gespräche', desktop: 'Gespräche' }
   };
 
   $('#raster').innerHTML = BEREICHE.map(b => {

@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/chat-aufraeumen",
+      "schedule": "17 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/sw.js",

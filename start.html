@@ -45,7 +45,9 @@
     .tr-banner{ margin:0 0 20px; }
     .st-raster{
       padding:28px 40px 36px;
-      grid-template-columns:repeat(5, minmax(0, 1fr)); gap:16px;
+      /* Sechs Bereiche in einer Reihe, solange der Platz reicht; darunter
+         bricht die Reihe um, statt die Kacheln zu quetschen. */
+      grid-template-columns:repeat(auto-fit, minmax(158px, 1fr)); gap:16px;
     }
     .st-kopfzeile{ padding:28px 40px 0; }
     .st-kopfzeile .gruss{ font-size:24px; font-weight:800; }

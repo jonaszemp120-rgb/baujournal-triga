@@ -64,6 +64,7 @@ button{ cursor:pointer; }
    Haken an den alten Screens mit ihren inline gesetzten Massen. */
 [class^="tr-"], [class*=" tr-"],
 [class^="br-"], [class*=" br-"],
+[class^="ch-"], [class*=" ch-"],
 [class^="dk-"], [class*=" dk-"],
 [class^="fp-"], [class*=" fp-"],
 [class^="pj-"], [class*=" pj-"],

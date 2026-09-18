@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Chat · TRIGA App</title>
+<meta name="theme-color" content="#00233f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TRIGA">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/chat.css">
+</head>
+<body data-bereich="chat">
+
+  <div class="ch-spalten">
+
+    <!-- Links die Gespräche. Auf dem Handy ist das die ganze Seite,
+         solange kein Gespräch offen ist. -->
+    <div class="ch-liste" id="spalte-liste">
+      <div class="br-kopf nur-mobil">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <a class="br-knopf pressable" href="start.html" aria-label="Zurück zur Startseite">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          </a>
+          <div style="font-weight:700; font-size:17px;">Chat</div>
+        </div>
+        <button type="button" class="br-knopf pressable" data-neu aria-label="Neues Gespräch">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <div class="ch-suchzeile">
+        <div class="ch-feld">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="suche" type="search" placeholder="Chat suchen…" aria-label="Chat suchen">
+        </div>
+        <button type="button" class="br-knopf voll pressable nur-desktop" data-neu aria-label="Neues Gespräch">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <div id="gespraeche" class="ch-gespraeche"></div>
+    </div>
+
+    <!-- Rechts das offene Gespräch. -->
+    <div class="ch-gespraech" id="spalte-gespraech">
+      <div id="g-kopf" class="ch-kopf" hidden></div>
+      <div id="verlauf" class="ch-verlauf"></div>
+      <div id="eingabe" class="ch-eingabe" hidden>
+        <button type="button" id="e-bild" class="br-knopf pressable" aria-label="Bild anhängen">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        </button>
+        <button type="button" id="e-emoji" class="br-knopf pressable" aria-label="Emoji einfügen">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/></svg>
+        </button>
+        <input id="e-datei" type="file" accept="image/*" hidden>
+        <textarea id="e-text" rows="1" placeholder="Nachricht schreiben…" aria-label="Nachricht schreiben"></textarea>
+        <button type="button" id="e-senden" class="ch-senden pressable" aria-label="Senden">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+<script src="vendor/supabase-js-2.58.0.js"></script>
+<script src="js/logo.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/store.js"></script>
+<script src="js/shell.js"></script>
+<script src="js/push.js"></script>
+<script src="js/chat.js"></script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 # TRIGA App · TRIGA Baumanagement AG
 
-Die interne App der TRIGA Baumanagement AG. Fünf Bereiche, ein Login, eine
+Die interne App der TRIGA Baumanagement AG. Sechs Bereiche, ein Login, eine
 Adresse: **Mitarbeiter**, **Projekte**, **Baujournal**, **Firmenpool**,
-**Dokumente**. Läuft
+**Dokumente**, **Chat**. Läuft
 im Browser, lässt sich auf dem Handy zum Homescreen hinzufügen und funktioniert
 im Baujournal auch ohne Empfang, etwa in der Tiefgarage oder im Rohbau.
 
@@ -10,7 +10,7 @@ Kein Build-Schritt, kein Framework. Reines HTML, CSS und JavaScript, das Vercel
 direkt als statische Seiten ausliefert. Wer am Code etwas ändert, öffnet die
 Datei, speichert, fertig.
 
-## Die fünf Bereiche
+## Die sechs Bereiche
 
 **Mitarbeiter** ist das Adressbuch des Teams, bewusst getrennt von den
 Login-Konten. Telefon und E-Mail sind direkt antippbar. Einen Eintrag hier zu
@@ -43,6 +43,22 @@ Erfassen einer neuen Firma lassen sich Adresse und Nummer über search.ch holen.
 **Dokumente** ist eine freie Ordnerablage für PDF, mit Dateiname, Datum und
 hochladender Person.
 
+**Chat** ist die interne Unterhaltung: Einzelgespräche und Gruppen, Text,
+Emoji und Bilder, in Echtzeit über Supabase Realtime. Ein Einzelchat wird nicht
+angelegt, er entsteht beim ersten Öffnen eines Gesprächs mit jemandem. Gruppen
+legt man bewusst an, mit Namen und Mitgliedern; pflegen darf sie, wer sie
+erstellt hat.
+
+Bilder leben **30 Tage**, danach verschwinden sie wirklich — die Datei wird aus
+dem Storage gelöscht, nicht bloss ausgeblendet. Der Verlauf bleibt vollständig,
+an der Stelle steht danach der Hinweis, dass es das Bild einmal gab. Eine
+Galerie «alle Bilder dieses Chats» gibt es bewusst nicht: sie würde aus dem
+Gesprächsverlauf ein Fotoarchiv machen, und genau das soll er nicht sein.
+
+Nachrichten lassen sich vorerst weder ändern noch löschen. Das ist kein
+Versehen, sondern der beschlossene Umfang — entsprechend haben `nachrichten`
+in der Datenbank gar keine Update- und keine Delete-Policy.
+
 Daneben steht **Mein Profil**, kein Bereich, sondern die eigene Seite jeder
 angemeldeten Person: erreichbar über das Konto-Feld unten in der Seitenleiste
 und über den Kreis mit den Initialen auf der Startseite. Dort pflegt jede Person
@@ -72,9 +88,10 @@ wurde.
 | Datei | Zweck |
 |---|---|
 | `index.html` | Anmeldung. Kein Selbstregistrieren, Konten legt die Geschäftsleitung im Supabase-Dashboard an. |
-| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den fünf Bereichen, mit Zahlen aus der Datenbank. |
+| `start.html` | Die Startseite nach dem Login: Auswahl zwischen den sechs Bereichen, mit Zahlen aus der Datenbank. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `profil.html` | Mein Profil: eigene Kontaktdaten und eigene Unterschrift. |
+| `chat.html` | Der Chat: Gespräche links, das offene rechts, `?chat=`. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
 | `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal und Dokumenten. |
@@ -118,6 +135,14 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Eigener Anzeigename | — | über den Kreis mit den Initialen | — |
 | Eigene Kontaktdaten | — | `profil.html` | — |
 | Eigene Unterschrift | `profil.html` | dort neu erfassen | dort |
+| Gruppenchat | `chat.html` | Mitglieder, durch die erstellende Person | — |
+| Einzelchat | entsteht beim ersten Öffnen | — | — |
+| Nachricht | `chat.html` | — | — |
+
+Eine dritte Stelle weicht ab: **Nachrichten** im Chat lassen sich weder ändern
+noch löschen. Ein Gespräch, das sich nachträglich umschreiben lässt, ist kein
+Gesprächsverlauf mehr. Was verschwindet, sind allein die Bilder, und die nach
+einer festen Frist statt auf Zuruf.
 
 Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
 der Garantie- und Verjährungsfristen. **Unterdetails** — Ansprechpersonen,
@@ -239,7 +264,7 @@ css/app.css          Schrift, Farben, Zustände, der gemeinsame Rahmen.
 js/logo.js           die einzige Logoquelle
 js/config.js         Supabase-URL und anon key
 js/app.js            Client, Session, Datumsformate, Sheets, Kontozeile
-js/shell.js          die Seitenleiste ab 1024px, die vier Bereiche,
+js/shell.js          die Seitenleiste ab 1024px, die sechs Bereiche,
                      das Test-Banner (ein einziger Schalter)
 js/start.js          die Startseite mit der Bereichsauswahl
 js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
@@ -260,6 +285,14 @@ js/projekte-bereich.js js/projekt-detail.js js/pendenzen.js
 js/suche.js           die globale Suche
 js/profil.js          Mein Profil: eigene Kontaktdaten, Unterschrift
                       auf einem Canvas erfassen und zuschneiden
+js/chat.js            der Chat: Liste, Gespräch, Echtzeit, Gruppen
+js/push.js            Benachrichtigungen, ohne Bezug zu einem Bereich
+css/chat.css          die zwei Spalten des Chats
+api/push.js           verschickt eine Meldung an die anderen Mitglieder
+api/_webpush.js       Web Push von Hand: Verschlüsselung nach RFC 8291,
+                      VAPID nach RFC 8292. Der Unterstrich haelt die
+                      Datei aus dem Routing von Vercel heraus
+api/chat-aufraeumen.js  taeglicher Cron: abgelaufene Bilder loeschen
 css/projekte.css      Statusmarken und Karten des Bereichs Projekte.
                       Liegt auch auf mitarbeiter.html, wegen der Marke
                       für die Berechtigungsstufe
@@ -290,7 +323,7 @@ um dieses Polster aus dem Bild.
 ## Datenbank
 
 Supabase-Projekt `baujournal-triga`, Region `eu-central-1`. Eine Datenbank für
-alle vier Bereiche.
+alle sechs Bereiche.
 
 - `projekte` — Stammdaten, `kontrollpunkte` und `gebaeude` als JSON-Listen,
   `beschrieb`, `status` (planung / laufend / abgeschlossen) und `archiviert`.
@@ -329,6 +362,14 @@ alle vier Bereiche.
   JSON-Liste im Feld `bkp_codes`
 - `ansprechpersonen`, `notizen` — Unterdetails einer Firma. Eine Notiz darf ein
   `projekt_id` tragen; ohne gilt sie allgemein für die Firma
+- `chats`, `chat_mitglieder`, `nachrichten` — der Chat. Ein Bild liegt im Bucket
+  `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
+  `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
+  `bild_ablauf` bleibt stehen — daran erkennt die App den Unterschied
+  zwischen «war nie ein Bild» und «Bild ist weg»
+- `push_geraete` — ein Abo je Gerät und Browser. Bewusst ohne Bezug zu einem
+  Bereich: wenn später eine zugewiesene Pendenz melden soll, braucht es hier
+  keine Zeile mehr
 
 Auf allen Tabellen ist Row Level Security aktiv, jede Policy verlangt die
 Rolle `authenticated`. Ohne Login liefert jede Abfrage leer zurück. Alle
@@ -418,6 +459,55 @@ zugeordnet, siehe `js/store.js`.
 den Client, der Schutz kommt von RLS. Der `service_role` key darf nie ins Repo,
 der umgeht RLS vollständig.
 
+## Chat und Benachrichtigungen
+
+**Wer mitreden darf, steht an genau einem Ort:** `chat_mitglieder`. Daran hängt
+alles — welche Gespräche jemand sieht (`ist_chat_mitglied()` in jeder Policy),
+welche Nachrichten er liest, und sogar der Zugriff auf die Bilder: sie liegen
+unter der Gesprächs-ID als erstem Ordner, und die Storage-Policy fragt dieselbe
+Funktion. Wer aus einer Gruppe fliegt, verliert damit auch die Bilder daraus,
+ohne dass irgendwo ein zweiter Schalter umgelegt werden müsste.
+
+**Der Ungelesen-Zähler steht nirgends als Zahl.** Er ist die Anzahl Nachrichten
+nach `chat_mitglieder.zuletzt_gelesen`. Eine gepflegte Zahl daneben würde beim
+ersten verlorenen Update abweichen, und niemand merkte es.
+
+**Echtzeit** läuft über die Postgres-Publikation `supabase_realtime`, auf der
+`nachrichten` und `chat_mitglieder` liegen. Zwei Kanäle mit verschiedenen
+Aufgaben: einer für das offene Gespräch, einer für die Liste. Der zweite bleibt
+bestehen, während man von Chat zu Chat springt — sonst verpasste man neue
+Nachrichten in allen anderen Gesprächen.
+
+**Push-Benachrichtigungen** sind eine eigenständige Grundlage, nicht Teil des
+Chats. `js/push.js` kennt vier Funktionen — fragen, anmelden, abmelden, senden —
+und keine davon weiss, was ein Chat ist. Beim ersten Öffnen des Chats wird
+einmal gefragt, mit Begründung; wer ablehnt, wird nicht wieder gefragt und
+merkt sonst nichts.
+
+Der Versand steckt in `api/push.js`, weil zwei Dinge nicht in einen Browser
+gehören: der private VAPID-Schlüssel und die Abos anderer Leute. Die Funktion
+nimmt das Zugangs-Token der sendenden Person und fragt damit **selbst** bei
+Supabase nach den Mitgliedern — steht die Person nicht drin, liefert RLS eine
+leere Liste und es passiert nichts. Erst danach kommt der Dienstschlüssel zum
+Zug, und nur für die so ermittelten Geräte.
+
+`api/_webpush.js` macht die Kryptografie von Hand: Verschlüsselung nach
+RFC 8291, VAPID-Token nach RFC 8292, beides mit der WebCrypto-Schnittstelle von
+Node. Es gäbe dafür ein fertiges npm-Paket, aber dieses Repo kommt seit jeher
+ohne Build-Schritt und ohne Abhängigkeiten aus. Beide RFC bringen Testvektoren
+mit, und die Prüfung rechnet das Beispiel aus RFC 8291 nach und vergleicht
+Byte für Byte — das ist mehr Sicherheit, als ein Paket-Update je gäbe.
+
+Die drei Umgebungsvariablen dazu stehen weiter unten unter
+[Umgebungsvariablen](#umgebungsvariablen), zusammen mit der von search.ch —
+eine Liste, ein Ort.
+
+**Der 30-Tage-Ablauf** hängt an einem Cron-Eintrag in `vercel.json`, der täglich
+`api/chat-aufraeumen` ruft. Erst die Datei, dann die Zeile — in dieser
+Reihenfolge, weil der umgekehrte Weg im Fehlerfall eine Datei zurückliesse, die
+niemand mehr findet. So bleibt beim Abbruch höchstens ein Eintrag stehen, den
+der nächste Lauf erneut aufgreift.
+
 ## Logo
 
 Es gibt genau eine Logoquelle: `assets/triga-logo.png`, die vollständige
@@ -461,11 +551,18 @@ ein Rest stehen bleibt.
 
 ## Umgebungsvariablen
 
-Eine einzige, und die ist optional:
+Vier, alle in den Projekteinstellungen von Vercel und keine davon im Repo:
 
 | Name | Wofür |
 |---|---|
-| `SEARCH_CH_API_KEY` | Schlüssel für die Tel-API von search.ch. Wird in den Projekteinstellungen von Vercel gesetzt, nicht im Repo. |
+| `SEARCH_CH_API_KEY` | Schlüssel für die Tel-API von search.ch |
+| `VAPID_PRIVAT` | signiert Push-Benachrichtigungen. Gegenstück zu `BJ_CONFIG.vapid` im Client |
+| `VAPID_ABSENDER` | `mailto:`-Adresse, die der Push-Dienst im Störungsfall anschreibt |
+| `SUPABASE_SERVICE_KEY` | liest die Push-Abos der anderen und räumt abgelaufene Chat-Bilder weg |
+
+Jede fehlende Variable schaltet genau ihren Teil ab und sonst nichts: ohne
+VAPID kommen keine Benachrichtigungen, der Chat läuft weiter; ohne
+Dienstschlüssel bleiben abgelaufene Bilder liegen, bis er da ist.
 
 Der Schlüssel bleibt in `api/search-ch.js` und erreicht den Browser nie. Ist
 er nicht gesetzt, antwortet die Function mit einem Hinweis, und der
