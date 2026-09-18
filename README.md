@@ -301,7 +301,9 @@ genehmigen, und was sonst noch dazukommt. Wer das abfragt, ruft `istBerechtigt()
 aus `js/app.js` auf und schreibt nirgends `berechtigung === 'geschaeftsleitung'`
 hin. Stünde die Regel an jedem Knopf einzeln, hätte irgendein Bildschirm die
 dritte Stufe früher oder später vergessen. Die Namen der Stufen stehen daneben
-in `STUFEN`, damit «Mitarbeiter» nicht an fünf Orten getippt wird.
+in `STUFEN`. Gespeicherter Wert und Bildschirmtext sind nicht dasselbe: in der
+Tabelle steht `mitarbeiter`, angezeigt wird «Mitarbeiter:in». Wer den Text
+ändert, ändert `STUFEN` und sonst nichts — die Datenbank bleibt, wo sie ist.
 
 Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
 `ordner`, `dateien`, `bkp_liste` und `firmen` tragen `geloescht_am` und

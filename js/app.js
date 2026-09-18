@@ -112,9 +112,12 @@ async function abmelden() {
    mit mitarbeiter.rolle — das ist die Funktion im Betrieb ("Bauleiter",
    "Administration"). Hier geht es darum, wer was darf.
    Die Stufe steht hier und nicht im Bereich Mitarbeiter, weil sie künftig
-   überall gebraucht wird: Beiträge im Feed löschen, Formulare genehmigen. */
+   überall gebraucht wird: Beiträge im Feed löschen, Formulare genehmigen.
+   Links steht der gespeicherte Wert, rechts der Text auf dem Bildschirm.
+   Die beiden müssen nicht gleich heissen — "Mitarbeiter:in" gehört in die
+   Anzeige, in der Tabelle steht weiter der schlichte Wert. */
 const STUFEN = {
-  mitarbeiter: 'Mitarbeiter',
+  mitarbeiter: 'Mitarbeiter:in',
   geschaeftsleitung: 'Geschäftsleitung',
   entwickler: 'Entwickler'
 };
