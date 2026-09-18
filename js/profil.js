@@ -26,7 +26,7 @@
           <span class="name" style="display:block;">${esc(ich.name)}</span>
           <span class="rolle" style="display:block;">${esc(ich.rolle || 'Keine Funktion erfasst')}</span>
         </span>
-        <span class="pj-marke klein stufe">${esc(stufeTitel(ich.berechtigung))}</span>
+        <span class="pj-marke klein stufe">${esc(badgeTitel(ich))}</span>
       </div>
 
       <div class="pr-karte">
@@ -307,7 +307,7 @@
 
     const s = await session();
     const { data, error } = await sb.from('mitarbeiter')
-      .select('id, user_id, name, rolle, telefon, email, berechtigung, unterschrift, unterschrift_am')
+      .select('id, user_id, name, rolle, telefon, email, berechtigung, badge_label, unterschrift, unterschrift_am')
       .eq('user_id', s.user.id)
       .is('geloescht_am', null)
       .maybeSingle();

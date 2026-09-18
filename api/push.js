@@ -48,6 +48,21 @@ const ANON = process.env.SUPABASE_ANON_KEY
 const OEFFENTLICH = () => process.env.VAPID_OEFFENTLICH
   || 'BJwToTRmPJy97puyQD3cquX3Q78mIA7r8Z_g64YfJkuVLkeTP4jjE6BNGB2w5dmxitcfyVo67xNWpw6GujHGjFw';
 
+/* Welche Rolle trägt der Dienstschlüssel? Der Unterschied entscheidet
+   hier alles: nur service_role sieht die Geräte anderer Leute. Steht in
+   der Umgebungsvariablen versehentlich der anon key, greift auf
+   push_geraete die Zeilensicherheit — und die liefert dann keine
+   Fehlermeldung, sondern eine leere Liste. Von aussen sieht das aus, als
+   hätte schlicht niemand ein Gerät angemeldet. */
+function rolleVon(schluessel) {
+  if (/^sb_secret_/.test(String(schluessel))) return 'service_role';
+  const teile = String(schluessel).split('.');
+  if (teile.length !== 3) return 'unbekannt';
+  try {
+    return JSON.parse(Buffer.from(teile[1], 'base64url').toString()).role || 'unbekannt';
+  } catch { return 'unbekannt'; }
+}
+
 /* Aus dem Token nur die Kennung herauslesen. Geprüft wird das Token nicht
    hier, sondern von Supabase beim nächsten Aufruf — wenn es nicht stimmt,
    kommt die Mitgliederliste leer zurück und wir senden nichts. */
@@ -84,6 +99,14 @@ module.exports = async (req, res) => {
   if (!privat || !dienst) {
     console.error(`[push] Abbruch: es fehlt ${!privat ? 'VAPID_PRIVAT' : ''}${!privat && !dienst ? ' und ' : ''}${!dienst ? 'SUPABASE_SERVICE_KEY' : ''} in dieser Bereitstellung.`);
     return res.status(503).json({ fehler: 'Für Benachrichtigungen fehlen noch die Schlüssel.' });
+  }
+
+  /* Einmal pro Aufruf laut nachsehen, womit wir gleich bei Supabase
+     anklopfen. Das kostet nichts und erspart die Sucherei, die es schon
+     einmal gekostet hat. */
+  const rolle = rolleVon(dienst);
+  if (rolle !== 'service_role') {
+    console.error(`[push] SUPABASE_SERVICE_KEY trägt die Rolle "${rolle}" statt "service_role". Damit greift auf push_geraete die Zeilensicherheit, und die Geräte der anderen bleiben unsichtbar — es kommt keine Meldung an, ohne dass ein Fehler entsteht.`);
   }
 
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
@@ -132,7 +155,10 @@ module.exports = async (req, res) => {
     return res.status(502).json({ fehler: 'Die Geräte liessen sich nicht laden.' });
   }
   if (!Array.isArray(geraete.daten) || !geraete.daten.length) {
-    console.log(`[push] ${chat}: von den ${ziele.length} anderen hat niemand ein Gerät angemeldet.`);
+    console.log(`[push] ${chat}: keine Geräte für ${ziele.join(', ')} gefunden (Schlüsselrolle ${rolle}).`);
+    if (rolle !== 'service_role') {
+      console.error('[push] Das ist vermutlich kein leeres Ergebnis, sondern die Zeilensicherheit: mit einem Schlüssel ohne service_role sieht diese Funktion nur die eigenen Geräte.');
+    }
     return res.status(200).json({ gesendet: 0 });
   }
 

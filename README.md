@@ -261,6 +261,20 @@ Wer eine neue Kopfzeile baut, gibt ihr `padding-top:env(safe-area-inset-top)`
 und lässt ihren Hintergrund bis `top:0` laufen; ein Abstand *über* der Leiste
 löst das Problem nicht, er verschiebt es nur.
 
+**Und die Kopfzeile allein genügt auf dem iPad trotzdem nicht.** `body` hat bis
+1024px eine Höchstbreite von 430px und steht mittig — auf dem Handy ist das die
+ganze Breite, auf einem iPad im Hochformat (744 bis 834px) nicht. Links und
+rechts davon liegt der Seitenhintergrund, und ausgerechnet dort steht die Uhr:
+am rechten Rand, weit ausserhalb der Spalte. Die Kopfzeile kann diese Stelle
+nicht abdecken, sie ist ja selbst nur so breit wie die Spalte. Deshalb legt
+jede Kopfzeile über `::before` einen Streifen über die **ganze** Fensterbreite,
+in ihrer eigenen Farbe (`background-color:inherit`, damit navy navy bleibt und
+weiss weiss). Am hellen Streifen unter der Uhr auf dem Baujournal-Screen liess
+sich das gut sehen, auf den weissen Kopfzeilen kaum — der Fehler war derselbe.
+Geprüft wird das nicht mehr am Aufbau der Seite, sondern am Bild: die Testreihe
+`safearea-ipad.mjs` fotografiert die oberste Zeile in acht iPad-Grössen auf
+jeder Seite der App und liest die Pixel.
+
 ## Aufbau
 
 ```
@@ -446,6 +460,18 @@ in `STUFEN`. Gespeicherter Wert und Bildschirmtext sind nicht dasselbe: in der
 Tabelle steht `mitarbeiter`, angezeigt wird «Mitarbeiter:in». Wer den Text
 ändert, ändert `STUFEN` und sonst nichts — die Datenbank bleibt, wo sie ist.
 
+**Das Abzeichen kann etwas anderes sagen als die Stufe.** `badge_label` ist ein
+optionaler Text pro Person; steht er da, zeigt ihn das Abzeichen statt des
+Stufennamens (`badgeTitel()` in `js/app.js`). An den Rechten ändert das nichts,
+die hängen weiter allein an `berechtigung`. Der Anlass war die Administration:
+sie braucht die Rechte der Geschäftsleitung, gehört ihr aber nicht an, und ein
+Abzeichen «Geschäftsleitung» neben der Funktion «Administration» behauptet
+etwas Falsches über die Person. Eine vierte Stufe wäre die schlechtere Antwort
+gewesen — zwei Stufen mit exakt denselben Rechten driften früher oder später
+auseinander. Pflegen darf den Text, wer auch die Stufe vergibt; dafür brauchte
+es keine neue Regel, weil `mitarbeiter_schutz()` eine Liste des Erlaubten führt
+und eine neue Spalte damit von sich aus geschützt ist.
+
 Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
 `ordner`, `dateien`, `bkp_liste` und `firmen` tragen `geloescht_am` und
 `geloescht_von` und haben schlicht keine Delete-Policy: ein DELETE über die
@@ -543,6 +569,23 @@ Zugangs-Token ist keiner, und das Tor vor der Datenbank weist eine Anfrage mit
 einem solchen `apikey` ab. Genau das stand hier einmal in beiden Köpfen, mit
 der Folge, dass `api/push.js` „kein Zugriff auf dieses Gespräch" meldete,
 obwohl die Person das Gespräch gerade eben beschrieben hatte.
+
+**Der Dienstschlüssel muss wirklich der Dienstschlüssel sein.** Nur die Rolle
+`service_role` sieht die Geräte *anderer* Leute; jeder andere Schlüssel liest
+`push_geraete` unter der Zeilensicherheit und bekommt dann keine Fehlermeldung,
+sondern eine **leere Liste**. Von aussen sieht das aus, als hätte niemand ein
+Gerät angemeldet — obwohl die Zeilen da sind. `api/push.js` liest deshalb bei
+jedem Aufruf die Rolle aus dem Schlüssel und schreibt es ins Log, wenn sie nicht
+stimmt.
+
+**Die Anmeldung eines Geräts sagt, wenn sie scheitert.** `pushAnmelden()` in
+`js/push.js` hat früher jeden Fehler verschluckt und `false` zurückgegeben:
+kein Abo beim Dienst, keine Sitzung, ein abgelehnter Schreibversuch — alles sah
+gleich aus, nämlich nach nichts. Wer gerade auf «erlauben» getippt hatte,
+glaubte, es sei eingerichtet. Jetzt nennt jeder Schritt seinen Grund, in der
+Konsole immer und auf dem Bildschirm dann, wenn die Person es selbst ausgelöst
+hat. Ein bestehendes Abo wird dabei weiterverwendet, und eines, das noch auf
+einen alten VAPID-Schlüssel lautet, vorher weggeräumt.
 
 **Jede Absage schreibt eine Zeile ins Log.** Eine Funktion, die 403 antwortet
 und sonst schweigt, sieht in den Vercel-Logs aus wie eine, die gar nicht erst

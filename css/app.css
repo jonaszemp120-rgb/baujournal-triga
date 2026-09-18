@@ -262,6 +262,33 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
 
 @media (max-width:1023px){
   .nur-desktop{ display:none !important; }
+
+  /* Der Streifen unter der Uhr.
+     Bis 1024px ist die App eine Spalte von höchstens 430px in der Mitte
+     des Fensters — auf dem Handy ist das die ganze Breite, auf dem iPad
+     nicht. Links und rechts davon liegt der Seitenhintergrund, und oben
+     sieht man das ausgerechnet dort, wo die Uhr steht: am rechten Rand,
+     weit ausserhalb der Spalte. Die Kopfzeile kann das nicht abdecken,
+     sie ist ja selbst nur so breit wie die Spalte. Also legt sie einen
+     Streifen über die ganze Fensterbreite, in ihrer eigenen Farbe.
+
+     background-color:inherit statt einer festen Farbe: so stimmt der
+     Streifen von selbst, egal ob die Kopfzeile navy oder weiss ist, und
+     bleibt richtig, wenn sich eine Farbe später ändert. Ist der
+     Sicherheitsbereich 0 — jeder Rechner, jedes Android —, ist der
+     Streifen 0 hoch und damit gar nicht da. */
+  .topbar::before,
+  .br-kopf::before,
+  .ch-kopf::before,
+  .st-gruss::before,
+  body.dark::before{
+    content:'';
+    position:fixed; top:0; left:0; right:0;
+    height:env(safe-area-inset-top);
+    background-color:inherit;
+    z-index:30;
+    pointer-events:none;
+  }
 }
 
 /* Kopfzeile eines Bereichs auf dem Handy: Zurück, Titel, rechts die

@@ -10,6 +10,12 @@
  *
  * Ohne Erlaubnis läuft alles weiter, nur eben still. Keine Funktion hier
  * wirft; wer sie ruft, soll sich nicht darum kümmern müssen.
+ *
+ * Still heisst aber nicht heimlich. Wer gerade auf "erlauben" getippt
+ * hat und danach nichts sieht, glaubt, es sei eingerichtet — und wundert
+ * sich tagelang über ausbleibende Meldungen. Jeder Schritt, der schief
+ * gehen kann, sagt deshalb warum: in der Konsole immer, und auf dem
+ * Bildschirm dann, wenn die Person es selbst ausgelöst hat.
  */
 
 const PUSH_GEFRAGT = 'bj_push_gefragt';
@@ -50,42 +56,95 @@ async function pushFragen({ grund, knopf = 'Benachrichtigungen erlauben' } = {})
   if (!ja) return false;
 
   let erlaubnis = 'default';
-  try { erlaubnis = await Notification.requestPermission(); } catch { return false; }
-  if (erlaubnis !== 'granted') return false;
-  return pushAnmelden();
+  try {
+    erlaubnis = await Notification.requestPermission();
+  } catch (e) {
+    console.warn('Benachrichtigungen: die Nachfrage des Browsers scheiterte', e.message);
+    toast('Benachrichtigungen liessen sich nicht einschalten: der Browser hat die Nachfrage abgelehnt', true);
+    return false;
+  }
+  if (erlaubnis !== 'granted') {
+    console.info('Benachrichtigungen: keine Erlaubnis erteilt.');
+    return false;
+  }
+  // Ab hier hat die Person aktiv zugestimmt und wartet auf ein Ergebnis.
+  return pushAnmelden({ laut: true });
 }
 
 /* Meldet dieses Gerät an und legt das Abo in push_geraete ab. Ist es schon
    angemeldet, wird nur der Zeitstempel aufgefrischt — der Endpunkt ist in
    der Tabelle eindeutig, ein zweiter Eintrag zum selben Gerät kann also
-   gar nicht entstehen. */
-async function pushAnmelden() {
-  if (!pushMoeglich() || Notification.permission !== 'granted') return false;
-  if (!istOnline()) return false;
+   gar nicht entstehen.
 
+   laut: true heisst, die Person hat gerade selbst zugestimmt und wartet
+   auf ein Ergebnis. Dann gehört ein Fehlschlag auf den Bildschirm. Beim
+   stillen Auffrischen bei jedem Öffnen reicht die Konsole. */
+async function pushAnmelden({ laut = false } = {}) {
+  const scheitert = (grund, zusatz = '') => {
+    console.warn(`Benachrichtigungen nicht eingerichtet: ${grund}`, zusatz);
+    if (laut) toast(`Benachrichtigungen liessen sich nicht einschalten: ${grund}`, true);
+    return false;
+  };
+
+  if (!pushMoeglich()) return scheitert('dieser Browser kann das nicht');
+  if (Notification.permission !== 'granted') return scheitert('die Erlaubnis fehlt');
+  if (!istOnline()) return scheitert('dafür braucht es eine Verbindung');
+
+  let abo;
   try {
     const reg = await navigator.serviceWorker.ready;
-    const abo = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: vapidBytes(BJ_CONFIG.vapid)
-    });
+    const schluessel = vapidBytes(BJ_CONFIG.vapid);
 
-    const j = abo.toJSON();
-    const s = await session();
-    if (!s) return false;
-
-    const { error } = await sb.from('push_geraete').upsert({
-      user_id: s.user.id,
-      endpunkt: j.endpoint,
-      p256dh: j.keys.p256dh,
-      auth: j.keys.auth,
-      zuletzt_gesehen: new Date().toISOString()
-    }, { onConflict: 'endpunkt' });
-
-    return !error;
-  } catch {
-    return false;
+    /* Ein bestehendes Abo weiterverwenden statt blind ein neues zu
+       verlangen: Safari lehnt ein zweites subscribe() ab, solange eines
+       besteht. Passt der Schlüssel nicht mehr zu dem, mit dem es einmal
+       ausgestellt wurde, ist es wertlos — dann weg damit und neu. */
+    abo = await reg.pushManager.getSubscription();
+    if (abo && !gleicherSchluessel(abo.options?.applicationServerKey, schluessel)) {
+      await abo.unsubscribe().catch(() => {});
+      abo = null;
+    }
+    if (!abo) {
+      abo = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: schluessel
+      });
+    }
+  } catch (e) {
+    return scheitert('das Gerät liess sich beim Dienst nicht anmelden', `${e.name}: ${e.message}`);
   }
+
+  const j = abo.toJSON();
+  if (!j?.endpoint || !j.keys?.p256dh || !j.keys?.auth) {
+    return scheitert('der Dienst hat ein unvollständiges Abo geliefert', JSON.stringify(j));
+  }
+
+  const s = await session();
+  if (!s) return scheitert('niemand ist angemeldet');
+
+  const { error } = await sb.from('push_geraete').upsert({
+    user_id: s.user.id,
+    endpunkt: j.endpoint,
+    p256dh: j.keys.p256dh,
+    auth: j.keys.auth,
+    zuletzt_gesehen: new Date().toISOString()
+  }, { onConflict: 'endpunkt' });
+
+  if (error) {
+    return scheitert('das Gerät liess sich nicht eintragen',
+                     `${error.code || ''} ${error.message || ''}`.trim());
+  }
+
+  console.info('Benachrichtigungen: dieses Gerät ist angemeldet.');
+  return true;
+}
+
+/* Zwei Schlüssel vergleichen, einmal als ArrayBuffer vom Browser und
+   einmal als eigene Bytes. */
+function gleicherSchluessel(vomBrowser, eigene) {
+  if (!vomBrowser) return false;
+  const a = new Uint8Array(vomBrowser);
+  return a.length === eigene.length && a.every((z, i) => z === eigene[i]);
 }
 
 /* Meldet dieses Gerät wieder ab. Beides zusammen: Abo im Browser aufheben
@@ -97,9 +156,12 @@ async function pushAbmelden() {
     const reg = await navigator.serviceWorker.ready;
     const abo = await reg.pushManager.getSubscription();
     if (!abo) return;
-    await sb.from('push_geraete').delete().eq('endpunkt', abo.endpoint);
+    const { error } = await sb.from('push_geraete').delete().eq('endpunkt', abo.endpoint);
+    if (error) console.warn('Benachrichtigungen: die Zeile blieb stehen', error.message);
     await abo.unsubscribe();
-  } catch { /* nicht schlimm */ }
+  } catch (e) {
+    console.warn('Benachrichtigungen: das Abmelden scheiterte', e.message);
+  }
 }
 
 /* Schickt eine Meldung an die anderen Mitglieder eines Gesprächs.

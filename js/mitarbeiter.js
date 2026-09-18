@@ -32,7 +32,7 @@
   /* Bewusst keine Sternchen-Abfrage: die Unterschrift aus Mein Profil hängt
      an derselben Zeile und ist ein Bild. Die gehört weder in eine Liste
      noch in den Spiegel im localStorage. */
-  const SPALTEN = 'id, user_id, name, rolle, telefon, email, berechtigung, erstellt_am';
+  const SPALTEN = 'id, user_id, name, rolle, telefon, email, berechtigung, badge_label, erstellt_am';
 
   async function ladeMitarbeiter() {
     if (!navigator.onLine) return lies(MA_CACHE, []);
@@ -84,11 +84,11 @@
 
   /* Die Berechtigungsstufe. Namen und Regel stehen in js/app.js, weil sie
      künftig überall gebraucht werden und nicht nur hier.
-     Die Stufe ist vorerst reine Anzeige: sie blendet nichts ein oder aus
-     und lässt sich in der App nirgends ändern, das macht Jonas direkt in
-     der Supabase-Tabelle. */
+     Die Stufe selbst vergibt Jonas in der Supabase-Tabelle. Änderbar ist
+     hier nur, was auf dem Abzeichen steht — badgeTitel() nimmt diesen
+     Text, wenn einer da ist, und sonst den Namen der Stufe. */
   const stufeMarke = m =>
-    `<span class="pj-marke klein stufe">${esc(stufeTitel(m.berechtigung))}</span>`;
+    `<span class="pj-marke klein stufe">${esc(badgeTitel(m))}</span>`;
 
   /* --- Liste -------------------------------------------------------------- */
 
@@ -186,6 +186,11 @@
           ${feld('f-rolle', 'Funktion', m.rolle, 'text', 'z.B. Bauleiter')}
           ${feld('f-telefon', 'Telefon', m.telefon, 'tel', '079 000 00 00')}
           ${feld('f-email', 'E-Mail', m.email, 'email', 'vorname.name@triga.ch')}
+          ${feld('f-badge', 'Abzeichen (freilassen für die Stufe)', m.badge_label, 'text', stufeTitel(m.berechtigung))}
+          <div style="font-size:12px; color:var(--text-dim); line-height:1.5; margin-top:-6px;">
+            Steht hier ein Text, zeigt das Abzeichen ihn statt
+            „${esc(stufeTitel(m.berechtigung))}". An den Rechten ändert das nichts.
+          </div>
           <div id="f-fehler" hidden style="font-size:12.5px; color:var(--red); font-weight:600;"></div>
           <div style="display:flex; gap:10px; margin-top:4px;">
             <button type="button" id="f-speichern" class="btn-primary pressable" style="flex:1; height:48px; border:none; border-radius:12px; background:var(--red); color:#fff; font-weight:700; font-size:15px;">Speichern</button>
@@ -262,12 +267,20 @@
           name: $('#f-name', wurzel).value.trim(),
           rolle: $('#f-rolle', wurzel).value.trim() || null,
           telefon: $('#f-telefon', wurzel).value.trim() || null,
-          email: $('#f-email', wurzel).value.trim() || null
+          email: $('#f-email', wurzel).value.trim() || null,
+          badge_label: $('#f-badge', wurzel).value.trim() || null
         };
         if (!felder.name) {
           fehler.textContent = 'Ohne Namen geht es nicht.';
           fehler.hidden = false;
           $('#f-name', wurzel).focus();
+          return;
+        }
+        // Dieselbe Grenze wie in der Datenbank, nur freundlicher gesagt.
+        if (felder.badge_label && felder.badge_label.length > 24) {
+          fehler.textContent = 'Das Abzeichen fasst höchstens 24 Zeichen.';
+          fehler.hidden = false;
+          $('#f-badge', wurzel).focus();
           return;
         }
         const btn = $('#f-speichern', wurzel);

@@ -125,6 +125,20 @@ const STUFE_STANDARD = 'mitarbeiter';
 
 function stufeTitel(wert) { return STUFEN[wert] || STUFEN[STUFE_STANDARD]; }
 
+/* Was auf dem Abzeichen steht. Normalerweise der Name der Stufe; steht
+   in badge_label etwas, gilt das stattdessen.
+   Das ist reine Anzeige und ändert an den Rechten nichts. Es gibt dafür
+   einen handfesten Grund: die Administration braucht dieselben Rechte
+   wie die Geschäftsleitung, gehört ihr aber nicht an. Ein Abzeichen
+   "Geschäftsleitung" neben der Funktion "Administration" behauptet dann
+   etwas, das nicht stimmt. Eine vierte Stufe mit denselben Rechten wäre
+   die schlechtere Antwort: zwei Stufen, die dasselbe dürfen, driften
+   früher oder später auseinander. */
+function badgeTitel(m) {
+  const eigen = String(m?.badge_label || '').trim();
+  return eigen || stufeTitel(m?.berechtigung);
+}
+
 /* Wer mehr darf als erfassen: Beiträge anderer löschen, Anträge genehmigen.
    Entwickler steht der Geschäftsleitung dabei gleich.
    Diese eine Stelle entscheidet das. Stünde an jedem Knopf einzeln
