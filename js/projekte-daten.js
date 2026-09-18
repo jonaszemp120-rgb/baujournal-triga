@@ -160,6 +160,107 @@ const PJ = (() => {
     if (error) throw error;
   }
 
+  /* --- Pendenzen ----------------------------------------------------------- */
+
+  /* Offene Punkte eines Projekts. Offene zuerst, innerhalb der beiden
+     Gruppen nach Erfassung sortiert. Ob eine Pendenz erledigt ist, steht
+     in genau einem Feld: erledigt_am. */
+  async function pendenzen(projektId) {
+    if (!istOnline()) return [];
+    const { data, error } = await sb.from('pendenzen')
+      .select('id, beschrieb, firma_id, erledigt_am, erledigt_von, erstellt_am, firmen(id, name)')
+      .eq('projekt_id', projektId)
+      .order('erstellt_am', { ascending: true });
+    if (meckern('Pendenzen laden', error)) return [];
+    const alle = data || [];
+    return [...alle.filter(p => !p.erledigt_am), ...alle.filter(p => p.erledigt_am)];
+  }
+
+  const offeneZahl = liste => liste.filter(p => !p.erledigt_am).length;
+
+  async function pendenzHaken(p, erledigt) {
+    if (!istOnline()) throw new Error('Pendenzen lassen sich nur online ändern');
+    const s = erledigt ? await session() : null;
+    const { error } = await sb.from('pendenzen').update({
+      erledigt_am: erledigt ? new Date().toISOString() : null,
+      erledigt_von: erledigt ? s.user.id : null
+    }).eq('id', p.id);
+    if (error) throw error;
+  }
+
+  /* Der Dialog aus der Design-Referenz: Beschrieb und optional eine
+     Firma. Kein Fälligkeitsdatum, keine Priorität, keine Zuweisung an
+     eine Person — das ist bewusst so, siehe Schritt 10.
+     firmen ist die Unternehmerliste des Projekts, nicht der ganze Pool:
+     zuständig ist, wer auf diesem Projekt arbeitet. */
+  function pendenzFormular({ projektId, firmen = [], vorhanden = null }) {
+    return new Promise(fertig => {
+      const s = sheet(`
+        <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:18px;">${vorhanden ? 'Pendenz bearbeiten' : 'Pendenz erfassen'}</div>
+
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;">
+          <label for="pd-text" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Beschrieb</label>
+          <textarea id="pd-text" rows="3" placeholder="z.B. Fassadengerüst Haus Flora abbauen"
+                    style="border-radius:10px; border:1.5px solid var(--border); padding:11px 13px; font-size:14px; color:var(--text); box-sizing:border-box; resize:vertical;">${esc(vorhanden?.beschrieb || '')}</textarea>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:18px;">
+          <label for="pd-firma" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Zuständige Firma (optional)</label>
+          <select id="pd-firma" style="height:44px; border-radius:10px; border:1.5px solid var(--border); background:var(--card); color:var(--text); font-size:14px; padding:0 10px; box-sizing:border-box;">
+            <option value="">Keine Firma ausgewählt</option>
+            ${firmen.map(f => `<option value="${esc(f.id)}"${f.id === vorhanden?.firma_id ? ' selected' : ''}>${esc(f.name)}</option>`).join('')}
+          </select>
+          ${firmen.length ? '' : '<span style="font-size:11.5px; color:var(--text-dim); line-height:1.5;">Auf diesem Projekt ist noch keine Firma eingetragen. Die Pendenz geht auch ohne.</span>'}
+        </div>
+
+        <div id="pd-fehler" hidden style="font-size:12.5px; color:var(--red); font-weight:600; margin-bottom:12px;"></div>
+        <div style="display:flex; gap:10px;">
+          <button type="button" id="pd-ja" class="btn-primary pressable" style="flex:1; height:48px; border:none; border-radius:12px; background:var(--red); color:#fff; font-weight:700; font-size:15px;">${vorhanden ? 'Speichern' : 'Erfassen'}</button>
+          <button type="button" id="pd-nein" class="pressable" style="flex:1; height:48px; border-radius:12px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:15px;">Abbrechen</button>
+        </div>
+      `);
+      s.el.style.maxHeight = '86dvh';
+      s.el.style.overflowY = 'auto';
+      setTimeout(() => $('#pd-text', s.el).focus(), 200);
+
+      $('#pd-nein', s.el).addEventListener('click', () => { s.schliessen(); fertig(null); });
+      $('#pd-ja', s.el).addEventListener('click', async () => {
+        const fehler = $('#pd-fehler', s.el);
+        fehler.hidden = true;
+        const beschrieb = $('#pd-text', s.el).value.trim();
+        if (!beschrieb) {
+          fehler.textContent = 'Ohne Beschrieb geht es nicht.';
+          fehler.hidden = false;
+          $('#pd-text', s.el).focus();
+          return;
+        }
+        const felder = { beschrieb, firma_id: $('#pd-firma', s.el).value || null };
+        const btn = $('#pd-ja', s.el);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spin"></span>';
+        try {
+          if (!istOnline()) throw new Error('Pendenzen lassen sich nur online erfassen');
+          if (vorhanden) {
+            const { error } = await sb.from('pendenzen').update(felder).eq('id', vorhanden.id);
+            if (error) throw error;
+          } else {
+            const sitzung = await session();
+            const { error } = await sb.from('pendenzen')
+              .insert({ ...felder, projekt_id: projektId, erstellt_von: sitzung.user.id });
+            if (error) throw error;
+          }
+          s.schliessen();
+          fertig(true);
+        } catch (e) {
+          fehler.textContent = e.message || 'Speichern hat nicht geklappt.';
+          fehler.hidden = false;
+          btn.disabled = false;
+          btn.textContent = vorhanden ? 'Speichern' : 'Erfassen';
+        }
+      });
+    });
+  }
+
   /* --- Das Stammdaten-Formular -------------------------------------------- */
 
   /* Steht hier und nicht in einer der beiden Seiten, weil es an beiden
@@ -248,6 +349,7 @@ const PJ = (() => {
     statusTitel, einsatzTitel, statusChip, einsatzChip,
     adresse, franken,
     projekte, projekt, einsaetze, einsaetzeDerFirma, personen, ordner,
+    pendenzen, offeneZahl, pendenzHaken, pendenzFormular,
     speichere, loeschen, formular
   };
 })();

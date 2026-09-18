@@ -14,6 +14,11 @@
 .pj-marke.gelb{ background:#fbf1de; color:#7d5a05; }
 .pj-marke.navy{ background:#e4eaf0; color:var(--navy); }
 .pj-marke.grau{ background:var(--bg); color:var(--text-dim); }
+/* Die Berechtigungsstufe bei den Mitarbeitern. Eigener Ton statt .grau:
+   diese Marke steht mal auf der weissen Zeile, mal auf grauem Grund — auf
+   der ausgewählten Zeile und im Kopf der Detailansicht. .grau hat genau
+   die Farbe dieses Grunds und würde dort verschwinden. */
+.pj-marke.stufe{ background:#dde4e8; color:#46545b; }
 
 /* --- Knöpfe -------------------------------------------------------------- */
 
@@ -145,6 +150,60 @@
 .pj-flach > .pj-eintrag:first-child{ border-top:none; }
 .pj-flach > .kopfzeile{ padding-top:12px; }
 
+/* --- Pendenzen ----------------------------------------------------------- */
+
+.pj-pendenz{
+  display:flex; align-items:flex-start; gap:12px;
+  padding:11px 2px; border-bottom:1px solid var(--border);
+}
+.pj-pendenz:last-of-type{ border-bottom:none; }
+.pj-pendenz .haken{
+  width:22px; height:22px; border-radius:6px; border:2px solid var(--border);
+  background:transparent; flex-shrink:0; margin-top:1px;
+  display:flex; align-items:center; justify-content:center; color:#fff; padding:0;
+}
+.pj-pendenz .haken svg{ display:none; }
+.pj-pendenz[data-erledigt="1"] .haken{ background:var(--ok); border-color:var(--ok); }
+.pj-pendenz[data-erledigt="1"] .haken svg{ display:block; }
+.pj-pendenz .was{ flex:1; min-width:0; }
+.pj-pendenz .text{ font-size:13.5px; line-height:1.45; overflow-wrap:anywhere; }
+.pj-pendenz .wer{ display:block; color:var(--text-dim); font-size:11.5px; margin-top:2px; overflow-wrap:anywhere; }
+/* Erledigtes verschwindet nicht, es tritt zurück. */
+.pj-pendenz[data-erledigt="1"] .text{ text-decoration:line-through; color:var(--text-dim); }
+.pj-pendenz[data-erledigt="1"] .wer{ text-decoration:line-through; }
+.pj-pendenz .tasten{ display:flex; gap:4px; flex-shrink:0; }
+.pj-pendenz .tasten button{
+  width:28px; height:28px; border-radius:7px; border:none; background:transparent;
+  display:flex; align-items:center; justify-content:center; color:var(--text-dim);
+}
+.pj-pendenz .tasten button.rot{ color:var(--red); }
+.pj-pendenz .tasten button:hover{ background:var(--bg); }
+
+/* Die vollständige Liste als eigene Seite */
+.pj-gruppe{
+  margin:0 0 10px; font-size:11.5px; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--text-dim);
+}
+.pj-gruppe:not(:first-child){ margin-top:24px; }
+.pj-kasten{
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  padding:4px 16px;
+}
+/* Auf dem Handy liegt der Erfassen-Knopf unten fest, wie in der
+   Referenz. Die Safe-Area unten rechnet er ein, sonst sitzt er auf dem
+   Home-Indicator. */
+.pj-fussleiste{
+  position:sticky; bottom:0; z-index:15;
+  background:linear-gradient(to top, var(--bg) 70%, transparent);
+  padding:14px 16px calc(20px + env(safe-area-inset-bottom));
+}
+.pj-fussleiste button{
+  width:100%; height:50px; border:none; border-radius:12px;
+  background:var(--red); color:#fff; font-weight:700; font-size:15px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.pj-fussleiste button:active{ background:var(--red-dark); }
+
 /* --- Breiten ------------------------------------------------------------- */
 
 @media (min-width:1024px){
@@ -164,6 +223,8 @@
   .pj-rechts{ flex:1; min-width:0; padding:24px 32px 40px; }
   .pj-tabelle{ display:block; }
   .pj-unternehmer-handy{ display:none; }
+  /* Auf dem Desktop steht der Erfassen-Knopf oben in der Kopfzeile. */
+  .pj-fussleiste{ display:none; }
 }
 
 @media (max-width:1023px){
@@ -180,7 +241,8 @@
   #unternehmer{ order:2; }
   #journal{ order:3; }
   #personen{ order:4; }
-  #dokumente{ order:5; padding-bottom:24px; }
+  #pendenzen{ order:5; }
+  #dokumente{ order:6; padding-bottom:24px; }
   .pj-block + .pj-block{ margin-top:20px; }
   .pj-flach{ border:none; border-radius:0; }
   .pj-eintrag{ padding-left:2px; padding-right:2px; }

@@ -19,9 +19,17 @@ Person. Konten legt weiterhin nur die Geschäftsleitung im Supabase-Dashboard an
 
 **Projekte** ist die Klammer um alles andere. Ein Projekt führt seine
 Stammdaten, die Unternehmerliste mit Gewerk, Status und Auftragssumme, die
-zuständigen Mitarbeiter mit ihrer Rolle, die letzten Baujournal-Einträge und
-die zugeordneten Dokumentenordner. Die Projektseite zeigt jeden dieser Teile
-als Auszug und verlinkt in den Bereich, der die volle Ansicht hat.
+zuständigen Mitarbeiter mit ihrer Rolle, die offenen Pendenzen, die letzten
+Baujournal-Einträge und die zugeordneten Dokumentenordner. Die Projektseite
+zeigt jeden dieser Teile als Auszug und verlinkt in den Bereich, der die volle
+Ansicht hat.
+
+Die **Pendenzen** sind bewusst vom Baujournal getrennt. Das Journal ist das
+Tagesprotokoll und gehört einem Datum; eine Pendenz bleibt über die Tage offen,
+bis jemand sie abhakt. Pro Punkt gibt es einen Beschrieb und optional eine
+zuständige Firma aus der Unternehmerliste des Projekts — kein Fälligkeitsdatum,
+keine Priorität, keine Zuweisung an eine Person. Erledigte Punkte verschwinden
+nicht, sie stehen durchgestrichen in der vollen Liste.
 
 **Baujournal** ist das Bautagebuch: Projekte, Rundgänge, Checkliste,
 Korrekturprotokoll, Export als PDF und Word. Der Bereich mit dem meisten
@@ -44,7 +52,8 @@ hochladender Person.
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
 | `mitarbeiter.html` | Das Adressbuch des Teams. |
 | `projekte-bereich.html` | Der Bereich Projekte: alle Projekte als Karten, gefiltert nach Status. |
-| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Journal und Dokumenten. |
+| `projekt-detail.html` | Die Projektseite mit Stammdaten, Unternehmerliste, Mitarbeitern, Pendenzen, Journal und Dokumenten. |
+| `pendenzen.html` | Alle Pendenzen eines Projekts, offene und erledigte, `?projekt=`. |
 | `projekte.html` | Übersicht aller Baustellen, mit Suche und Archivfilter. |
 | `projekt-start.html` | Startseite einer Baustelle: neues Baujournal, abgeschlossene Einträge, Papierkorb. |
 | `projekt.html` | Projekt anlegen und bearbeiten. Ohne `?id=` neu, mit `?id=` bestehend. |
@@ -68,6 +77,7 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 | Projekt | `projekte-bereich.html` | dort oder `projekt.html?id=` | archivieren, kein Löschen |
 | Firma auf einem Projekt | `projekt-detail.html` | dort (Gewerk, Status, Summe) | direkt, ohne Papierkorb |
 | Mitarbeiter auf einem Projekt | `projekt-detail.html` | dort (Rolle) | direkt, ohne Papierkorb |
+| Pendenz | `projekt-detail.html` oder `pendenzen.html` | dort | direkt, ohne Papierkorb |
 | Projekt eines Ordners | `dokumente.html` | dort | Feld leeren |
 | Projekt einer Notiz | in der Firma | dort | Auswahl zurücksetzen |
 | Kontrollpunkte eines Projekts | `projekt.html` | dort | dort |
@@ -84,7 +94,7 @@ Sackgasse, in der ein Tippfehler für immer stehen bleibt.
 
 Zwei bewusste Ausnahmen. **Projekte** werden archiviert statt gelöscht, wegen
 der Garantie- und Verjährungsfristen. **Unterdetails** — Ansprechpersonen,
-Notizen und die beiden Projektzuordnungen — hängen an genau einem Datensatz,
+Notizen, Pendenzen und die beiden Projektzuordnungen — hängen an genau einem Datensatz,
 haben keinen Beweischarakter und werden direkt gelöscht; eine falsch entfernte
 Zuordnung ist mit zwei Klicks wieder gesetzt. Die Rückfrage sagt das jeweils
 auch so.
@@ -208,9 +218,11 @@ js/projekte-daten.js  alles, was mehrere Seiten über Projekte wissen
                       Stammdaten-Formular. Hängt an einem globalen
                       Namen (PJ), weil ladeProjekte() im Baujournal
                       schon vergeben ist
-js/projekte-bereich.js js/projekt-detail.js
+js/projekte-bereich.js js/projekt-detail.js js/pendenzen.js
 js/suche.js           die globale Suche
-css/projekte.css      Statusmarken und Karten des Bereichs Projekte
+css/projekte.css      Statusmarken und Karten des Bereichs Projekte.
+                      Liegt auch auf mitarbeiter.html, wegen der Marke
+                      für die Berechtigungsstufe
 api/search-ch.js     Serverless-Function als Proxy zur Tel-API von
                      search.ch, hält den Schlüssel serverseitig
 vendor/              supabase-js, jsPDF, docx, SheetJS, lokal statt
@@ -250,6 +262,10 @@ alle vier Bereiche.
   BKP-Code, `status` (angefragt / offeriert / beauftragt / ausgeführt) und die
   optionale `auftragssumme`
 - `projekt_mitarbeiter` — wer auf einem Projekt zuständig ist, mit `rolle`
+- `pendenzen` — offene Punkte eines Projekts: `beschrieb`, optional `firma_id`,
+  `erledigt_am` und `erledigt_von`. Ob eine Pendenz erledigt ist, steht in genau
+  einem Feld, `erledigt_am` — dasselbe Muster wie `geloescht_am`. Eine zweite
+  Status-Spalte daneben wäre eine zweite Wahrheit
 - `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
   Punkteliste, `betrifft_gebaeude` als JSON-Liste, `geloescht_am` und
   `geloescht_von` für den Papierkorb
@@ -257,7 +273,10 @@ alle vier Bereiche.
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
 - `mitarbeiter` — das Adressbuch des Teams, bewusst getrennt von den
-  Login-Konten. Einen Eintrag zu löschen berührt kein Konto
+  Login-Konten. Einen Eintrag zu löschen berührt kein Konto. `berechtigung`
+  hält die Stufe (`mitarbeitend` oder `geschaeftsleitung`) und heisst absichtlich
+  nicht `rolle`: die Spalte `rolle` trägt schon die Funktion im Betrieb
+  («Bauleiter», «Administration»)
 - `ordner`, `dateien` — die Dokumentenablage, die PDF selbst liegt im
   Storage-Bucket `dokumente`. Ein Ordner darf ein `projekt_id` tragen, die
   Dateien darin erben die Zuordnung über ihren Ordner und haben bewusst kein
@@ -271,16 +290,19 @@ alle vier Bereiche.
 
 Auf allen Tabellen ist Row Level Security aktiv, jede Policy verlangt die
 Rolle `authenticated`. Ohne Login liefert jede Abfrage leer zurück. Alle
-Teammitglieder sehen alles und dürfen überall erfassen, Rollen gibt es keine.
+Teammitglieder sehen alles und dürfen überall erfassen. `mitarbeiter.berechtigung`
+ändert daran vorläufig nichts: die Stufe wird nur angezeigt, als Marke neben dem
+Namen, und ist die Grundlage für einen späteren Schritt. Ändern lässt sie sich
+nur direkt in der Supabase-Tabelle, die App hat dafür keine Oberfläche.
 
 Gelöscht wird nirgends wirklich. `projekte`, `eintraege`, `mitarbeiter`,
 `ordner`, `dateien`, `bkp_liste` und `firmen` tragen `geloescht_am` und
 `geloescht_von` und haben schlicht keine Delete-Policy: ein DELETE über die
 API trifft dort null Zeilen. Wer und wann gelöscht hat, trägt der Trigger
 `setze_loeschspur()` serverseitig ein, der Client kann das nicht fälschen.
-Die Ausnahmen sind `ansprechpersonen`, `notizen`, `projekteinsaetze` und
-`projekt_mitarbeiter`: Unterdetails, die zu genau einem Datensatz gehören und
-bewusst direkt löschbar sind.
+Die Ausnahmen sind `ansprechpersonen`, `notizen`, `pendenzen`,
+`projekteinsaetze` und `projekt_mitarbeiter`: Unterdetails, die zu genau einem
+Datensatz gehören und bewusst direkt löschbar sind.
 
 Die Ampelfarbe einer Firma ist nirgends gespeichert. Sie ist die Farbe der
 jüngsten Notiz, ohne Notiz bleibt sie grau. Damit gibt es keine zweite

@@ -67,6 +67,20 @@
      damit das Wählen auch bei "+41 (41) 660 56 00" funktioniert. */
   const telLink = t => 'tel:' + String(t).replace(/[^\d+]/g, '');
 
+  /* Die Berechtigungsstufe. Nicht zu verwechseln mit m.rolle, das ist die
+     Funktion im Betrieb ("Bauleiter", "Administration"). Hier geht es um
+     die zwei Stufen aus der Datenbank.
+     Die Stufe ist reine Anzeige: sie blendet nichts ein oder aus und
+     lässt sich in der App nirgends ändern, das macht Jonas direkt in der
+     Supabase-Tabelle. */
+  const STUFE = { mitarbeitend: 'Mitarbeitend', geschaeftsleitung: 'Geschäftsleitung' };
+  const stufeTitel = m => STUFE[m.berechtigung] || STUFE.mitarbeitend;
+
+  /* In der Liste nur bei der Geschäftsleitung — sonst stünde neben jedem
+     Namen dasselbe Wort und das Abzeichen sagt nichts mehr. */
+  const stufeMarke = m => m.berechtigung === 'geschaeftsleitung'
+    ? `<span class="pj-marke klein stufe">${esc(stufeTitel(m))}</span>` : '';
+
   /* --- Liste -------------------------------------------------------------- */
 
   function zeichneListe() {
@@ -86,7 +100,10 @@
         <span class="avatar">${esc(initialen(m.name))}</span>
         <span style="min-width:0; flex:1;">
           <span class="titel" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.name)}</span>
-          <span class="unter" style="display:block;">${esc(m.rolle || '—')}</span>
+          <span class="unter" style="display:flex; align-items:center; gap:8px; min-width:0;">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.rolle || '—')}</span>
+            ${stufeMarke(m)}
+          </span>
         </span>
         <span class="br-nur-handy" style="display:flex; gap:6px; flex-shrink:0;">
           ${m.telefon ? `<a class="br-knopf pressable" href="${esc(telLink(m.telefon))}" aria-label="${esc(m.name)} anrufen" data-stopp>${svg(IKON.telefon, 16)}</a>` : ''}
@@ -118,7 +135,13 @@
           <span class="avatar" style="width:56px; height:56px; font-size:17px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; flex-shrink:0;">${esc(initialen(m.name))}</span>
           <span style="min-width:0; flex:1;">
             <span style="display:block; font-size:20px; font-weight:800; overflow-wrap:anywhere;">${esc(m.name)}</span>
-            <span style="display:block; color:var(--text-dim); font-size:13.5px;">${esc(m.rolle || 'Keine Funktion erfasst')}</span>
+            <!-- Die Stufe steht auf der zweiten Zeile statt am rechten Rand:
+                 rechts bliebe neben den zwei Knöpfen auf dem Handy so wenig
+                 Platz, dass der Name buchstabenweise umbricht. -->
+            <span style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:var(--text-dim); font-size:13.5px;">
+              <span>${esc(m.rolle || 'Keine Funktion erfasst')}</span>
+              ${neu ? '' : `<span class="pj-marke klein stufe">${esc(stufeTitel(m))}</span>`}
+            </span>
           </span>
           <button type="button" id="ma-bearbeiten" class="br-knopf pressable" aria-label="Bearbeiten" style="width:40px; height:40px;">${svg(IKON.stift, 17)}</button>
           <button type="button" id="ma-weg" class="br-knopf rot pressable" aria-label="In den Papierkorb" style="width:40px; height:40px;">${svg(IKON.eimer, 17)}</button>

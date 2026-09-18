@@ -17,6 +17,7 @@
   let personen = [];
   let ordner = [];
   let journal = [];
+  let pendenzen = [];
   let firmen = [];
   let mitarbeiter = [];
   let bkp = [];
@@ -28,6 +29,7 @@
     stift: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
     weg: '<path d="M18 6 6 18M6 6l12 12"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    haken: '<path d="M20 6 9 17l-5-5"/>',
     archiv: '<rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>'
   };
   const svg = (d, g = 16) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -66,9 +68,9 @@
   }
 
   async function allesLaden() {
-    [projekt, einsaetze, personen, ordner, journal] = await Promise.all([
+    [projekt, einsaetze, personen, ordner, journal, pendenzen] = await Promise.all([
       PJ.projekt(projektId), PJ.einsaetze(projektId), PJ.personen(projektId),
-      PJ.ordner(projektId), ladeJournal()
+      PJ.ordner(projektId), ladeJournal(), PJ.pendenzen(projektId)
     ]);
   }
 
@@ -499,6 +501,98 @@
     }
   }
 
+  /* --- Pendenzen -------------------------------------------------------------- */
+
+  /* Der Auszug auf der Projektseite: nur die offenen Punkte, der Rest
+     steht in der vollständigen Liste. Der Zähler nennt genau das, was
+     man hier sieht. */
+  function zeichnePendenzen() {
+    const offen = pendenzen.filter(p => !p.erledigt_am);
+    const erledigt = pendenzen.length - offen.length;
+    $('#pendenzen').innerHTML = `
+      <div class="kopf">
+        <h2>Pendenzen${pendenzen.length ? ` · ${offen.length} offen` : ''}</h2>
+        ${pendenzen.length ? `<a class="pj-mehr" href="pendenzen.html?projekt=${encodeURIComponent(projektId)}">Alle ansehen →</a>` : ''}
+      </div>
+      ${offen.length ? offen.map(pendenzZeile).join('')
+        : `<div class="pj-leer">${erledigt
+            ? `Nichts offen. ${erledigt} ${erledigt === 1 ? 'Punkt ist' : 'Punkte sind'} erledigt.`
+            : 'Keine Pendenzen auf diesem Projekt.'}</div>`}
+      <button type="button" id="pendenz-dazu" class="pj-dazu pressable">${svg(IKON.plus, 16)}<span>Pendenz erfassen</span></button>`;
+
+    $('#pendenz-dazu').addEventListener('click', pendenzErfassen);
+    bindePendenzen($('#pendenzen'));
+  }
+
+  function pendenzZeile(p) {
+    const erledigt = !!p.erledigt_am;
+    return `
+      <div class="pj-pendenz" data-erledigt="${erledigt ? 1 : 0}">
+        <button type="button" class="haken pressable" data-p-haken="${esc(p.id)}"
+                role="checkbox" aria-checked="${erledigt}"
+                aria-label="${esc(p.beschrieb)} ${erledigt ? 'wieder öffnen' : 'erledigen'}">${svg(IKON.haken, 14)}</button>
+        <span class="was">
+          <span class="text">${esc(p.beschrieb)}</span>
+          ${p.firmen ? `<span class="wer">${esc(p.firmen.name)}</span>` : ''}
+        </span>
+        <span class="tasten">
+          <button type="button" class="pressable" data-p-bearb="${esc(p.id)}" aria-label="Pendenz bearbeiten">${svg(IKON.stift, 14)}</button>
+          <button type="button" class="rot pressable" data-p-fort="${esc(p.id)}" aria-label="Pendenz löschen">${svg(IKON.weg, 14)}</button>
+        </span>
+      </div>`;
+  }
+
+  function bindePendenzen(wurzel) {
+    $$('[data-p-haken]', wurzel).forEach(el => el.addEventListener('click',
+      () => pendenzHaken(pendenzen.find(p => p.id === el.dataset.pHaken))));
+    $$('[data-p-bearb]', wurzel).forEach(el => el.addEventListener('click',
+      () => pendenzErfassen(pendenzen.find(p => p.id === el.dataset.pBearb))));
+    $$('[data-p-fort]', wurzel).forEach(el => el.addEventListener('click',
+      () => pendenzLoeschen(pendenzen.find(p => p.id === el.dataset.pFort))));
+  }
+
+  async function pendenzErfassen(vorhanden = null) {
+    const gemacht = await PJ.pendenzFormular({
+      projektId,
+      firmen: einsaetze.map(e => e.firmen).filter(Boolean),
+      vorhanden: vorhanden && vorhanden.id ? vorhanden : null
+    });
+    if (!gemacht) return;
+    pendenzen = await PJ.pendenzen(projektId);
+    zeichnePendenzen();
+    toast(vorhanden && vorhanden.id ? 'Gespeichert' : 'Pendenz erfasst');
+  }
+
+  async function pendenzHaken(p) {
+    if (!p) return;
+    try {
+      await PJ.pendenzHaken(p, !p.erledigt_am);
+      pendenzen = await PJ.pendenzen(projektId);
+      zeichnePendenzen();
+      toast(p.erledigt_am ? 'Wieder offen' : 'Erledigt');
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
+  async function pendenzLoeschen(p) {
+    if (!p) return;
+    const ja = await frage({
+      titel: 'Pendenz löschen?',
+      text: `„${p.beschrieb}" wird endgültig entfernt. Für Pendenzen gibt es keinen Papierkorb; wer einen Punkt nur abhaken will, nimmt die Checkbox — erledigte bleiben in der Liste stehen.`,
+      knopf: 'Löschen'
+    });
+    if (!ja) return;
+    try {
+      await PJ.loeschen('pendenzen', p.id);
+      pendenzen = await PJ.pendenzen(projektId);
+      zeichnePendenzen();
+      toast('Gelöscht');
+    } catch (e) {
+      toast(e.message, true);
+    }
+  }
+
   /* --- Baujournal und Dokumente ---------------------------------------------- */
 
   function zeichneJournal() {
@@ -552,6 +646,7 @@
     zeichneStammdaten();
     zeichneUnternehmer();
     zeichnePersonen();
+    zeichnePendenzen();
     zeichneJournal();
     zeichneDokumente();
   })();
