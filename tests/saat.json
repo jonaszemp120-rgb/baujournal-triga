@@ -1,0 +1,612 @@
+{
+ "profile": [
+  {
+   "id": "u1",
+   "name": "Jonas Zemp"
+  }
+ ],
+ "projekte": [
+  {
+   "id": "p1",
+   "name": "WUB Garten Mille Fiori",
+   "standort": "Sarnen",
+   "bauherrschaft": "StImmobilia GmbH",
+   "parzelle": "3188",
+   "projekt_nr": "25004",
+   "notizen": "Zufahrt über die Baustrasse.",
+   "kontrollpunkte": [
+    "Gerüste (Zustand, Verankerung)",
+    "Bauzaun / Absperrungen intakt",
+    "Fluchtwege frei",
+    "PSA getragen (Helm, Schuhe, Weste)",
+    "Bauschild vorhanden"
+   ],
+   "gebaeude": [
+    "Haus A",
+    "Haus B",
+    "Haus C",
+    "Tiefgarage",
+    "Umgebung"
+   ],
+   "archiviert": false,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "status": "laufend",
+   "beschrieb": "5 Mehrfamilienhäuser, 37 Wohnungen, gemeinsame Tiefgarage. Hybridbauweise Stahlbetonkern + Holzelementfassade."
+  },
+  {
+   "id": "p2",
+   "name": "Umbau Dorfstrasse 12",
+   "standort": "Kerns",
+   "bauherrschaft": null,
+   "parzelle": null,
+   "projekt_nr": "24011",
+   "notizen": null,
+   "kontrollpunkte": [
+    "Gerüste (Zustand, Verankerung)",
+    "Bauzaun / Absperrungen intakt",
+    "Fluchtwege frei",
+    "PSA getragen (Helm, Schuhe, Weste)",
+    "Bauschild vorhanden"
+   ],
+   "gebaeude": [],
+   "archiviert": true,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "status": "abgeschlossen",
+   "beschrieb": null
+  },
+  {
+   "id": "p3",
+   "name": "Büroumbau Blue Diamond",
+   "standort": "Baarerstrasse, 6300 Zug",
+   "bauherrschaft": null,
+   "parzelle": null,
+   "projekt_nr": "26002",
+   "notizen": null,
+   "kontrollpunkte": [
+    "Gerüste (Zustand, Verankerung)",
+    "Bauzaun / Absperrungen intakt",
+    "Fluchtwege frei",
+    "PSA getragen (Helm, Schuhe, Weste)",
+    "Bauschild vorhanden"
+   ],
+   "gebaeude": [],
+   "archiviert": false,
+   "status": "planung",
+   "beschrieb": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  }
+ ],
+ "eintraege": [
+  {
+   "id": "e1",
+   "projekt_id": "p1",
+   "datum": "2026-09-16",
+   "wetter": "Bewölkt",
+   "temperatur": "10–20°C",
+   "kontrolle": {
+    "punkte": [
+     {
+      "label": "Gerüste (Zustand, Verankerung)",
+      "ok": true
+     },
+     {
+      "label": "Bauzaun / Absperrungen intakt",
+      "ok": true
+     },
+     {
+      "label": "Fluchtwege frei",
+      "ok": true
+     },
+     {
+      "label": "PSA getragen (Helm, Schuhe, Weste)",
+      "ok": false
+     },
+     {
+      "label": "Bauschild vorhanden",
+      "ok": false
+     }
+    ]
+   },
+   "betrifft_gebaeude": [
+    "Haus A",
+    "Tiefgarage"
+   ],
+   "firmen": "Melk Durrer AG, Elektro Huwyler AG",
+   "fortschritt": "Decke über UG betoniert, Schalung Haus B gestellt.",
+   "feststellungen": "Absturzsicherung bei der Treppe Haus B fehlt.",
+   "anweisungen": "Geländer bis Donnerstag montieren, Rückmeldung an die Bauleitung.",
+   "fotos_hinweis": true,
+   "ersteller_id": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": null
+  },
+  {
+   "id": "e2",
+   "projekt_id": "p1",
+   "datum": "2026-09-12",
+   "wetter": "Regen",
+   "temperatur": "0–10°C",
+   "kontrolle": {
+    "punkte": [
+     {
+      "label": "Gerüste (Zustand, Verankerung)",
+      "ok": true
+     },
+     {
+      "label": "Bauzaun / Absperrungen intakt",
+      "ok": true
+     },
+     {
+      "label": "Fluchtwege frei",
+      "ok": true
+     },
+     {
+      "label": "PSA getragen (Helm, Schuhe, Weste)",
+      "ok": true
+     },
+     {
+      "label": "Bauschild vorhanden",
+      "ok": true
+     }
+    ]
+   },
+   "betrifft_gebaeude": null,
+   "firmen": "Melk Durrer AG",
+   "fortschritt": "Aushub abgeschlossen.",
+   "feststellungen": null,
+   "anweisungen": null,
+   "fotos_hinweis": false,
+   "ersteller_id": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": "2026-09-13T09:00:00.000Z",
+   "geloescht_von": "u1"
+  }
+ ],
+ "eintraege_korrekturen": [
+  {
+   "id": "kk1",
+   "eintrag_id": "e1",
+   "feld": "fortschritt",
+   "alt": "Decke über UG betoniert.",
+   "neu": "Decke über UG betoniert, Schalung Haus B gestellt.",
+   "geaendert_von": "u1",
+   "geaendert_am": "2026-09-16T16:20:00.000Z"
+  }
+ ],
+ "mitarbeiter": [
+  {
+   "id": "m1",
+   "name": "Adrian Zemp",
+   "rolle": "Geschäftsleitung, Inhaber",
+   "telefon": "079 763 62 30",
+   "email": "adrian.zemp@triga.ch",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "berechtigung": "geschaeftsleitung",
+   "user_id": "u9-adrian",
+   "unterschrift": null,
+   "unterschrift_am": null
+  },
+  {
+   "id": "m2",
+   "name": "Silvia Weber",
+   "rolle": "Administration",
+   "telefon": "079 548 63 01",
+   "email": "silvia.weber@triga.ch",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "berechtigung": "mitarbeiter",
+   "user_id": "u9-silvia",
+   "unterschrift": null,
+   "unterschrift_am": null
+  },
+  {
+   "id": "m3",
+   "name": "Bruno Wiederkehr",
+   "rolle": "Bau-/Projektleitung",
+   "telefon": "079 408 54 77",
+   "email": "bruno.wiederkehr@triga.ch",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": "2026-09-14T10:00:00.000Z",
+   "geloescht_von": "u1",
+   "berechtigung": "mitarbeiter",
+   "user_id": null,
+   "unterschrift": null,
+   "unterschrift_am": null
+  },
+  {
+   "id": "m4",
+   "name": "Jonas Zemp",
+   "rolle": "Bau-/Projektleitung, Inhaber, Mitglied der GL",
+   "telefon": "079 000 00 01",
+   "email": "jonas.zemp@triga.ch",
+   "berechtigung": "entwickler",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "user_id": "u1",
+   "unterschrift": null,
+   "unterschrift_am": null
+  }
+ ],
+ "ordner": [
+  {
+   "id": "o1",
+   "name": "Pläne",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "projekt_id": "p1"
+  },
+  {
+   "id": "o2",
+   "name": "Verträge",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "projekt_id": null
+  },
+  {
+   "id": "o3",
+   "name": "Altes",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": "2026-09-14T10:00:00.000Z",
+   "geloescht_von": "u1",
+   "projekt_id": null
+  }
+ ],
+ "dateien": [
+  {
+   "id": "d1",
+   "ordner_id": "o1",
+   "name": "Grundriss Haus A.pdf",
+   "pfad": "o1/aaa.pdf",
+   "groesse": 824400,
+   "hochgeladen_von": "u1",
+   "hochgeladen_am": "2026-09-15T09:00:00.000Z"
+  },
+  {
+   "id": "d2",
+   "ordner_id": "o1",
+   "name": "Schnitt A-A.pdf",
+   "pfad": "o1/bbb.pdf",
+   "groesse": 412000,
+   "hochgeladen_von": "u1",
+   "hochgeladen_am": "2026-09-15T09:05:00.000Z"
+  },
+  {
+   "id": "d3",
+   "ordner_id": "o2",
+   "name": "Werkvertrag Baumeister.pdf",
+   "pfad": "o2/ccc.pdf",
+   "groesse": 180000,
+   "hochgeladen_von": "u1",
+   "hochgeladen_am": "2026-09-14T11:00:00.000Z",
+   "geloescht_am": "2026-09-15T08:00:00.000Z",
+   "geloescht_von": "u1"
+  }
+ ],
+ "bkp_liste": [
+  {
+   "id": "k1",
+   "code": "211",
+   "bezeichnung": "Baumeisterarbeiten",
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "k2",
+   "code": "230",
+   "bezeichnung": "Elektroanlagen",
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "k3",
+   "code": "271",
+   "bezeichnung": "Gipserarbeiten",
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "k4",
+   "code": "999",
+   "bezeichnung": "Versehentlich angelegt",
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": "2026-09-15T08:00:00.000Z",
+   "geloescht_von": "u1"
+  }
+ ],
+ "firmen": [
+  {
+   "id": "f1",
+   "name": "Melk Durrer AG",
+   "adresse": "Kanalstrasse 20",
+   "plz_ort": "6056 Kägiswil",
+   "telefon": "+41 (41) 660 56 58",
+   "email": "mario.durrer@melkdurrer.ch",
+   "bkp_codes": [
+    "211"
+   ],
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "f2",
+   "name": "Elektro Huwyler AG",
+   "adresse": "Kanalstrasse 10",
+   "plz_ort": "6056 Kägiswil",
+   "telefon": "+41 (41) 666 30 70",
+   "email": "info@elektro-huwyler.ch",
+   "bkp_codes": [
+    "230"
+   ],
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "f3",
+   "name": "Slanzi Malen Gipsen AG",
+   "adresse": "Mühlemattli 10",
+   "plz_ort": "6074 Giswil",
+   "telefon": "+41 (41) 675 10 60",
+   "email": "info@slanzi.ch",
+   "bkp_codes": [
+    "271",
+    "211"
+   ],
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  },
+  {
+   "id": "f4",
+   "name": "Alte Firma AG",
+   "adresse": null,
+   "plz_ort": "6060 Sarnen",
+   "telefon": null,
+   "email": null,
+   "bkp_codes": [],
+   "erstellt_am": "2026-09-10T07:30:00.000Z",
+   "geloescht_am": "2026-09-15T08:00:00.000Z",
+   "geloescht_von": "u1"
+  }
+ ],
+ "ansprechpersonen": [
+  {
+   "id": "a1",
+   "firma_id": "f1",
+   "name": "Mario Durrer",
+   "funktion": "Geschäftsführer",
+   "telefon": "041 660 56 58",
+   "email": "mario.durrer@melkdurrer.ch",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T07:30:00.000Z"
+  }
+ ],
+ "notizen": [
+  {
+   "id": "n1",
+   "firma_id": "f1",
+   "text": "Offerten kommen immer termingerecht, gute Kommunikation.",
+   "farbe": "gruen",
+   "autor_id": "u1",
+   "erstellt_am": "2026-05-03T10:00:00.000Z",
+   "projekt_id": null
+  },
+  {
+   "id": "n2",
+   "firma_id": "f3",
+   "text": "Zweimal zu spät geliefert, Absprache nötig.",
+   "farbe": "gelb",
+   "autor_id": "u1",
+   "erstellt_am": "2026-08-12T10:00:00.000Z",
+   "projekt_id": null
+  }
+ ],
+ "projekteinsaetze": [
+  {
+   "id": "pe1",
+   "projekt_id": "p1",
+   "firma_id": "f1",
+   "gewerk": "211",
+   "status": "beauftragt",
+   "auftragssumme": 1150000,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T08:00:00.000Z"
+  },
+  {
+   "id": "pe2",
+   "projekt_id": "p1",
+   "firma_id": "f3",
+   "gewerk": "271",
+   "status": "offeriert",
+   "auftragssumme": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T08:01:00.000Z"
+  }
+ ],
+ "projekt_mitarbeiter": [
+  {
+   "id": "pm1",
+   "projekt_id": "p1",
+   "mitarbeiter_id": "m1",
+   "rolle": "Bauleiter",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T08:00:00.000Z"
+  },
+  {
+   "id": "pm2",
+   "projekt_id": "p1",
+   "mitarbeiter_id": "m2",
+   "rolle": "Unterstützung",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T08:00:00.000Z"
+  }
+ ],
+ "pendenzen": [
+  {
+   "id": "pd1",
+   "projekt_id": "p1",
+   "beschrieb": "Fassadengerüst Haus Flora abbauen",
+   "firma_id": "f1",
+   "erledigt_am": null,
+   "erledigt_von": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-15T08:00:00.000Z"
+  },
+  {
+   "id": "pd2",
+   "projekt_id": "p1",
+   "beschrieb": "Fehlende Steckdose Küche Haus B nachrüsten",
+   "firma_id": "f3",
+   "erledigt_am": null,
+   "erledigt_von": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-15T08:05:00.000Z"
+  },
+  {
+   "id": "pd3",
+   "projekt_id": "p1",
+   "beschrieb": "Bauschild neu beschriften",
+   "firma_id": null,
+   "erledigt_am": null,
+   "erledigt_von": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-16T09:00:00.000Z"
+  },
+  {
+   "id": "pd4",
+   "projekt_id": "p1",
+   "beschrieb": "Zufahrt Baustrasse ausbessern",
+   "firma_id": "f1",
+   "erledigt_am": "2026-09-17T14:00:00.000Z",
+   "erledigt_von": "u1",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-12T10:00:00.000Z"
+  }
+ ],
+ "chats": [
+  {
+   "id": "c1",
+   "art": "gruppe",
+   "name": "Mille Fiori Team",
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-10T08:00:00.000Z"
+  },
+  {
+   "id": "c2",
+   "art": "einzel",
+   "name": null,
+   "erstellt_von": "u9-adrian",
+   "erstellt_am": "2026-09-12T09:00:00.000Z"
+  }
+ ],
+ "chat_mitglieder": [
+  {
+   "chat_id": "c1",
+   "user_id": "u1",
+   "zuletzt_gelesen": "2026-09-18T06:00:00.000Z",
+   "beigetreten_am": "2026-09-10T08:00:00.000Z",
+   "admin": true
+  },
+  {
+   "chat_id": "c1",
+   "user_id": "u9-adrian",
+   "zuletzt_gelesen": "2026-09-18T06:00:00.000Z",
+   "beigetreten_am": "2026-09-10T08:00:00.000Z",
+   "admin": false
+  },
+  {
+   "chat_id": "c1",
+   "user_id": "u9-silvia",
+   "zuletzt_gelesen": "2026-09-18T06:00:00.000Z",
+   "beigetreten_am": "2026-09-10T08:00:00.000Z",
+   "admin": false
+  },
+  {
+   "chat_id": "c2",
+   "user_id": "u1",
+   "zuletzt_gelesen": "2026-09-18T06:00:00.000Z",
+   "beigetreten_am": "2026-09-12T09:00:00.000Z",
+   "admin": false
+  },
+  {
+   "chat_id": "c2",
+   "user_id": "u9-adrian",
+   "zuletzt_gelesen": "2026-09-18T06:00:00.000Z",
+   "beigetreten_am": "2026-09-12T09:00:00.000Z",
+   "admin": false
+  }
+ ],
+ "nachrichten": [
+  {
+   "id": "n1",
+   "chat_id": "c1",
+   "absender": "u9-adrian",
+   "text": "bin um 9 auf der Baustelle 👍",
+   "bild_pfad": null,
+   "bild_ablauf": null,
+   "erstellt_am": "2026-09-18T06:45:00.000Z"
+  },
+  {
+   "id": "n2",
+   "chat_id": "c1",
+   "absender": "u1",
+   "text": "merci, bin ab 8:30 dort",
+   "bild_pfad": null,
+   "bild_ablauf": null,
+   "erstellt_am": "2026-09-18T06:47:00.000Z"
+  },
+  {
+   "id": "n3",
+   "chat_id": "c1",
+   "absender": "u9-silvia",
+   "text": "Rechnung für Fankhauser ist unterwegs",
+   "bild_pfad": null,
+   "bild_ablauf": null,
+   "erstellt_am": "2026-09-18T07:10:00.000Z"
+  },
+  {
+   "id": "n4",
+   "chat_id": "c2",
+   "absender": "u9-adrian",
+   "text": "Hast du die Pläne schon?",
+   "bild_pfad": null,
+   "bild_ablauf": null,
+   "erstellt_am": "2026-09-17T15:20:00.000Z"
+  }
+ ],
+ "protokolle": [
+  {
+   "id": "pk1",
+   "projekt_id": "p1",
+   "nummer": 12,
+   "bezeichnung": "Baubesprechung",
+   "datum": "2026-09-17",
+   "ort": "Baustelle Sarnen",
+   "status": "entwurf",
+   "abgeschlossen_am": null,
+   "pdf_datei_id": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-17T07:00:00.000Z"
+  }
+ ],
+ "protokoll_teilnehmer": [
+  {
+   "id": "tn1",
+   "protokoll_id": "pk1",
+   "mitarbeiter_id": null,
+   "ansprechperson_id": null,
+   "name": "Jonas Zemp",
+   "firma": "TRIGA Baumanagement AG",
+   "status": "vorsitz",
+   "erstellt_am": "2026-09-17T07:00:00.000Z"
+  }
+ ],
+ "protokoll_traktanden": [
+  {
+   "id": "tr1",
+   "protokoll_id": "pk1",
+   "reihenfolge": 1,
+   "titel": "Stand Rohbau Haus Lilly",
+   "text": "Bodenplatte fertig, Aufrichten KW 41.",
+   "foto_pfad": null,
+   "beschluss": true,
+   "pendenz_id": null,
+   "erstellt_von": "u1",
+   "erstellt_am": "2026-09-17T07:05:00.000Z"
+  }
+ ]
+}
