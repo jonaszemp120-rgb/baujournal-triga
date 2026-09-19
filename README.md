@@ -494,9 +494,16 @@ nichts gesetzt statt etwas auf Verdacht. Kommt weder Lage noch Stufe heraus,
 sagt die Zeile das, statt einen Chip auf gut Glück zu drücken.
 
 **Ausserhalb der Schweiz gibt es keine Antwort,** und das ist Absicht.
-SwissMetNet endet an der Grenze; eine Station 300 Kilometer weiter zu nehmen
-wäre kein Messwert mehr. `api/wetter.js` antwortet dort mit 400, und die App
-macht daraus einen klaren Satz statt einer Fehlermeldung.
+SwissMetNet endet an der Grenze; eine weit entfernte Station zu nehmen wäre
+kein Messwert mehr, sondern das Wetter einer anderen Gegend, im Journal als
+Wetter des Tages eingetragen. Entschieden wird das nicht über ein Rechteck um
+die Schweiz — Mailand läge mitten darin —, sondern über den Abstand: ist die
+nächste Station weiter als 40 Kilometer weg, antwortet `api/wetter.js` mit 400,
+und die App macht daraus einen klaren Satz statt einer Fehlermeldung. 158
+Stationen auf 41 000 Quadratkilometern heisst im Mittel gut zwanzig Kilometer
+zur nächsten, also lässt die Grenze auch dem hintersten Seitental Luft. Das
+Rechteck bleibt trotzdem stehen, aber nur als billiger Vorfilter, damit ein
+Standort aus einem anderen Erdteil nicht erst eine Stationsliste herunterlädt.
 
 **Was iOS anders macht,** und was daraus folgt:
 
