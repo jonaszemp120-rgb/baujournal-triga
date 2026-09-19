@@ -338,14 +338,35 @@ Fehlschlag endet in einer Zeile Text unter den Chips: kein Dialog, keine Sperre,
 kein Toast, der etwas verdeckt. Offline wird gar nicht erst losgeschickt, das
 spart den Freigabe-Dialog für eine Abfrage, die ohnehin nicht durchkäme.
 
-**Open-Meteo, weil es dauerhaft frei ist.** Kein Konto, kein Schlüssel, keine
-Kreditkarte, keine Bezahlstufe, die später zuschnappt; die nicht gewerbliche
-Nutzung ist ausdrücklich freigegeben. Damit gibt es auch nichts in den
-Umgebungsvariablen zu hinterlegen und nichts, was ohne Schlüssel still stehen
-bliebe — anders als bei der Adresssuche über search.ch, die deshalb über eine
-eigene Serverless-Function läuft. Die Anfrage geht direkt aus dem Browser an
-`api.open-meteo.com` und damit an einen fremden Ursprung, den der Service Worker
-ohnehin in Ruhe lässt.
+**Open-Meteo, weil es ohne Konto und ohne Schlüssel läuft.** Kein Login, keine
+Kreditkarte, nichts in den Umgebungsvariablen zu hinterlegen und nichts, was
+ohne Schlüssel still stehen bliebe — anders als bei der Adresssuche über
+search.ch, die deshalb über eine eigene Serverless-Function läuft. Die Anfrage
+geht direkt aus dem Browser an `api.open-meteo.com` und damit an einen fremden
+Ursprung, den der Service Worker ohnehin in Ruhe lässt.
+
+**Offen ist dabei die Lizenz, und das gehört hierhin und nicht in eine
+Fussnote.** Die Daten selbst stehen unter CC BY 4.0 und dürfen auch gewerblich
+verwendet werden. Der *freie Endpunkt* dagegen ist ausdrücklich der nicht
+gewerblichen Nutzung vorbehalten, mit 10 000 Abrufen am Tag; für gewerbliche
+Nutzung sieht Open-Meteo ein Abonnement mit eigenem Endpunkt und Schlüssel vor.
+Eine Firmen-App, mit der eine Bauleitung ihre Journale führt, ist im
+gewöhnlichen Sinn gewerbliche Nutzung. Das ist zu klären, bevor der Knopf
+länger im Einsatz steht; die Menge ist kein Thema, ein paar Abrufe am Tag
+bleiben weit unter jeder Grenze. Die naheliegende Alternative steht weiter
+unten.
+
+**Eine zweite Quelle ist vorbereitet, aber nicht gebaut.** `wetter_quelle` am
+Eintrag hält fest, wer geantwortet hat, und `WETTER_JETZT.QUELLE` ist der
+einzige Ort, an dem der Name steht. Ein zweiter Dienst käme also dazu, ohne
+dass ein einziger bestehender Eintrag umgeschrieben werden müsste. Der
+Kandidat dafür ist **MeteoSchweiz**: seit 2025 stehen Mess-, Klima- und
+Prognosedaten als Open Government Data frei zur Verfügung, ausdrücklich ohne
+Nutzungsbeschränkung und nur mit Quellenangabe — damit fällt die Lizenzfrage
+weg, und es sind echte Messwerte von 158 automatischen Stationen statt eines
+Modellwerts. Der Preis dafür: die nächste Station kann fünfzehn Kilometer
+entfernt und vierhundert Meter höher stehen, und dann beschreibt sie die
+Baustelle schlechter als ein Modell, das auf ihre Koordinaten rechnet.
 
 **Der Standort verlässt das Gerät auf drei Nachkommastellen gerundet**, also
 gut hundert Meter genau. Für das Wetter über einer Baustelle reicht das bei
@@ -1199,9 +1220,10 @@ Vier, alle in den Projekteinstellungen von Vercel und keine davon im Repo:
 | `VAPID_ABSENDER` | `mailto:`-Adresse, die der Push-Dienst im Störungsfall anschreibt |
 | `SUPABASE_SERVICE_KEY` | liest die Push-Abos der anderen und räumt abgelaufene Chat-Bilder weg |
 
-Die Wetterabfrage im Baujournal steht bewusst nicht in dieser Tabelle:
-Open-Meteo braucht keinen Schlüssel, also gibt es auch nichts zu hinterlegen
-und nichts, was ohne Schlüssel still stehen bliebe.
+Die Wetterabfrage im Baujournal steht bewusst nicht in dieser Tabelle: der
+freie Endpunkt von Open-Meteo braucht keinen Schlüssel, also gibt es auch
+nichts zu hinterlegen und nichts, was ohne Schlüssel still stehen bliebe. Zur
+offenen Lizenzfrage dieses Endpunkts siehe «Wetter jetzt abrufen».
 
 Jede fehlende Variable schaltet genau ihren Teil ab und sonst nichts: ohne
 VAPID kommen keine Benachrichtigungen, der Chat läuft weiter; ohne

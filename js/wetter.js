@@ -39,10 +39,19 @@ const WETTER_JETZT = (() => {
   const GEDULD_API = 8000;
 
   /* Ein Windwert, ab dem die Lage unabhängig vom Himmel «Sturm/Wind»
-     heisst. 62 km/h ist Beaufort 8, der Beginn des Sturms — auf der
-     Baustelle die Grenze, ab der Kran und Gerüst zum Thema werden.
-     Darunter wird nicht übersteuert: ein sonniger Tag mit Brise bleibt
-     sonnig. */
+     heisst. 62 km/h ist Beaufort 8, «stürmischer Wind»; der Sturm selbst
+     beginnt erst bei Beaufort 9 und 75 km/h.
+     Zwei Dinge dazu, damit der Wert richtig gelesen wird. Verglichen wird
+     mit dem mittleren Wind auf 10 Metern, nicht mit Böen — und Böen
+     liegen typisch beim Anderthalb- bis Doppelten. Ein Mittel von 62
+     bedeutet also Böen um 90 bis 110, einen Tag, an dem ohnehin niemand
+     mehr auf dem Gerüst steht. Umgekehrt bleibt ein Tag mit blauem
+     Himmel und Böen von 70 hier «Sonnig», obwohl der Kran steht. Wer
+     will, dass der Chip beschreibt, was auf der Baustelle los war, fragt
+     wind_gusts_10m ab und vergleicht damit. Das ist eine Entscheidung
+     und keine Feinheit, deshalb steht sie hier und nicht im Verborgenen.
+     Unterhalb der Schwelle wird nicht übersteuert: ein sonniger Tag mit
+     Brise bleibt sonnig. */
   const STURM_KMH = 62;
 
   /* Die WMO-Schlüssel, die Open-Meteo liefert, auf die sieben Chips
