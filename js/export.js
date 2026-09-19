@@ -65,7 +65,13 @@ function abschnitte(e) {
       ['Bauleiter', e.ersteller_name || '–'],
       ['Erfasst am', e.erstellt_am ? new Date(e.erstellt_am).toLocaleString('de-CH') : '–'],
       ['Wetter', e.wetter || '–'],
-      ['Temperatur', e.temperatur || '–']
+      ['Temperatur', e.temperatur || '–'],
+      /* Stammt die Angabe aus der Live-Abfrage, steht der gemessene Wert
+         daneben. Von Hand gewaehlte Eintraege haben die Zeile nicht —
+         genau das ist ihr Sinn. */
+      ...(hatWetterMessung(e) ? [['Gemessen',
+        wetterMessText(e.wetter, e.temperatur, e.wetter_grad, e.wetter_gemessen_am)
+          .replace(/^Um /, '').replace(/ gemessen: /, ' Uhr: ')]] : [])
     ] },
     { titel: `Allgemeine Kontrolle (${erfuellt}/${total})`, liste: punkte.map(p =>
       `${p.ok ? '[x]' : '[ ]'} ${p.label}`) },

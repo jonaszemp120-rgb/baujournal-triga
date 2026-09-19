@@ -68,8 +68,17 @@
         paar('Erfasst am', eintrag.erstellt_am ? new Date(eintrag.erstellt_am).toLocaleString('de-CH') : '–') +
         (eintrag._offen ? '<div style="margin-top:8px; font-size:12px; font-weight:700; color:var(--red);">Noch nicht übertragen, liegt in der Warteschlange.</div>' : '')),
 
+      /* Unter den Chips die Messung, falls es eine gibt. Genau dieselbe
+         Zeile wie beim Erfassen, nur ohne den Hinweis aufs Antippen:
+         hier ist nichts mehr anzutippen. Ein Eintrag mit von Hand
+         gewählten Chips zeigt sie nicht — daran ist erkennbar, welcher
+         auf einer echten Messung beruht. Ältere Einträge haben keinen
+         Messwert und bleiben damit ebenfalls bei den blossen Chips. */
       karte('Wetter',
-        `<div style="display:flex; flex-wrap:wrap; gap:8px;">${chipAnzeige(eintrag.wetter, false)}${chipAnzeige(eintrag.temperatur, true)}</div>`),
+        `<div style="display:flex; flex-wrap:wrap; gap:8px;">${chipAnzeige(eintrag.wetter, false)}${chipAnzeige(eintrag.temperatur, true)}</div>`
+        + (hatWetterMessung(eintrag)
+            ? `<div class="wt-hinweis">${esc(wetterMessText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am))}</div>`
+            : '')),
 
       `<div class="karte">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
@@ -180,7 +189,16 @@
           <input id="e-datum" type="date" value="${esc(String(entwurf.datum).slice(0, 10))}" style="height:44px; border-radius:10px; border:1.5px solid var(--border); padding:0 13px; font-size:14px; color:var(--text); box-sizing:border-box;">
         </div>`),
 
-      karte('Wetter', '<div id="e-wetter" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div><div id="e-temp" style="display:flex; flex-wrap:wrap; gap:8px;"></div>'),
+      /* Steht eine Messung daran, sagt die Zeile darunter, was eine
+         Korrektur mit ihr macht: sie hebt sie auf. Wer den Chip von Hand
+         ändert, hat nicht neu gemessen, und die Angabe soll danach nicht
+         mehr so aussehen. Das Korrekturprotokoll hält die Änderung
+         ohnehin fest. */
+      karte('Wetter', '<div id="e-wetter" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div><div id="e-temp" style="display:flex; flex-wrap:wrap; gap:8px;"></div>'
+        + (hatWetterMessung(eintrag)
+            ? `<div class="wt-hinweis">${esc(wetterMessText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am))}`
+              + ' Wer hier etwas ändert, hebt die Messung auf.</div>'
+            : '')),
 
       gebaeudeDesProjekts().length
         ? karte('Betrifft', '<div id="e-betrifft" style="display:flex; flex-wrap:wrap; gap:8px;"></div>')
@@ -405,6 +423,12 @@
 
     Object.assign(eintrag, jetzt);
     if (neu.kontrolle) eintrag.kontrolle = neu.kontrolle;
+    /* Dasselbe, was korrigiere_eintrag() in der Datenbank tut — hier
+       nachgezogen, damit die Ansicht ohne Neuladen stimmt. */
+    if ('wetter' in neu || 'temperatur' in neu) {
+      eintrag.wetter_grad = null;
+      eintrag.wetter_gemessen_am = null;
+    }
     korrekturen = await ladeKorrekturen(eintrag.id);
 
     setzeModus('lesen');

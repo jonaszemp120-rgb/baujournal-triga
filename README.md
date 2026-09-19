@@ -351,6 +351,35 @@ ohnehin in Ruhe lässt.
 gut hundert Meter genau. Für das Wetter über einer Baustelle reicht das bei
 weitem, und mehr als nötig soll niemand verschicken.
 
+**Der gemessene Wert bleibt am Eintrag stehen.** Die beiden Chips halten nur
+Grobstufen fest — «Sonnig», «10–20°C». Damit ginge beim Speichern genau das
+verloren, was die Abfrage ausmacht: die Gradzahl selbst, der Zeitpunkt und die
+Tatsache, dass da gemessen und nicht getippt wurde. Für ein Journal, das im
+Streitfall als Beweismittel dient, ist das der Unterschied zwischen «der
+Bauleiter hat sonnig angetippt» und «um 11:25 wurden an diesem Ort 17.2 Grad
+gemessen». `eintraege.wetter_grad` und `eintraege.wetter_gemessen_am` halten
+beides; der Zeitpunkt ist zugleich das Kennzeichen, dass es eine Messung war.
+Eine Prüfregel verlangt beide Spalten zusammen oder keine, und ohne Chip
+daneben gar keine — eine Gradzahl ohne Zeitpunkt sagt nicht, wann sie galt.
+
+Die Zeile darunter — im Formular wie in der Detailansicht des gespeicherten
+Eintrags — baut `wetterMessText()` in `js/store.js`, an einer Stelle für beide
+Orte. Ein Eintrag mit von Hand gewählten Chips hat sie nicht, und ältere
+Einträge haben sie auch nicht: bei ihnen stehen beide Spalten leer, und
+rückwirkend wird nichts behauptet, was niemand gemessen hat. Genau daran
+bleibt erkennbar, welcher Eintrag auf einer Messung beruht.
+
+**Die Messung verfällt, sobald jemand von Hand eingreift.** Ein Tipp auf einen
+Chip im Formular, ein «Angaben vom letzten Eintrag übernehmen», eine Korrektur
+am fertigen Eintrag — in allen drei Fällen fallen Gradzahl und Zeitpunkt weg.
+Sonst stünde später «um 11:25 gemessen: Sonnig» an einem Eintrag, bei dem
+inzwischen Regen angetippt ist. Bei der Korrektur macht das nicht die App,
+sondern `korrigiere_eintrag()`: die Funktion führt eine Erlaubnisliste von
+Spalten, die beiden neuen stehen bewusst nicht darin — von Hand nachtragen
+soll niemand können, was als Messung gilt —, und sie setzt beide auf null,
+sobald `wetter` oder `temperatur` im Korrektursatz vorkommen. Die Änderung
+selbst steht ohnehin im Korrekturprotokoll.
+
 **Die Zuordnung** steht in `js/wetter.js` und ist bewusst ohne Oberfläche
 prüfbar. `lageAus(code, wind)` bildet die WMO-Schlüssel auf die sieben Chips ab,
 `stufeAus(grad)` die Gradzahl auf die fünf Bereiche. Zwei Entscheide darin sind
@@ -494,7 +523,10 @@ alle acht Bereiche.
   Status-Spalte daneben wäre eine zweite Wahrheit
 - `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
   Punkteliste, `betrifft_gebaeude` als JSON-Liste, `geloescht_am` und
-  `geloescht_von` für den Papierkorb
+  `geloescht_von` für den Papierkorb. `wetter_grad` und `wetter_gemessen_am`
+  stehen nur da, wo das Wetter über die Live-Abfrage kam: die Gradzahl auf ein
+  Zehntel und der Zeitpunkt. Beide zusammen oder keine, das hält die Prüfregel
+  `eintraege_wetter_messung` fest; siehe «Wetter jetzt abrufen»
 - `eintraege_korrekturen` — das Korrekturprotokoll, nur lesen und anhängen
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
