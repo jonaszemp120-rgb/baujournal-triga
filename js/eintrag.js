@@ -78,7 +78,7 @@
       karte('Wetter',
         `<div style="display:flex; flex-wrap:wrap; gap:8px;">${chipAnzeige(eintrag.wetter, false)}${chipAnzeige(eintrag.temperatur, true)}</div>`
         + (hatWetterAbruf(eintrag)
-            ? `<div class="wt-hinweis">${esc(wetterAbrufText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am, eintrag.wetter_quelle))}</div>`
+            ? `<div class="wt-hinweis">${esc(wetterAbrufText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am, eintrag.wetter_quelle, eintrag.wetter_rohwerte))}</div>`
             : '')),
 
       `<div class="karte">
@@ -197,7 +197,7 @@
          ohnehin fest. */
       karte('Wetter', '<div id="e-wetter" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div><div id="e-temp" style="display:flex; flex-wrap:wrap; gap:8px;"></div>'
         + (hatWetterAbruf(eintrag)
-            ? `<div class="wt-hinweis">${esc(wetterAbrufText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am, eintrag.wetter_quelle))}`
+            ? `<div class="wt-hinweis">${esc(wetterAbrufText(eintrag.wetter, eintrag.temperatur, eintrag.wetter_grad, eintrag.wetter_gemessen_am, eintrag.wetter_quelle, eintrag.wetter_rohwerte))}`
               + ' Wer hier etwas ändert, hebt die Abfrage auf.</div>'
             : '')),
 
@@ -430,6 +430,7 @@
       eintrag.wetter_grad = null;
       eintrag.wetter_gemessen_am = null;
       eintrag.wetter_quelle = null;
+      eintrag.wetter_rohwerte = null;
     }
     korrekturen = await ladeKorrekturen(eintrag.id);
 

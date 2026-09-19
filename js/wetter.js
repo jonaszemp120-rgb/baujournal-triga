@@ -1,94 +1,138 @@
 /* Wetter jetzt abrufen.
  *
- * Der Knopf im Baujournal-Formular holt den Standort über den Browser und
- * fragt damit das aktuelle Wetter ab. Anschliessend stehen die passenden
- * Chips für Wetterlage und Temperaturbereich bereits ausgewählt da.
+ * Der Knopf im Baujournal-Formular holt den Standort über den Browser
+ * und fragt damit die nächstgelegene Messstation von MeteoSchweiz ab.
+ * Anschliessend stehen die passenden Chips für Wetterlage und
+ * Temperaturbereich bereits ausgewählt da.
  *
  * Alles daran ist freiwillig. Wer den Knopf nicht antippt, wählt wie
  * bisher von Hand; wer ihn antippt und den Standort nicht freigibt,
- * ebenfalls. Es gibt keinen Fall, in dem ein Eintrag daran hängen bleibt:
- * jeder Fehler endet in einer Zeile Text neben dem Knopf, und das
- * Formular ist so benutzbar wie zuvor. Auch die automatisch gesetzten
- * Chips bleiben ganz normale Chips — ein Tipp darauf ändert sie.
+ * ebenfalls. Es gibt keinen Fall, in dem ein Eintrag daran hängen
+ * bleibt: jeder Fehler endet in einer Zeile Text unter den Chips, und
+ * das Formular ist so benutzbar wie zuvor. Auch die automatisch
+ * gesetzten Chips bleiben ganz normale Chips — ein Tipp darauf ändert
+ * sie.
  *
- * Warum Open-Meteo: kein Konto, kein Schlüssel, keine Kreditkarte, keine
- * Bezahlstufe, die später zuschnappt. Der Dienst nennt die nicht
- * gewerbliche Nutzung ausdrücklich frei. Damit gibt es auch nichts in den
- * Umgebungsvariablen zu hinterlegen und nichts, was ohne Schlüssel
- * plötzlich still stehen bliebe — anders als bei der Adresssuche über
- * search.ch, die über eine eigene Serverless-Function läuft.
+ * Warum MeteoSchweiz und nicht mehr Open-Meteo: der freie Endpunkt von
+ * Open-Meteo ist ausdrücklich der nicht gewerblichen Nutzung
+ * vorbehalten, und eine Firmen-App, mit der eine Bauleitung ihre
+ * Journale führt, ist gewerbliche Nutzung. Die Open Government Data von
+ * MeteoSchweiz sind dagegen ohne Einschränkung frei, verlangt ist die
+ * Quellenangabe — und die steht an jedem Eintrag in wetter_quelle. Kein
+ * Konto, kein Schlüssel, kein Abo. Dazu sind es amtliche Messwerte
+ * einer realen Station statt eines gerechneten Modellwerts.
+ *
+ * Der Preis dafür steht gleich dabei, damit ihn niemand übersieht:
+ *
+ *   Ein Messnetz misst, es beurteilt nicht. MeteoSchweiz liefert
+ *   Temperatur, Böe, Niederschlag, Sonnenschein und Feuchte — aber
+ *   keinen Wetterschlüssel. Die Lage wird hier deshalb abgeleitet, und
+ *   zwar nur, wo die Messwerte sie wirklich hergeben. Nebel und
+ *   Gewitter setzt diese Datei nie: für beides gibt es keinen Messwert,
+ *   der sie belegen würde, und ein geratener Chip in einem Journal ist
+ *   schlimmer als ein leerer. Die tippt der Bauleiter.
+ *
+ *   Die Station steht nicht auf der Baustelle. Sie kann Kilometer
+ *   entfernt und einige hundert Meter höher liegen, und deshalb steht
+ *   sie mit Name und Abstand in der Zeile unter den Chips und in den
+ *   Rohwerten am Eintrag. Wer das Journal später liest, soll nicht
+ *   glauben, hier sei auf dem Bauplatz gemessen worden.
+ *
+ * Alle Rohwerte wandern mit an den Eintrag. Damit bleibt die Zuordnung
+ * auf die sieben Chips eine Frage der Anzeige: sie lässt sich jederzeit
+ * nachrechnen und bei Bedarf anders treffen, ohne dass etwas
+ * unwiderruflich zusammenfällt.
+ *
+ * Abgefragt wird über die eigene Function /api/wetter. Warum nicht
+ * direkt: siehe den Kopf von api/wetter.js — CORS, die Stationssuche
+ * über rund 160 Zeilen CSV und das Format mit Semikolon und Metern pro
+ * Sekunde haben auf einem Handy mit Baustellenempfang nichts verloren.
  *
  * Der Standort verlässt das Gerät auf drei Nachkommastellen gerundet,
- * also gut hundert Meter genau. Für das Wetter über einer Baustelle
+ * also gut hundert Meter genau. Für die Suche nach der nächsten Station
  * reicht das bei weitem, und mehr als nötig soll niemand verschicken.
  */
 
 const WETTER_JETZT = (() => {
-  const API = 'https://api.open-meteo.com/v1/forecast';
+  const API = '/api/wetter';
 
   /* Der Name des Dienstes, so wie er am Eintrag stehen soll. Er wandert
      mit in die Datenbank und nicht nur in einen Anzeigetext: kommt
      später ein zweiter Dienst dazu oder wird gewechselt, muss an jedem
      einzelnen Eintrag nachvollziehbar bleiben, woher seine Angabe kam. */
-  const QUELLE = 'Open-Meteo';
+  const QUELLE = 'MeteoSchweiz';
 
   /* Wie lange gewartet wird. Der Standort darf länger brauchen als die
      Abfrage: auf dem Handy heisst das erste Mal Freigabe-Dialog, GPS und
-     manchmal ein Gang vor die Tür. */
+     manchmal ein Gang vor die Tür. Hinter /api/wetter liegen zwei
+     fremde Abrufe, deshalb etwas mehr Geduld als bei einem einzelnen. */
   const GEDULD_ORT = 12000;
-  const GEDULD_API = 8000;
+  const GEDULD_API = 10000;
 
-  /* Ein Windwert, ab dem die Lage unabhängig vom Himmel «Sturm/Wind»
-     heisst. 62 km/h ist Beaufort 8, «stürmischer Wind»; der Sturm selbst
-     beginnt erst bei Beaufort 9 und 75 km/h.
-     Zwei Dinge dazu, damit der Wert richtig gelesen wird. Verglichen wird
-     mit dem mittleren Wind auf 10 Metern, nicht mit Böen — und Böen
-     liegen typisch beim Anderthalb- bis Doppelten. Ein Mittel von 62
-     bedeutet also Böen um 90 bis 110, einen Tag, an dem ohnehin niemand
-     mehr auf dem Gerüst steht. Umgekehrt bleibt ein Tag mit blauem
-     Himmel und Böen von 70 hier «Sonnig», obwohl der Kran steht. Wer
-     will, dass der Chip beschreibt, was auf der Baustelle los war, fragt
-     wind_gusts_10m ab und vergleicht damit. Das ist eine Entscheidung
-     und keine Feinheit, deshalb steht sie hier und nicht im Verborgenen.
-     Unterhalb der Schwelle wird nicht übersteuert: ein sonniger Tag mit
-     Brise bleibt sonnig. */
-  const STURM_KMH = 62;
+  /* Ab welcher Böenspitze die Lage unabhängig vom Himmel «Sturm/Wind»
+     heisst.
+     Gemessen wird die Böe und nicht mehr der mittlere Wind — das ist
+     der Wert, an dem auf der Baustelle etwas hängt. Kranführer stellen
+     im Bereich um 60 bis 70 km/h ein, Gerüst- und Fassadenarbeiten
+     hören früher auf. 60 km/h ist damit die Grenze, ab der ein Tag im
+     Journal «Sturm/Wind» heissen soll, auch wenn die Sonne scheint.
+     Der mittlere Wind lag für dasselbe Ereignis bei gut der Hälfte;
+     wer alte Einträge vergleicht, muss das wissen. */
+  const STURM_KMH = 60;
 
-  /* Die WMO-Schlüssel, die Open-Meteo liefert, auf die sieben Chips
-     abgebildet. Gewitter (95–99) zählt zu Sturm/Wind und nicht zu Regen:
-     auf dem Bau ist der Grund für den Unterbruch das Gewitter, nicht die
-     Nässe. */
-  const CODES = [
-    [[0, 1], 'Sonnig'],
-    [[2], 'Wechselhaft'],
-    [[3], 'Bewölkt'],
-    [[45, 48], 'Nebel'],
-    [[51, 53, 55, 56, 57], 'Regen'],          // Niesel, auch gefrierend
-    [[61, 63, 65, 66, 67], 'Regen'],
-    [[80, 81, 82], 'Regen'],                  // Schauer
-    [[71, 73, 75, 77], 'Schnee'],
-    [[85, 86], 'Schnee'],                     // Schneeschauer
-    [[95, 96, 99], 'Sturm/Wind']              // Gewitter, auch mit Hagel
-  ];
+  /* Ab wann Niederschlag als Schnee gilt. Nassschnee fällt bis knapp
+     über null; darüber wird es Regen. */
+  const SCHNEE_GRAD = 1;
 
-  /* Welcher der sieben Wetter-Chips passt. Ein unbekannter Schlüssel
-     ergibt nichts — dann bleibt das Feld leer und wird von Hand gesetzt,
-     statt dass etwas Falsches dasteht. */
-  /* Fehlt ein Wert, ist er nicht null Grad und nicht Schlüssel null:
-     Number(null) ergäbe beides, und aus einer Lücke in der Antwort würde
-     ein wolkenloser Himmel. Also erst prüfen, dann rechnen. */
+  /* Sonnenscheindauer der letzten zehn Minuten, in Minuten. Sieben von
+     zehn heisst: die Sonne stand die meiste Zeit frei. Unter zwei war
+     sie es so gut wie nie. Dazwischen wechselt es, und genau so heisst
+     der Chip. */
+  const SONNIG_MIN = 7;
+  const WECHSEL_MIN = 2;
+
+  /* Unter dieser Sonnenhöhe sagt die Sonnenscheindauer nichts mehr:
+     nachts ist sie immer null, und daraus «bedeckt» zu machen wäre
+     falsch. Drei Grad, weil knapp über dem Horizont auch bei klarem
+     Himmel kaum noch etwas gemessen wird. */
+  const DAEMMERUNG_GRAD = 3;
+
   const zahl = v => {
     if (v === null || v === undefined || v === '') return NaN;
     const n = Number(v);
     return Number.isFinite(n) ? n : NaN;
   };
 
-  function lageAus(code, windKmh) {
-    if (zahl(windKmh) >= STURM_KMH) return 'Sturm/Wind';
-    const c = zahl(code);
-    if (Number.isNaN(c)) return null;
-    const treffer = CODES.find(([liste]) => liste.includes(c));
-    return treffer ? treffer[1] : null;
+  /* --- Die Zuordnung auf die Chips ---------------------------------------- */
+
+  /* Welcher der sieben Wetter-Chips passt, aus den Messwerten. Kommt
+     nichts Belastbares heraus, kommt nichts zurück — dann bleibt das
+     Feld leer und wird von Hand gesetzt, statt dass etwas Falsches
+     dasteht.
+
+     Was diese Funktion bewusst nie liefert:
+       Nebel    — SwissMetNet misst keine Sichtweite an jeder Station,
+                  und hohe Feuchte allein ist kein Nebel.
+       Gewitter — dafür gibt es unter diesen Messwerten keinen Beleg.
+     Beides steht als Chip bereit und wartet auf einen Fingertipp. */
+  function lageAus({ boe_kmh, regen_mm, sonne_min, grad, tag } = {}) {
+    if (zahl(boe_kmh) >= STURM_KMH) return 'Sturm/Wind';
+
+    const regen = zahl(regen_mm);
+    if (Number.isFinite(regen) && regen > 0) {
+      const t = zahl(grad);
+      return Number.isFinite(t) && t <= SCHNEE_GRAD ? 'Schnee' : 'Regen';
+    }
+
+    /* Ohne Tageslicht ist die Sonnenscheindauer keine Aussage über den
+       Himmel, sondern nur über die Uhrzeit. */
+    if (tag === false) return null;
+
+    const sonne = zahl(sonne_min);
+    if (Number.isNaN(sonne)) return null;
+    if (sonne >= SONNIG_MIN) return 'Sonnig';
+    if (sonne >= WECHSEL_MIN) return 'Wechselhaft';
+    return 'Bewölkt';
   }
 
   /* Welcher der fünf Temperatur-Chips passt. Die Grenzen gehören jeweils
@@ -105,9 +149,39 @@ const WETTER_JETZT = (() => {
     return '> 30°C';
   }
 
-  /* Ein Fehler, der sagen kann, warum. Der Grund steuert den Text neben
-     dem Knopf; die Meldung selbst steht schon hier, damit sie an einer
-     Stelle gepflegt wird. */
+  /* Steht die Sonne über dem Horizont? Gebraucht wird nur ja oder nein,
+     deshalb genügt die übliche Näherung über Deklination und
+     Zeitgleichung; sie liegt auf etwa ein Grad genau, und das ist für
+     diese Frage eine Genauigkeit zu viel statt zu wenig. */
+  function sonnenhoehe(wann, lat, lon) {
+    const d = wann instanceof Date ? wann : new Date(wann);
+    if (Number.isNaN(d.getTime())) return null;
+    const rad = Math.PI / 180;
+
+    const jahresbeginn = Date.UTC(d.getUTCFullYear(), 0, 0);
+    const tag = (d.getTime() - jahresbeginn) / 86400000;
+
+    const dekl = 23.44 * rad * Math.sin(2 * Math.PI * (284 + tag) / 365);
+    const b = 2 * Math.PI * (tag - 81) / 364;
+    const zeitgleichung = 9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b);
+
+    const utc = d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600;
+    const ortszeit = utc + lon / 15 + zeitgleichung / 60;
+    const stundenwinkel = (ortszeit - 12) * 15 * rad;
+
+    const h = Math.asin(
+      Math.sin(lat * rad) * Math.sin(dekl) +
+      Math.cos(lat * rad) * Math.cos(dekl) * Math.cos(stundenwinkel));
+    return h / rad;
+  }
+
+  const istTag = (wann, lat, lon) => {
+    const h = sonnenhoehe(wann, lat, lon);
+    return h === null ? true : h > DAEMMERUNG_GRAD;
+  };
+
+  /* --- Fehler ------------------------------------------------------------- */
+
   function fehler(grund, text) {
     const e = new Error(text);
     e.grund = grund;
@@ -120,23 +194,24 @@ const WETTER_JETZT = (() => {
     verweigert: 'Standort nicht freigegeben. Bitte von Hand wählen.',
     unbekannt: 'Der Standort liess sich nicht bestimmen. Bitte von Hand wählen.',
     zeit: 'Der Standort kam nicht rechtzeitig. Bitte von Hand wählen.',
-    dienst: 'Der Wetterdienst antwortet gerade nicht. Bitte von Hand wählen.'
+    dienst: 'MeteoSchweiz antwortet gerade nicht. Bitte von Hand wählen.',
+    ausserhalb: 'Für diesen Standort gibt es keine Messstation von MeteoSchweiz. Bitte von Hand wählen.'
   };
 
-  /* Den Standort holen.
-   *
-   * Zwei Dinge sind hier iPhone-Erfahrung und nicht Vorsicht auf Vorrat.
-   * Erstens fragt iOS nur nach, wenn der Aufruf an einem Fingertipp
-   * hängt — deshalb steht er hinter dem Knopf und nirgends sonst.
-   * Zweitens meldet sich die Standortabfrage in einer zum
-   * Startbildschirm hinzugefügten App gelegentlich überhaupt nicht
-   * zurück, weder mit Erfolg noch mit Fehler; dann läuft auch das eigene
-   * timeout der Browserfunktion nicht ab. Also läuft eine eigene Uhr
-   * daneben, und nach ihr ist Schluss.
-   *
-   * maximumAge: eine Ortung aus den letzten fünf Minuten wird
-   * angenommen. Für das Wetter ist sie so gut wie eine frische und auf
-   * dem Handy um ein Vielfaches schneller. */
+  /* --- Der Standort -------------------------------------------------------- */
+
+  /* Zwei Dinge sind hier iPhone-Erfahrung und nicht Vorsicht auf Vorrat.
+     Erstens fragt iOS nur nach, wenn der Aufruf an einem Fingertipp
+     hängt — deshalb steht er hinter dem Knopf und nirgends sonst.
+     Zweitens meldet sich die Standortabfrage in einer zum
+     Startbildschirm hinzugefügten App gelegentlich überhaupt nicht
+     zurück, weder mit Erfolg noch mit Fehler; dann läuft auch das eigene
+     timeout der Browserfunktion nicht ab. Also läuft eine eigene Uhr
+     daneben, und nach ihr ist Schluss.
+
+     maximumAge: eine Ortung aus den letzten fünf Minuten wird
+     angenommen. Für die Suche nach der nächsten Station ist sie so gut
+     wie eine frische und auf dem Handy um ein Vielfaches schneller. */
   function standort() {
     return new Promise((gut, schlecht) => {
       if (!navigator.geolocation) {
@@ -168,12 +243,10 @@ const WETTER_JETZT = (() => {
     });
   }
 
-  /* Die Abfrage selbst. Ohne Schlüssel, ohne Kopfzeilen, ohne Cookie —
-     eine einfache GET-Anfrage, die auch der Service Worker in Ruhe lässt,
-     weil sie an einen fremden Ursprung geht. */
+  /* --- Die Abfrage --------------------------------------------------------- */
+
   async function messwerte({ lat, lon }) {
-    const ziel = `${API}?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}`
-               + '&current=temperature_2m,weather_code,wind_speed_10m';
+    const ziel = `${API}?lat=${lat.toFixed(3)}&lon=${lon.toFixed(3)}`;
 
     const abbruch = new AbortController();
     const uhr = setTimeout(() => abbruch.abort(), GEDULD_API);
@@ -185,18 +258,23 @@ const WETTER_JETZT = (() => {
     } finally {
       clearTimeout(uhr);
     }
+
+    /* 400 heisst hier immer dasselbe: ausserhalb des Messnetzes. Das ist
+       kein Ausfall und soll auch nicht so klingen. */
+    if (antwort.status === 400) throw fehler('ausserhalb', TEXTE.ausserhalb);
     if (!antwort.ok) throw fehler('dienst', TEXTE.dienst);
 
-    let roh;
-    try { roh = await antwort.json(); } catch { throw fehler('dienst', TEXTE.dienst); }
+    let d;
+    try { d = await antwort.json(); } catch { throw fehler('dienst', TEXTE.dienst); }
+    if (!d || !d.station) throw fehler('dienst', TEXTE.dienst);
 
-    const jetzt = roh && roh.current;
-    if (!jetzt) throw fehler('dienst', TEXTE.dienst);
+    const grad = zahl(d.grad);
+    const gemessen_am = d.gemessen_am || new Date().toISOString();
+    const tag = istTag(gemessen_am, lat, lon);
 
-    const grad = zahl(jetzt.temperature_2m);
-    const code = zahl(jetzt.weather_code);
-    const wind = zahl(jetzt.wind_speed_10m);
-    const lage = lageAus(code, wind);
+    const lage = lageAus({
+      boe_kmh: d.boe_kmh, regen_mm: d.regen_mm, sonne_min: d.sonne_min, grad, tag
+    });
     const stufe = stufeAus(grad);
 
     /* Kommt weder eine Lage noch eine Stufe heraus, war die Abfrage
@@ -204,7 +282,30 @@ const WETTER_JETZT = (() => {
        Verdacht drücken. */
     if (!lage && !stufe) throw fehler('dienst', TEXTE.dienst);
 
-    return { lage, stufe, grad, code, wind, quelle: QUELLE };
+    /* Was an den Eintrag wandert: die Werte, aus denen die Zuordnung
+       entstanden ist, dazu die Station und der ganze Rohsatz der
+       Messung. Damit ist jede Zuordnung später nachrechenbar. */
+    const rohwerte = {
+      station: d.station,
+      gemessen_am,
+      boe_kmh: Number.isFinite(zahl(d.boe_kmh)) ? d.boe_kmh : null,
+      wind_kmh: Number.isFinite(zahl(d.wind_kmh)) ? d.wind_kmh : null,
+      regen_mm: Number.isFinite(zahl(d.regen_mm)) ? d.regen_mm : null,
+      sonne_min: Number.isFinite(zahl(d.sonne_min)) ? d.sonne_min : null,
+      feuchte_prozent: Number.isFinite(zahl(d.feuchte_prozent)) ? d.feuchte_prozent : null,
+      strahlung_wm2: Number.isFinite(zahl(d.strahlung_wm2)) ? d.strahlung_wm2 : null,
+      sonne_am_himmel: tag,
+      messung: d.roh || null
+    };
+
+    return {
+      lage, stufe, grad,
+      boe_kmh: d.boe_kmh ?? null,
+      quelle: d.quelle || QUELLE,
+      gemessen_am,
+      station: d.station,
+      rohwerte
+    };
   }
 
   /* Der ganze Weg, wie ihn der Knopf braucht. Offline wird gar nicht
@@ -217,5 +318,8 @@ const WETTER_JETZT = (() => {
     return messwerte(await standort());
   }
 
-  return { lageAus, stufeAus, standort, messwerte, abrufen, TEXTE, STURM_KMH, QUELLE };
+  return {
+    lageAus, stufeAus, sonnenhoehe, istTag, standort, messwerte, abrufen,
+    TEXTE, QUELLE, STURM_KMH, SCHNEE_GRAD
+  };
 })();

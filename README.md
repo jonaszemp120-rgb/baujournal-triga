@@ -338,35 +338,42 @@ Fehlschlag endet in einer Zeile Text unter den Chips: kein Dialog, keine Sperre,
 kein Toast, der etwas verdeckt. Offline wird gar nicht erst losgeschickt, das
 spart den Freigabe-Dialog für eine Abfrage, die ohnehin nicht durchkäme.
 
-**Open-Meteo, weil es ohne Konto und ohne Schlüssel läuft.** Kein Login, keine
-Kreditkarte, nichts in den Umgebungsvariablen zu hinterlegen und nichts, was
-ohne Schlüssel still stehen bliebe — anders als bei der Adresssuche über
-search.ch, die deshalb über eine eigene Serverless-Function läuft. Die Anfrage
-geht direkt aus dem Browser an `api.open-meteo.com` und damit an einen fremden
-Ursprung, den der Service Worker ohnehin in Ruhe lässt.
+**MeteoSchweiz, und zwar aus einem Lizenzgrund.** Zuerst lief die Abfrage über
+Open-Meteo. Dessen Daten stehen zwar unter CC BY 4.0, der *freie Endpunkt*
+aber ist ausdrücklich der nicht gewerblichen Nutzung vorbehalten; für
+gewerbliche Nutzung sieht Open-Meteo ein Abonnement mit eigenem Endpunkt und
+Schlüssel vor. Eine Firmen-App, mit der eine Bauleitung ihre Journale führt,
+ist im gewöhnlichen Sinn gewerbliche Nutzung — also ist die Quelle gewechselt,
+bevor der Knopf länger im Einsatz stand.
 
-**Offen ist dabei die Lizenz, und das gehört hierhin und nicht in eine
-Fussnote.** Die Daten selbst stehen unter CC BY 4.0 und dürfen auch gewerblich
-verwendet werden. Der *freie Endpunkt* dagegen ist ausdrücklich der nicht
-gewerblichen Nutzung vorbehalten, mit 10 000 Abrufen am Tag; für gewerbliche
-Nutzung sieht Open-Meteo ein Abonnement mit eigenem Endpunkt und Schlüssel vor.
-Eine Firmen-App, mit der eine Bauleitung ihre Journale führt, ist im
-gewöhnlichen Sinn gewerbliche Nutzung. Das ist zu klären, bevor der Knopf
-länger im Einsatz steht; die Menge ist kein Thema, ein paar Abrufe am Tag
-bleiben weit unter jeder Grenze. Die naheliegende Alternative steht weiter
-unten.
+Die Messdaten von **MeteoSchweiz** stehen seit 2025 als Open Government Data
+frei zur Verfügung: kein Konto, kein Schlüssel, kein Abo, keine Kreditkarte
+und keine Tagesgrenze, an der etwas kippt. Verlangt ist die Quellenangabe, und
+die steht an jedem Eintrag in `wetter_quelle` und in der Zeile unter den Chips.
+Gewerbliche Nutzung ist dabei ausdrücklich erlaubt. Dazu kommt, dass es
+amtliche Messwerte von 158 automatischen Stationen sind und kein gerechneter
+Modellwert.
 
-**Eine zweite Quelle ist vorbereitet, aber nicht gebaut.** `wetter_quelle` am
-Eintrag hält fest, wer geantwortet hat, und `WETTER_JETZT.QUELLE` ist der
-einzige Ort, an dem der Name steht. Ein zweiter Dienst käme also dazu, ohne
-dass ein einziger bestehender Eintrag umgeschrieben werden müsste. Der
-Kandidat dafür ist **MeteoSchweiz**: seit 2025 stehen Mess-, Klima- und
-Prognosedaten als Open Government Data frei zur Verfügung, ausdrücklich ohne
-Nutzungsbeschränkung und nur mit Quellenangabe — damit fällt die Lizenzfrage
-weg, und es sind echte Messwerte von 158 automatischen Stationen statt eines
-Modellwerts. Der Preis dafür: die nächste Station kann fünfzehn Kilometer
-entfernt und vierhundert Meter höher stehen, und dann beschreibt sie die
-Baustelle schlechter als ein Modell, das auf ihre Koordinaten rechnet.
+**Der Preis dafür steht gleich dabei.** Die nächste Station kann Kilometer
+entfernt und einige hundert Meter höher liegen als die Baustelle. Deshalb
+stehen ihr Name und ihr Abstand in der Zeile unter den Chips und in den
+Rohwerten am Eintrag — wer das Journal später liest, soll nicht glauben, hier
+sei auf dem Bauplatz gemessen worden.
+
+**Die Abfrage läuft über `/api/wetter`** und nicht direkt aus dem Browser.
+Zwischen dem Handy und der Antwort liegen die Stationsliste als CSV mit rund
+160 Zeilen, die Suche nach der nächsten Station und ein Messsatz mit Semikolon
+als Trenner und Metern pro Sekunde als Einheit; das gehört auf einen Server und
+nicht in einen Baustellenempfang. `api/wetter.js` macht daraus einen kleinen
+JSON-Satz mit fertigen km/h. Ein Schlüssel ist dafür nirgends zu hinterlegen —
+anders als bei der Adresssuche über search.ch, die aus demselben Grund eine
+eigene Function hat, aber zusätzlich einen Schlüssel braucht.
+
+**Ein Wechsel der Quelle schreibt keinen alten Eintrag um.** `wetter_quelle`
+hält an jedem Eintrag fest, wer geantwortet hat, und `WETTER_JETZT.QUELLE` ist
+der einzige Ort im Code, an dem der Name steht. Einträge aus der Open-Meteo-Zeit
+behalten also ihren Namen und ihre Gradzahl und bleiben genau so lesbar wie
+vorher.
 
 **Der Standort verlässt das Gerät auf drei Nachkommastellen gerundet**, also
 gut hundert Meter genau. Für das Wetter über einer Baustelle reicht das bei
@@ -377,13 +384,28 @@ Grobstufen fest — «Sonnig», «10–20°C». Damit ginge beim Speichern genau
 verloren, was die Abfrage ausmacht: die Gradzahl selbst, der Zeitpunkt, und
 dass da ein Dienst geantwortet hat statt jemand getippt. Für ein Journal, das
 im Streitfall als Beweismittel dient, ist das der Unterschied zwischen «der
-Bauleiter hat sonnig angetippt» und «um 11:42 lieferte Open-Meteo für diesen
-Ort 17,7 Grad». Drei Spalten halten das fest: `eintraege.wetter_grad`,
-`eintraege.wetter_gemessen_am` und `eintraege.wetter_quelle`. Der Zeitpunkt ist
-zugleich das Kennzeichen, dass abgefragt wurde. Eine Prüfregel verlangt alle
-drei zusammen oder keine, und ohne Chip daneben gar keine — eine Gradzahl ohne
-Zeitpunkt sagt nicht, wann sie galt, und eine ohne Quelle nicht, wer sie
-behauptet.
+Bauleiter hat sonnig angetippt» und «um 11:30 meldete die Station Giswil, 6,2
+Kilometer entfernt, 17,7 Grad». Drei Spalten halten das fest:
+`eintraege.wetter_grad`, `eintraege.wetter_gemessen_am` und
+`eintraege.wetter_quelle`. Der Zeitpunkt ist zugleich das Kennzeichen, dass
+abgefragt wurde, und er kommt von der Messung und nicht von der Uhr des
+Geräts. Eine Prüfregel verlangt alle drei zusammen oder keine, und ohne Chip
+daneben gar keine — eine Gradzahl ohne Zeitpunkt sagt nicht, wann sie galt, und
+eine ohne Quelle nicht, wer sie behauptet.
+
+**Und daneben steht alles, was sonst noch kam.** `eintraege.wetter_rohwerte`
+nimmt als `jsonb` den ganzen Satz der Station auf: Böe, mittlerer Wind,
+Niederschlag, Sonnenscheindauer, Feuchte, Globalstrahlung, dazu Station,
+Abstand und Höhe, und ob die Sonne zu diesem Zeitpunkt über dem Horizont stand.
+Der Grund ist derselbe wie bei der Gradzahl, nur eine Stufe grundsätzlicher:
+die sieben Chips sind grob, und ein Gewitter mit Hagel fiele sonst
+unwiderruflich zu «Sturm/Wind» zusammen. Mit den Rohwerten bleibt die Zuordnung
+eine Frage der Anzeige — jederzeit nachrechenbar und bei Bedarf anders zu
+treffen. `jsonb` und nicht eine Spalte je Wert, weil die Dienste
+Verschiedenes liefern: MeteoSchweiz misst, ein Modelldienst schickt stattdessen
+einen WMO-Schlüssel. Welche Form dasteht, sagt `wetter_quelle` daneben. Die
+Spalte darf leer bleiben, wo sie es muss: Einträge aus der Zeit davor haben
+keine, und Erfundenes gehört nicht in ein Journal.
 
 **Die Quelle steht als eigener Wert und nicht im Anzeigetext.** Kommt später
 ein zweiter Dienst dazu oder wird gewechselt, muss an jedem einzelnen Eintrag
@@ -391,9 +413,13 @@ nachvollziehbar bleiben, woher seine Angabe kam; ein fest verdrahteter Name in
 einer Zeile Text leistet das nicht. Den Namen liefert `WETTER_JETZT.QUELLE` in
 `js/wetter.js` und niemand sonst.
 
-Die Zeile — «Um 11:42 Uhr automatisch abgefragt (Open-Meteo): Sonnig · 10–20°C
-(17,7°C).» — baut `wetterAbrufText()` in `js/store.js`, an einer Stelle für alle
-drei Orte: Formular, Detailansicht und Export. Bewusst nicht «gemessen»:
+Die Zeile — «Um 11:30 Uhr automatisch abgefragt (MeteoSchweiz · Giswil, 6,2 km):
+Sonnig · 10–20°C (17,7°C).» — baut `wetterAbrufText()` in `js/store.js`, an
+einer Stelle für alle drei Orte: Formular, Detailansicht und Export. Kam keine
+Gradzahl, steht dort keine Abfrage, sondern nur die kurze Notiz, welcher Chip
+gesetzt wurde: ohne Gradzahl nimmt die Datenbank die Abfrage nicht an, also
+verspricht die Zeile auch keine Herkunft, die der Eintrag nachher nicht mehr
+zeigt. Bewusst nicht «gemessen»:
 niemand hat ein Thermometer abgelesen, ein Dienst im Netz wurde gefragt.
 Ein Eintrag mit von Hand gewählten Chips hat die Zeile nicht, und ältere
 Einträge haben sie auch nicht: bei ihnen stehen die Spalten leer, und
@@ -402,15 +428,28 @@ bleibt erkennbar, welcher Eintrag auf einem Abruf beruht.
 
 **Die Abfrage verfällt, sobald jemand von Hand eingreift.** Ein Tipp auf einen
 Chip im Formular, ein «Angaben vom letzten Eintrag übernehmen», eine Korrektur
-am fertigen Eintrag — in allen drei Fällen fallen Gradzahl, Zeitpunkt und
-Quelle weg. Sonst stünde später «um 11:42 Uhr automatisch abgefragt: Sonnig» an
-einem Eintrag, bei dem inzwischen Regen angetippt ist. Bei der Korrektur macht
-das nicht die App, sondern `korrigiere_eintrag()`: die Funktion führt eine
-Erlaubnisliste von Spalten, die drei neuen stehen bewusst nicht darin — von
-Hand nachtragen oder umschreiben soll niemand können, was als Abfrage gilt —,
-und sie setzt alle drei auf null, sobald `wetter` oder `temperatur` im
-Korrektursatz vorkommen. Die Änderung selbst steht ohnehin im
+am fertigen Eintrag — in allen drei Fällen fallen Gradzahl, Zeitpunkt, Quelle
+und Rohwerte weg. Sonst stünde später «um 11:30 Uhr automatisch abgefragt:
+Sonnig» an einem Eintrag, bei dem inzwischen Regen angetippt ist. Bei der
+Korrektur macht das nicht die App, sondern `korrigiere_eintrag()`: die Funktion
+führt eine Erlaubnisliste von Spalten, die vier stehen bewusst nicht darin —
+über diesen Weg soll niemand nachtragen oder umschreiben können, was als
+Abfrage gilt —, und sie setzt alle vier auf null, sobald `wetter` oder
+`temperatur` im Korrektursatz vorkommen. Die Änderung selbst steht ohnehin im
 Korrekturprotokoll.
+
+Das gilt für den Weg durch die Funktion und nicht darüber hinaus: die
+UPDATE-Policy auf `eintraege` steht auf `true`, und das Recht auf die Spalten
+liegt bei `authenticated`. Ein angemeldetes Konto könnte also mit einem
+direkten Aufruf an PostgREST jede Spalte jedes Eintrags umschreiben, an der
+Erlaubnisliste und am Korrekturprotokoll vorbei — die vier Wetterspalten
+eingeschlossen. Die App selbst tut das nirgends, sie geht ausschliesslich über
+`korrigiere_eintrag()`, `loesche_eintrag()` und `stelle_eintrag_wieder_her()`.
+Zuzumachen ist die Lücke nicht mit einem `revoke`: die drei Funktionen laufen
+als `security invoker` und leben genau von diesem Recht. Dafür müssten sie auf
+`security definer` umgestellt werden und ihre Berechtigungsprüfung selbst
+mitbringen. Das ist ein Eingriff in den Schutz der Kerntabelle und wartet auf
+einen eigenen Schritt.
 
 Die Spalte heisst weiterhin `wetter_gemessen_am` und nicht `…abgefragt_am`. Sie
 steht seit dem ersten Tag so in der Tabelle, und ein Eintrag, der in einer
@@ -419,14 +458,45 @@ sich — eine Umbenennung liesse ihn beim Nachtragen auflaufen. Gemeint ist der
 Zeitpunkt der Abfrage.
 
 **Die Zuordnung** steht in `js/wetter.js` und ist bewusst ohne Oberfläche
-prüfbar. `lageAus(code, wind)` bildet die WMO-Schlüssel auf die sieben Chips ab,
-`stufeAus(grad)` die Gradzahl auf die fünf Bereiche. Zwei Entscheide darin sind
-keine Selbstverständlichkeit: ein Gewitter (95–99) zählt zu *Sturm/Wind* und
-nicht zu *Regen*, denn auf dem Bau ist der Grund für den Unterbruch das Gewitter;
-und ab 62 km/h — Beaufort 8, der Beginn des Sturms — heisst die Lage *Sturm/Wind*
-unabhängig vom Himmel, weil dann Kran und Gerüst zum Thema werden. Eine
-kräftige Brise übersteuert dagegen nichts. Ist ein Schlüssel unbekannt oder
-fehlt ein Wert, wird nichts gesetzt statt etwas auf Verdacht.
+prüfbar. `stufeAus(grad)` bildet die Gradzahl auf die fünf Bereiche ab, die
+Grenzen gehören jeweils zum unteren Bereich. `lageAus({boe_kmh, regen_mm,
+sonne_min, grad, tag})` bildet die Messwerte auf die sieben Wetter-Chips ab —
+und hier liegt der eigentliche Unterschied zu vorher, denn:
+
+**Ein Messnetz misst, es beurteilt nicht.** MeteoSchweiz liefert keinen
+Wetterschlüssel, sondern Zahlen. Die Lage wird deshalb abgeleitet, und nur
+dort, wo die Messwerte sie wirklich hergeben:
+
+- Böe ab **60 km/h** heisst *Sturm/Wind*, unabhängig vom Himmel. Gemessen wird
+  die Böenspitze (`fkl010z1`) und nicht mehr der mittlere Wind: an der Böe
+  hängt auf der Baustelle etwas. Kranführer stellen im Bereich um 60 bis 70
+  km/h ein, Gerüst- und Fassadenarbeiten hören früher auf. Der mittlere Wind
+  lag für dasselbe Ereignis bei gut der Hälfte — wer Einträge aus der
+  Open-Meteo-Zeit vergleicht, muss das wissen.
+- Niederschlag über null heisst *Regen*, bei bis zu 1 °C *Schnee*. Nassschnee
+  fällt bis knapp über null.
+- Sonst entscheidet die Sonnenscheindauer der letzten zehn Minuten: ab sieben
+  Minuten *Sonnig*, ab zwei *Wechselhaft*, darunter *Bewölkt*.
+
+**Nachts sagt die Sonnenscheindauer nichts.** Sie ist dann immer null, und
+daraus «Bewölkt» zu machen wäre schlicht falsch. Also rechnet `sonnenhoehe()`
+über Deklination und Zeitgleichung nach, ob die Sonne zum Zeitpunkt der Messung
+mehr als drei Grad über dem Horizont stand; darunter bleibt der Wetter-Chip
+leer. Die Näherung liegt auf etwa ein Grad genau, und für die Frage «Tag oder
+Nacht» ist das eine Genauigkeit zu viel statt zu wenig.
+
+**Nebel und Gewitter setzt die App nie von selbst.** Für Nebel misst nicht jede
+Station die Sichtweite, und hohe Feuchte allein ist kein Nebel; für ein
+Gewitter gibt es unter diesen Messwerten überhaupt keinen Beleg. Beide Chips
+stehen bereit und warten auf einen Fingertipp. Ein geratener Chip in einem
+Journal ist schlimmer als ein leerer — und generell gilt: fehlt ein Wert, wird
+nichts gesetzt statt etwas auf Verdacht. Kommt weder Lage noch Stufe heraus,
+sagt die Zeile das, statt einen Chip auf gut Glück zu drücken.
+
+**Ausserhalb der Schweiz gibt es keine Antwort,** und das ist Absicht.
+SwissMetNet endet an der Grenze; eine Station 300 Kilometer weiter zu nehmen
+wäre kein Messwert mehr. `api/wetter.js` antwortet dort mit 400, und die App
+macht daraus einen klaren Satz statt einer Fehlermeldung.
 
 **Was iOS anders macht,** und was daraus folgt:
 
@@ -487,8 +557,8 @@ js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
                      Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
 js/journal.js js/eintrag.js js/papierkorb.js
-js/wetter.js          Wetter jetzt abrufen: Standort, Open-Meteo,
-                      Zuordnung auf die Chips
+js/wetter.js          Wetter jetzt abrufen: Standort, MeteoSchweiz,
+                      Ableitung der Chips aus den Messwerten
 js/verlauf.js        Eintragszeile und Filter, geteilt von Startseite
                      und Papierkorb
 js/export.js         PDF und Word
@@ -518,6 +588,8 @@ css/projekte.css      Statusmarken und Karten des Bereichs Projekte.
                       für die Berechtigungsstufe
 api/search-ch.js     Serverless-Function als Proxy zur Tel-API von
                      search.ch, hält den Schlüssel serverseitig
+api/wetter.js        sucht die nächste Messstation von MeteoSchweiz und
+                     macht aus ihrem CSV-Satz fertige Zahlen
 vendor/              supabase-js, jsPDF, docx, SheetJS, lokal statt
                      vom CDN
 assets/              Logo, PWA-Icons, Archivo als woff2
@@ -561,11 +633,13 @@ alle acht Bereiche.
   Status-Spalte daneben wäre eine zweite Wahrheit
 - `eintraege` — ein Rundgang, `kontrolle` als JSON mit der kompletten
   Punkteliste, `betrifft_gebaeude` als JSON-Liste, `geloescht_am` und
-  `geloescht_von` für den Papierkorb. `wetter_grad`, `wetter_gemessen_am` und
-  `wetter_quelle` stehen nur da, wo das Wetter über die Live-Abfrage kam: die
-  Gradzahl auf ein Zehntel, der Zeitpunkt und der Name des Dienstes. Alle drei
-  zusammen oder keine, das hält die Prüfregel `eintraege_wetter_messung` fest;
-  siehe «Wetter jetzt abrufen»
+  `geloescht_von` für den Papierkorb. `wetter_grad`, `wetter_gemessen_am`,
+  `wetter_quelle` und `wetter_rohwerte` stehen nur da, wo das Wetter über die
+  Live-Abfrage kam: die Gradzahl auf ein Zehntel, der Zeitpunkt, der Name des
+  Dienstes und der ganze Messsatz als JSON. Die ersten drei zusammen oder
+  keine, das hält die Prüfregel `eintraege_wetter_messung` fest; die Rohwerte
+  dürfen fehlen, weil die Einträge von vor dieser Spalte keine haben. Siehe
+  «Wetter jetzt abrufen»
 - `eintraege_korrekturen` — das Korrekturprotokoll, nur lesen und anhängen
 - `profile` — Anzeigename je Konto, weil `auth.users` vom Client aus nicht
   lesbar ist. Wird automatisch angelegt, sobald ein Konto entsteht
@@ -1220,10 +1294,11 @@ Vier, alle in den Projekteinstellungen von Vercel und keine davon im Repo:
 | `VAPID_ABSENDER` | `mailto:`-Adresse, die der Push-Dienst im Störungsfall anschreibt |
 | `SUPABASE_SERVICE_KEY` | liest die Push-Abos der anderen und räumt abgelaufene Chat-Bilder weg |
 
-Die Wetterabfrage im Baujournal steht bewusst nicht in dieser Tabelle: der
-freie Endpunkt von Open-Meteo braucht keinen Schlüssel, also gibt es auch
-nichts zu hinterlegen und nichts, was ohne Schlüssel still stehen bliebe. Zur
-offenen Lizenzfrage dieses Endpunkts siehe «Wetter jetzt abrufen».
+Die Wetterabfrage im Baujournal steht bewusst nicht in dieser Tabelle, obwohl
+sie über eine eigene Function läuft: die Open Government Data von MeteoSchweiz
+brauchen keinen Schlüssel und kein Konto, also gibt es nichts zu hinterlegen
+und nichts, was ohne Schlüssel still stehen bliebe. Warum es trotzdem eine
+Function ist, steht unter «Wetter jetzt abrufen».
 
 Jede fehlende Variable schaltet genau ihren Teil ab und sonst nichts: ohne
 VAPID kommen keine Benachrichtigungen, der Chat läuft weiter; ohne

@@ -72,7 +72,7 @@ function abschnitte(e) {
          ist ihr Sinn. Die Stufen stehen schon zwei Zeilen darueber, also
          hier nur die Herkunft. */
       ...(hatWetterAbruf(e)
-        ? [['Herkunft', wetterAbrufKurz(e.wetter_grad, e.wetter_gemessen_am, e.wetter_quelle)]]
+        ? [['Herkunft', wetterAbrufKurz(e.wetter_grad, e.wetter_gemessen_am, e.wetter_quelle, e.wetter_rohwerte)]]
         : [])
     ] },
     { titel: `Allgemeine Kontrolle (${erfuellt}/${total})`, liste: punkte.map(p =>

@@ -32,20 +32,27 @@ const WETTER_ICON = { 'Sonnig': '☀', 'Wechselhaft': '⛅', 'Bewölkt': '☁', 
 const TEMPERATUR = ['< 0°C', '0–10°C', '10–20°C', '20–30°C', '> 30°C'];
 
 /* Der Satz zur abgefragten Angabe: «Um 11:42 Uhr automatisch abgefragt
-   (Open-Meteo): Sonnig · 10–20°C (17,7°C)». Er steht an drei Orten — im
-   Formular gleich nach dem Abruf, in der Detailansicht des gespeicherten
-   Eintrags und im Export —, und deshalb steht er hier und nicht dreimal.
+   (MeteoSchweiz · Giswil, 6 km): Sonnig · 10–20°C (17,7°C)». Er steht an
+   drei Orten — im Formular gleich nach dem Abruf, in der Detailansicht
+   des gespeicherten Eintrags und im Export —, und deshalb steht er hier
+   und nicht dreimal.
 
    Nicht «gemessen»: niemand hat ein Thermometer abgelesen. Ein Dienst im
    Netz wurde gefragt, und welcher, steht dabei — aus derselben Spalte,
    aus der es auch die Datenbank weiss, und nicht als fester Text in
    dieser Zeile.
 
+   Und die Station gehört dazu, sobald es eine gibt. MeteoSchweiz misst
+   nicht auf der Baustelle, sondern an einem Ort, der Kilometer entfernt
+   und mehrere hundert Meter höher liegen kann. Wer das Journal später
+   liest, soll das sehen und nicht glauben, hier sei auf dem Bauplatz
+   gemessen worden.
+
    Ohne Zeitpunkt gab es keine Abfrage; dann kommt nichts zurück, und die
    Stelle faellt weg. Genau daran erkennt man am Ende, welche Eintraege
    auf einem Abruf beruhen und welche jemand angetippt hat. */
-function wetterAbrufText(lage, stufe, grad, wann, quelle) {
-  const kopf = wetterAbrufKopf(wann, quelle);
+function wetterAbrufText(lage, stufe, grad, wann, quelle, roh) {
+  const kopf = wetterAbrufKopf(wann, quelle, roh);
   if (!kopf) return null;
   const stufen = [lage, stufe].filter(Boolean).join(' · ');
   return `${kopf}: ${stufen || 'keine Angabe'}${wetterGradText(grad)}.`;
@@ -53,21 +60,44 @@ function wetterAbrufText(lage, stufe, grad, wann, quelle) {
 
 /* Dieselbe Angabe als Wert einer beschrifteten Zeile, wie sie der Export
    braucht: dort steht «Herkunft» schon links daneben, und die Stufen
-   stehen zwei Zeilen darüber. */
-function wetterAbrufKurz(grad, wann, quelle) {
-  const kopf = wetterAbrufKopf(wann, quelle);
-  return kopf ? `${kopf}${wetterGradText(grad)}` : null;
+   stehen zwei Zeilen darüber. Deshalb ohne den Satzbau, dafür mit allem,
+   was zur Herkunft gehört. */
+function wetterAbrufKurz(grad, wann, quelle, roh) {
+  if (!wann) return null;
+  const zeit = new Date(wann);
+  if (Number.isNaN(zeit.getTime())) return null;
+  const uhr = zeit.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+  const teile = [
+    String(quelle || '').trim() || null,
+    wetterStationText(roh),
+    `um ${uhr} Uhr abgefragt`,
+    wetterGradText(grad).replace(/^ \(|\)$/g, '') || null
+  ].filter(Boolean);
+  return teile.join(' · ');
 }
 
-function wetterAbrufKopf(wann, quelle) {
+function wetterAbrufKopf(wann, quelle, roh) {
   if (!wann) return null;
   const zeit = new Date(wann);
   if (Number.isNaN(zeit.getTime())) return null;
   const uhr = zeit.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
   /* Ein Eintrag aus der Zeit vor der Quellenspalte nennt keinen Dienst.
      Dann bleibt die Klammer weg, statt einen zu behaupten. */
-  const wer = String(quelle || '').trim();
+  const wer = [String(quelle || '').trim() || null, wetterStationText(roh)]
+    .filter(Boolean).join(' · ');
   return `Um ${uhr} Uhr automatisch abgefragt${wer ? ` (${wer})` : ''}`;
+}
+
+/* «Giswil, 6 km» — woher der Wert kam und wie weit weg das ist. Fehlt
+   die Station, etwa bei einem Eintrag aus der Zeit davor, faellt die
+   Stelle weg. */
+function wetterStationText(roh) {
+  const s = roh && roh.station;
+  if (!s || !s.name) return null;
+  const km = Number(s.abstand_km);
+  return Number.isFinite(km)
+    ? `${s.name}, ${String(Math.round(km * 10) / 10).replace('.', ',')} km`
+    : String(s.name);
 }
 
 /* Eine Nachkommastelle, und die nur, wenn sie etwas sagt: 17 Grad sollen

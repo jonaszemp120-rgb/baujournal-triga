@@ -81,10 +81,10 @@
      keiner Stelle daran — es gibt keinen Zustand, in dem das Formular
      auf die Abfrage wartet. */
 
-  /* Der Abruf, solange er gilt: { grad, gemessen_am, quelle }. Er wandert
-     mit dem Eintrag in die Datenbank und macht dort den Unterschied
-     zwischen einer Angabe, die jemand angetippt hat, und einer, die ein
-     Dienst geliefert hat. Null heisst: von Hand. */
+  /* Der Abruf, solange er gilt: { grad, gemessen_am, quelle, rohwerte }.
+     Er wandert mit dem Eintrag in die Datenbank und macht dort den
+     Unterschied zwischen einer Angabe, die jemand angetippt hat, und
+     einer, die ein Dienst geliefert hat. Null heisst: von Hand. */
   let abruf = null;
 
   function wetterHinweis(text, warn) {
@@ -103,8 +103,8 @@
   /* Wie die Zeile lautet — einmal beim Erfassen, einmal beim Ansehen des
      gespeicherten Eintrags. Damit steht dort später wirklich dasselbe und
      nicht zweimal etwas Ähnliches. */
-  function abrufZeile(lage, stufe, grad, wann, quelle) {
-    return wetterAbrufText(lage, stufe, grad, wann, quelle)
+  function abrufZeile(lage, stufe, grad, wann, quelle, roh) {
+    return wetterAbrufText(lage, stufe, grad, wann, quelle, roh)
          + ' Ein Tipp auf einen Chip ändert die Auswahl.';
   }
 
@@ -128,20 +128,25 @@
         if (w.stufe) chipSetzen($('#temperatur'), w.stufe);
 
         /* Der gelieferte Wert selbst, und nicht nur die Stufe daraus,
-           dazu der Dienst, der ihn geliefert hat. Beides wandert mit dem
-           Eintrag in die Datenbank; ohne das liesse sich später nicht
-           mehr sagen, ob jemand «10–20°C» abgefragt oder geschätzt hat
-           und wer gefragt wurde. Kam keine Gradzahl, gibt es auch nichts
-           festzuhalten. */
+           dazu der Dienst und alles, was die Station sonst noch gemeldet
+           hat. Alles wandert mit dem Eintrag in die Datenbank; ohne das
+           liesse sich später nicht mehr sagen, ob jemand «10–20°C»
+           abgefragt oder geschätzt hat, wer gefragt wurde und woraus die
+           Lage entstanden ist. Kam keine Gradzahl, gibt es auch nichts
+           festzuhalten.
+
+           Der Zeitpunkt kommt von der Messung und nicht von der Uhr
+           dieses Geräts: massgebend ist, wann gemessen wurde. */
         abruf = Number.isFinite(w.grad)
           ? { grad: Math.round(w.grad * 10) / 10,
-              gemessen_am: new Date().toISOString(),
-              quelle: w.quelle || WETTER_JETZT.QUELLE }
+              gemessen_am: w.gemessen_am || new Date().toISOString(),
+              quelle: w.quelle || WETTER_JETZT.QUELLE,
+              rohwerte: w.rohwerte || null }
           : null;
         entwurfSichern();
 
         wetterHinweis(abruf
-          ? abrufZeile(w.lage, w.stufe, abruf.grad, abruf.gemessen_am, abruf.quelle)
+          ? abrufZeile(w.lage, w.stufe, abruf.grad, abruf.gemessen_am, abruf.quelle, abruf.rohwerte)
           : `Gesetzt: ${[w.lage, w.stufe].filter(Boolean).join(' · ')}. `
             + 'Ein Tipp auf einen Chip ändert die Auswahl.');
       } catch (e) {
@@ -240,10 +245,12 @@
       wetter: chipWert($('#wetter')),
       temperatur: chipWert($('#temperatur')),
       /* Nur gesetzt, wenn die Angabe daneben wirklich abgefragt wurde.
-         Die Datenbank verlangt alle drei zusammen oder keines. */
+         Die Datenbank verlangt Gradzahl, Zeitpunkt und Quelle zusammen
+         oder keines davon. */
       wetter_grad: abruf ? abruf.grad : null,
       wetter_gemessen_am: abruf ? abruf.gemessen_am : null,
       wetter_quelle: abruf ? abruf.quelle : null,
+      wetter_rohwerte: abruf ? abruf.rohwerte : null,
       kontrolle: { punkte },
       betrifft_gebaeude: hatGebaeude ? chipWerte($('#betrifft')) : null,
       firmen: $('#f-firmen').value.trim() || null,
@@ -283,12 +290,15 @@
 
     /* Ein Abruf überlebt den Absturz genauso wie der getippte Text:
        sonst stünde nach dem Wiederherstellen dieselbe Auswahl da, aber
-       ohne den Wert und die Quelle, die sie zum Abruf machen. */
+       ohne den Wert, die Quelle und die Rohwerte, die sie zum Abruf
+       machen. */
     abruf = e.wetter_gemessen_am
-      ? { grad: e.wetter_grad, gemessen_am: e.wetter_gemessen_am, quelle: e.wetter_quelle }
+      ? { grad: e.wetter_grad, gemessen_am: e.wetter_gemessen_am,
+          quelle: e.wetter_quelle, rohwerte: e.wetter_rohwerte || null }
       : null;
     if (abruf) {
-      wetterHinweis(abrufZeile(e.wetter, e.temperatur, abruf.grad, abruf.gemessen_am, abruf.quelle));
+      wetterHinweis(abrufZeile(e.wetter, e.temperatur, abruf.grad, abruf.gemessen_am,
+                               abruf.quelle, abruf.rohwerte));
     }
 
     $('#f-firmen').value = e.firmen || '';
