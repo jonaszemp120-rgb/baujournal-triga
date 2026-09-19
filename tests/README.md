@@ -1,6 +1,6 @@
 # Die Testsuiten
 
-22 Suiten mit zusammen rund 2400 Prüfungen, gefahren mit Playwright gegen
+22 Suiten mit zusammen rund 2500 Prüfungen, gefahren mit Playwright gegen
 Chromium. Sie laufen nicht gegen die echte Datenbank, sondern gegen einen
 handgeschriebenen Supabase-Ersatz.
 
