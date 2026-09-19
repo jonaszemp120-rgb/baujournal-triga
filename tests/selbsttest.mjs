@@ -131,7 +131,7 @@ for (const breite of [390, 1440]) {
 /* --- 3. Das Test-Banner haengt wirklich an einem Schalter -------------- */
 {
   console.log('\n=== Test-Banner: ein Schalter, überall weg ===');
-  const echt = fs.readFileSync(`${WURZEL}js/shell.js`,'utf8');
+  const echt = fs.readFileSync(`${WURZEL}/js/shell.js`,'utf8');
   const aus = echt.replace('const TEST_BANNER = true;', 'const TEST_BANNER = false;');
   ok('genau eine Stelle im Code schaltet das Banner',
      (echt.match(/const TEST_BANNER = true;/g) || []).length === 1);

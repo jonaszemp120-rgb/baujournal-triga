@@ -3,7 +3,7 @@
    aufrufen — und vor allem in welcher Reihenfolge. */
 import { WURZEL } from './umgebung.mjs';
 import { createRequire } from 'node:module';
-const require = createRequire(`${WURZEL}api/`);
+const require = createRequire(`${WURZEL}/api/`);
 
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz = '') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -64,7 +64,7 @@ function antwortDoppel() {
 
 console.log('\n=== api/chat-aufraeumen ===');
 {
-  const pfad = `${WURZEL}api/chat-aufraeumen.js`;
+  const pfad = `${WURZEL}/api/chat-aufraeumen.js`;
   delete require.cache[require.resolve(pfad)];
   const aufraeumen = require(pfad);
 
@@ -138,7 +138,7 @@ console.log('\n=== api/chat-aufraeumen ===');
 
 console.log('\n=== api/push ===');
 {
-  const pfad = `${WURZEL}api/push.js`;
+  const pfad = `${WURZEL}/api/push.js`;
   delete require.cache[require.resolve(pfad)];
   const push = require(pfad);
 
@@ -146,7 +146,7 @@ console.log('\n=== api/push ===');
   const token = (sub) => 'x.' + Buffer.from(JSON.stringify({ sub })).toString('base64url') + '.y';
   const CHAT = '11111111-2222-3333-4444-555555555555';
 
-  const { subtle } = require(`${WURZEL}api/_webpush.js`);
+  const { subtle } = require(`${WURZEL}/api/_webpush.js`);
   const empfaenger = await subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
   const p256dh = Buffer.from(await subtle.exportKey('raw', empfaenger.publicKey)).toString('base64url');
 
@@ -490,7 +490,7 @@ console.log('\n=== api/push ===');
 
 console.log('\n=== api/wetter ===');
 {
-  const pfad = `${WURZEL}api/wetter.js`;
+  const pfad = `${WURZEL}/api/wetter.js`;
   const frisch = () => { delete require.cache[require.resolve(pfad)]; return require(pfad); };
 
   /* Die Stationsliste, wie sie bei MeteoSchweiz aussieht: Semikolon,
@@ -689,7 +689,7 @@ console.log('\n=== api/wetter ===');
 
 console.log('\n=== api/push: stumm, Erwähnung, Zuständigkeit ===');
 {
-  const pfad = `${WURZEL}api/push.js`;
+  const pfad = `${WURZEL}/api/push.js`;
   delete require.cache[require.resolve(pfad)];
   const push = require(pfad);
 
@@ -698,7 +698,7 @@ console.log('\n=== api/push: stumm, Erwähnung, Zuständigkeit ===');
   const NACHRICHT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
   const ANTRAG = '99999999-8888-7777-6666-555555555555';
 
-  const { subtle } = require(`${WURZEL}api/_webpush.js`);
+  const { subtle } = require(`${WURZEL}/api/_webpush.js`);
   const paar = await subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
   process.env.VAPID_PRIVAT = (await subtle.exportKey('jwk', paar.privateKey)).d;
   process.env.VAPID_OEFFENTLICH = Buffer.from(await subtle.exportKey('raw', paar.publicKey)).toString('base64url');

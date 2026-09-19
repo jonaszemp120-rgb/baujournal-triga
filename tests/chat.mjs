@@ -38,21 +38,40 @@ const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '
 /* Die Frage nach Benachrichtigungen kommt beim ersten Öffnen und würde
    sonst jeden Klick verdecken. Wo sie selbst geprüft wird, bleibt der
    Merker weg. */
-async function baueKontext(breite, { saat = SAAT, gefragt = true, geteilt = false } = {}) {
+/* erlaubnis sagt, in welchem Zustand die Benachrichtigungen stehen
+   sollen: 'default' heisst noch nicht gefragt, 'granted' erteilt,
+   'denied' abgelehnt. Das wird gesetzt und nicht geerbt — der eine
+   Chromium-Build liefert dafür von sich aus "default", der nächste
+   "denied", und ctx.grantPermissions() greift im neueren gar nicht mehr.
+   Dann steht die Suite rot da, ohne dass an der App etwas falsch wäre;
+   genau das ist hier passiert. Geprüft wird, was die App aus einem
+   Zustand macht, nicht wie der Browser zu ihm kommt. */
+async function baueKontext(breite, { saat = SAAT, gefragt = true, geteilt = false,
+                                     erlaubnis = null } = {}) {
   const ctx = await browser.newContext({
     viewport:{ width:breite, height: breite>=1024?900:844 },
     locale:'de-CH', serviceWorkers:'block'
   });
   await ctx.route('**/vendor/supabase-js-2.58.0.js', r => r.fulfill({status:200,contentType:'application/javascript',body:STUB}));
   await ctx.route('**/api/push', r => r.fulfill({status:200,contentType:'application/json',body:'{"gesendet":1}'}));
-  await ctx.addInitScript(([s, g, t]) => {
+  await ctx.addInitScript(([s, g, t, e]) => {
     try {
       if (t) localStorage.setItem('__stub_geteilt', '1');
       if (g) localStorage.setItem('bj_push_gefragt', '1');
     } catch {}
     const lager = t ? localStorage : sessionStorage;
     if (!lager.getItem('__stub_db')) lager.setItem('__stub_db', JSON.stringify(s));
-  }, [saat, gefragt, geteilt]);
+
+    if (e && typeof Notification !== 'undefined') {
+      try {
+        Object.defineProperty(Notification, 'permission', {
+          configurable: true, get: () => e
+        });
+        // Wer zusagt, bekommt auch die Zusage zurück.
+        Notification.requestPermission = async () => e === 'default' ? 'granted' : e;
+      } catch {}
+    }
+  }, [saat, gefragt, geteilt, erlaubnis]);
   return ctx;
 }
 
@@ -416,7 +435,7 @@ console.log('\n=== Bilder ===');
 
 console.log('\n=== Benachrichtigungen ===');
 {
-  const ctx = await baueKontext(1440, { gefragt: false });
+  const ctx = await baueKontext(1440, { gefragt: false, erlaubnis: 'default' });
   const p = await anmelden(ctx);
   await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
@@ -1023,8 +1042,7 @@ for (const breite of [390, 1440]) {
 
 console.log('\n=== Benachrichtigungen: Fehler sichtbar ===');
 {
-  const ctx = await baueKontext(1440);
-  await ctx.grantPermissions(['notifications'], { origin: SAAT });
+  const ctx = await baueKontext(1440, { erlaubnis: 'granted' });
   const p = await anmelden(ctx);
   await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
