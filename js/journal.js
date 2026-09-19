@@ -58,11 +58,12 @@
       const an = b.getAttribute('aria-pressed') === 'true';
       $$('button', wrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
       b.setAttribute('aria-pressed', an ? 'false' : 'true');   // nochmals tippen hebt auf
-      /* Ab hier gilt die eigene Wahl, und damit verfaellt die Messung —
+      /* Ab hier gilt die eigene Wahl, und damit verfaellt der Abruf —
          die Zeile darunter genauso wie der Wert, der mit dem Eintrag
-         gespeichert wuerde. Sonst stuende spaeter "um 11:25 gemessen:
-         Sonnig" an einem Eintrag, bei dem Regen angetippt ist. */
-      messungVergessen();
+         gespeichert wuerde. Sonst stuende spaeter "um 11:42 Uhr
+         automatisch abgefragt: Sonnig" an einem Eintrag, bei dem Regen
+         angetippt ist. */
+      abrufVergessen();
       entwurfSichern();
     }));
   }
@@ -80,11 +81,11 @@
      keiner Stelle daran — es gibt keinen Zustand, in dem das Formular
      auf die Abfrage wartet. */
 
-  /* Die Messung, solange sie gilt: { grad, gemessen_am }. Sie wandert mit
-     dem Eintrag in die Datenbank und macht dort den Unterschied zwischen
-     einer Angabe, die jemand angetippt hat, und einer, die gemessen
-     wurde. Null heisst: von Hand. */
-  let messung = null;
+  /* Der Abruf, solange er gilt: { grad, gemessen_am, quelle }. Er wandert
+     mit dem Eintrag in die Datenbank und macht dort den Unterschied
+     zwischen einer Angabe, die jemand angetippt hat, und einer, die ein
+     Dienst geliefert hat. Null heisst: von Hand. */
+  let abruf = null;
 
   function wetterHinweis(text, warn) {
     const el = $('#wetter-hinweis');
@@ -94,16 +95,16 @@
     el.hidden = !text;
   }
 
-  function messungVergessen() {
-    messung = null;
+  function abrufVergessen() {
+    abruf = null;
     wetterHinweis('');
   }
 
   /* Wie die Zeile lautet — einmal beim Erfassen, einmal beim Ansehen des
      gespeicherten Eintrags. Damit steht dort später wirklich dasselbe und
      nicht zweimal etwas Ähnliches. */
-  function messZeile(lage, stufe, grad, wann) {
-    return wetterMessText(lage, stufe, grad, wann)
+  function abrufZeile(lage, stufe, grad, wann, quelle) {
+    return wetterAbrufText(lage, stufe, grad, wann, quelle)
          + ' Ein Tipp auf einen Chip ändert die Auswahl.';
   }
 
@@ -126,23 +127,27 @@
         if (w.lage) chipSetzen($('#wetter'), w.lage);
         if (w.stufe) chipSetzen($('#temperatur'), w.stufe);
 
-        /* Der Messwert selbst, und nicht nur die Stufe daraus. Er wandert
-           mit dem Eintrag in die Datenbank; ohne ihn liesse sich später
-           nicht mehr sagen, ob jemand «10–20°C» gemessen oder geschätzt
-           hat. Kam keine Gradzahl, gibt es auch nichts festzuhalten. */
-        messung = Number.isFinite(w.grad)
-          ? { grad: Math.round(w.grad * 10) / 10, gemessen_am: new Date().toISOString() }
+        /* Der gelieferte Wert selbst, und nicht nur die Stufe daraus,
+           dazu der Dienst, der ihn geliefert hat. Beides wandert mit dem
+           Eintrag in die Datenbank; ohne das liesse sich später nicht
+           mehr sagen, ob jemand «10–20°C» abgefragt oder geschätzt hat
+           und wer gefragt wurde. Kam keine Gradzahl, gibt es auch nichts
+           festzuhalten. */
+        abruf = Number.isFinite(w.grad)
+          ? { grad: Math.round(w.grad * 10) / 10,
+              gemessen_am: new Date().toISOString(),
+              quelle: w.quelle || WETTER_JETZT.QUELLE }
           : null;
         entwurfSichern();
 
-        wetterHinweis(messung
-          ? messZeile(w.lage, w.stufe, messung.grad, messung.gemessen_am)
+        wetterHinweis(abruf
+          ? abrufZeile(w.lage, w.stufe, abruf.grad, abruf.gemessen_am, abruf.quelle)
           : `Gesetzt: ${[w.lage, w.stufe].filter(Boolean).join(' · ')}. `
             + 'Ein Tipp auf einen Chip ändert die Auswahl.');
       } catch (e) {
         /* Jeder Fehlschlag endet hier und nirgends sonst. Kein Dialog,
            keine Sperre, nur die Zeile unter den Chips. */
-        messung = null;
+        abruf = null;
         const text = e && e.message ? e.message : WETTER_JETZT.TEXTE.unbekannt;
         wetterHinweis(e && e.grund === 'verweigert'
           ? `${text} Die Freigabe lässt sich in den Einstellungen des Geräts wieder erteilen.`
@@ -234,10 +239,11 @@
       datum: $('#f-datum').value || heute(),
       wetter: chipWert($('#wetter')),
       temperatur: chipWert($('#temperatur')),
-      /* Nur gesetzt, wenn die Angabe daneben wirklich gemessen wurde.
-         Die Datenbank verlangt beides zusammen oder keines. */
-      wetter_grad: messung ? messung.grad : null,
-      wetter_gemessen_am: messung ? messung.gemessen_am : null,
+      /* Nur gesetzt, wenn die Angabe daneben wirklich abgefragt wurde.
+         Die Datenbank verlangt alle drei zusammen oder keines. */
+      wetter_grad: abruf ? abruf.grad : null,
+      wetter_gemessen_am: abruf ? abruf.gemessen_am : null,
+      wetter_quelle: abruf ? abruf.quelle : null,
       kontrolle: { punkte },
       betrifft_gebaeude: hatGebaeude ? chipWerte($('#betrifft')) : null,
       firmen: $('#f-firmen').value.trim() || null,
@@ -275,13 +281,14 @@
     chipSetzen($('#wetter'), e.wetter);
     chipSetzen($('#temperatur'), e.temperatur);
 
-    /* Eine Messung überlebt den Absturz genauso wie der getippte Text:
+    /* Ein Abruf überlebt den Absturz genauso wie der getippte Text:
        sonst stünde nach dem Wiederherstellen dieselbe Auswahl da, aber
-       ohne den Wert, der sie zur Messung macht. */
-    messung = e.wetter_gemessen_am
-      ? { grad: e.wetter_grad, gemessen_am: e.wetter_gemessen_am } : null;
-    if (messung) {
-      wetterHinweis(messZeile(e.wetter, e.temperatur, messung.grad, messung.gemessen_am));
+       ohne den Wert und die Quelle, die sie zum Abruf machen. */
+    abruf = e.wetter_gemessen_am
+      ? { grad: e.wetter_grad, gemessen_am: e.wetter_gemessen_am, quelle: e.wetter_quelle }
+      : null;
+    if (abruf) {
+      wetterHinweis(abrufZeile(e.wetter, e.temperatur, abruf.grad, abruf.gemessen_am, abruf.quelle));
     }
 
     $('#f-firmen').value = e.firmen || '';
@@ -335,13 +342,13 @@
     };
     setzeText('#f-firmen', letzter.firmen, 'Firmen');
     setzeText('#f-fortschritt', letzter.fortschritt, 'Baufortschritt');
-    /* Übernommen wird immer nur der Chip, nie die Messung des letzten
-       Eintrags — die galt an jenem Tag und nicht heute. Und wer hier
-       etwas übernimmt, hebt damit eine eigene Messung auf: sie
-       beschriebe sonst eine Auswahl, die inzwischen von woanders kommt. */
+    /* Übernommen wird immer nur der Chip, nie der Abruf des letzten
+       Eintrags — der galt an jenem Tag und nicht heute. Und wer hier
+       etwas übernimmt, hebt damit einen eigenen Abruf auf: er beschriebe
+       sonst eine Auswahl, die inzwischen von woanders kommt. */
     if (letzter.wetter && !chipWert($('#wetter'))) { chipSetzen($('#wetter'), letzter.wetter); uebernommen.push('Wetter'); }
     if (letzter.temperatur && !chipWert($('#temperatur'))) { chipSetzen($('#temperatur'), letzter.temperatur); uebernommen.push('Temperatur'); }
-    if (uebernommen.includes('Wetter') || uebernommen.includes('Temperatur')) messungVergessen();
+    if (uebernommen.includes('Wetter') || uebernommen.includes('Temperatur')) abrufVergessen();
 
     entwurfSichern();
     toast(uebernommen.length

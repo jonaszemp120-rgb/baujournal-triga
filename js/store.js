@@ -31,34 +31,58 @@ const WETTER = ['Sonnig', 'Wechselhaft', 'Bewölkt', 'Regen', 'Schnee', 'Nebel',
 const WETTER_ICON = { 'Sonnig': '☀', 'Wechselhaft': '⛅', 'Bewölkt': '☁', 'Regen': '☂', 'Schnee': '❄', 'Nebel': '≈', 'Sturm/Wind': '🌬' };
 const TEMPERATUR = ['< 0°C', '0–10°C', '10–20°C', '20–30°C', '> 30°C'];
 
-/* Der Satz zur gemessenen Angabe: «Um 11:25 gemessen: Sonnig · 10–20°C
-   (17.2 °C)». Er steht an zwei Orten — im Formular gleich nach dem Abruf
-   und später in der Detailansicht des gespeicherten Eintrags —, und
-   deshalb steht er hier und nicht zweimal.
+/* Der Satz zur abgefragten Angabe: «Um 11:42 Uhr automatisch abgefragt
+   (Open-Meteo): Sonnig · 10–20°C (17,7°C)». Er steht an drei Orten — im
+   Formular gleich nach dem Abruf, in der Detailansicht des gespeicherten
+   Eintrags und im Export —, und deshalb steht er hier und nicht dreimal.
 
-   Eine Angabe ohne Zeitpunkt ist keine Messung; dann kommt nichts
-   zurück, und die Stelle faellt weg. Genau daran erkennt man am Ende,
-   welche Eintraege auf einer Messung beruhen und welche jemand angetippt
-   hat. */
-function wetterMessText(lage, stufe, grad, wann) {
+   Nicht «gemessen»: niemand hat ein Thermometer abgelesen. Ein Dienst im
+   Netz wurde gefragt, und welcher, steht dabei — aus derselben Spalte,
+   aus der es auch die Datenbank weiss, und nicht als fester Text in
+   dieser Zeile.
+
+   Ohne Zeitpunkt gab es keine Abfrage; dann kommt nichts zurück, und die
+   Stelle faellt weg. Genau daran erkennt man am Ende, welche Eintraege
+   auf einem Abruf beruhen und welche jemand angetippt hat. */
+function wetterAbrufText(lage, stufe, grad, wann, quelle) {
+  const kopf = wetterAbrufKopf(wann, quelle);
+  if (!kopf) return null;
+  const stufen = [lage, stufe].filter(Boolean).join(' · ');
+  return `${kopf}: ${stufen || 'keine Angabe'}${wetterGradText(grad)}.`;
+}
+
+/* Dieselbe Angabe als Wert einer beschrifteten Zeile, wie sie der Export
+   braucht: dort steht «Herkunft» schon links daneben, und die Stufen
+   stehen zwei Zeilen darüber. */
+function wetterAbrufKurz(grad, wann, quelle) {
+  const kopf = wetterAbrufKopf(wann, quelle);
+  return kopf ? `${kopf}${wetterGradText(grad)}` : null;
+}
+
+function wetterAbrufKopf(wann, quelle) {
   if (!wann) return null;
   const zeit = new Date(wann);
   if (Number.isNaN(zeit.getTime())) return null;
-
-  const stufen = [lage, stufe].filter(Boolean).join(' · ');
-  const zahl = Number(grad);
-  /* Eine Nachkommastelle, und die nur, wenn sie etwas sagt: 17 Grad
-     sollen nicht als 17.0 dastehen. */
-  const genau = Number.isFinite(zahl)
-    ? ` (${(Math.round(zahl * 10) / 10).toLocaleString('de-CH')} °C)` : '';
   const uhr = zeit.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
-
-  return `Um ${uhr} gemessen: ${stufen || 'keine Angabe'}${genau}.`;
+  /* Ein Eintrag aus der Zeit vor der Quellenspalte nennt keinen Dienst.
+     Dann bleibt die Klammer weg, statt einen zu behaupten. */
+  const wer = String(quelle || '').trim();
+  return `Um ${uhr} Uhr automatisch abgefragt${wer ? ` (${wer})` : ''}`;
 }
 
-/* Ob ein Eintrag eine Messung traegt. Massgebend ist der Zeitpunkt: ohne
-   ihn gibt es keine, und aeltere Eintraege haben keinen. */
-const hatWetterMessung = e => !!(e && e.wetter_gemessen_am);
+/* Eine Nachkommastelle, und die nur, wenn sie etwas sagt: 17 Grad sollen
+   nicht als 17,0 dastehen. Komma und kein Abstand vor dem Zeichen, wie
+   bei den Chips daneben — «10–20°C», «17,7°C». */
+function wetterGradText(grad) {
+  const zahl = Number(grad);
+  if (!Number.isFinite(zahl)) return '';
+  return ` (${String(Math.round(zahl * 10) / 10).replace('.', ',')}°C)`;
+}
+
+/* Ob die Wetterangabe eines Eintrags aus einem Abruf stammt. Massgebend
+   ist der Zeitpunkt: ohne ihn gibt es keinen, und aeltere Eintraege
+   haben keinen. */
+const hatWetterAbruf = e => !!(e && e.wetter_gemessen_am);
 
 /* Fester Chip neben den Gebaeuden eines Projekts. Er steht fuer sich und
    schliesst die Einzelauswahl aus, gespeichert wird genau das Wort. */

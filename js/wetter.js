@@ -26,6 +26,12 @@
 const WETTER_JETZT = (() => {
   const API = 'https://api.open-meteo.com/v1/forecast';
 
+  /* Der Name des Dienstes, so wie er am Eintrag stehen soll. Er wandert
+     mit in die Datenbank und nicht nur in einen Anzeigetext: kommt
+     später ein zweiter Dienst dazu oder wird gewechselt, muss an jedem
+     einzelnen Eintrag nachvollziehbar bleiben, woher seine Angabe kam. */
+  const QUELLE = 'Open-Meteo';
+
   /* Wie lange gewartet wird. Der Standort darf länger brauchen als die
      Abfrage: auf dem Handy heisst das erste Mal Freigabe-Dialog, GPS und
      manchmal ein Gang vor die Tür. */
@@ -189,7 +195,7 @@ const WETTER_JETZT = (() => {
        Verdacht drücken. */
     if (!lage && !stufe) throw fehler('dienst', TEXTE.dienst);
 
-    return { lage, stufe, grad, code, wind };
+    return { lage, stufe, grad, code, wind, quelle: QUELLE };
   }
 
   /* Der ganze Weg, wie ihn der Knopf braucht. Offline wird gar nicht
@@ -202,5 +208,5 @@ const WETTER_JETZT = (() => {
     return messwerte(await standort());
   }
 
-  return { lageAus, stufeAus, standort, messwerte, abrufen, TEXTE, STURM_KMH };
+  return { lageAus, stufeAus, standort, messwerte, abrufen, TEXTE, STURM_KMH, QUELLE };
 })();
