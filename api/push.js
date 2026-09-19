@@ -13,18 +13,24 @@
  *
  * Vier Wege hinein, ein Weg hinaus:
  *
- *   { chat: <uuid> }      die anderen Mitglieder dieses Gesprächs
+ *   { chat: <uuid> }      die anderen Mitglieder dieses Gesprächs, ohne
+ *                         die stumm gestellten — wer aber im Text
+ *                         erwähnt wird, bekommt die Meldung trotzdem.
+ *                         Dazu optional { nachricht: <uuid> }: sie sagt,
+ *                         in welchem Text nach Erwähnungen zu suchen ist
  *   { beitrag: <uuid> }   bei einem Beitrag der Kategorie "wichtig" alle
  *                         anderen im Adressbuch, sonst nur die im Text
  *                         erwähnten Personen
  *   { kommentar: <uuid> } die im Kommentar erwähnten Personen
- *   { antrag: <uuid> }    die Person, die den Antrag eingereicht hat, und
- *                         nur, wenn er gerade entschieden wurde
+ *   { antrag: <uuid> }    beim Einreichen die Person, die diese Art
+ *                         entscheidet; beim Entscheid die Person, die
+ *                         ihn eingereicht hat
  *
  * Wer melden darf und wann, entscheidet jedes Mal diese Funktion und nicht
- * die App: ein Update ohne Erwähnung, eine Umfrage oder ein noch offener
- * Antrag lösen nichts aus, auch dann nicht, wenn jemand den Aufruf von
- * Hand nachbaut.
+ * die App: ein Update ohne Erwähnung oder eine Umfrage lösen nichts aus,
+ * auch dann nicht, wenn jemand den Aufruf von Hand nachbaut. Beim Antrag
+ * sagt der Status in der Zeile, in welche Richtung gemeldet wird, und die
+ * Zuständigkeit steht in der Datenbank und nicht hier.
  *
  * Eine Erwähnung steht als @[Name](Kennung) im gespeicherten Text. Diese
  * Funktion liest die Kennungen dort selbst heraus und schneidet sie mit
@@ -155,6 +161,11 @@ module.exports = async (req, res) => {
   const beitrag = String(daten.beitrag || '');
   const kommentar = String(daten.kommentar || '');
   const antrag = String(daten.antrag || '');
+  /* Die gesendete Nachricht. Kein eigener Weg hinein, sondern eine
+     Beilage zu chat: sie sagt, in welchem Text nach Erwähnungen zu
+     suchen ist. Fehlt sie, meldet das Gespräch wie eh und je an alle,
+     die nicht stumm gestellt haben. */
+  const nachricht = String(daten.nachricht || '');
   const istKennung = w => /^[0-9a-f-]{36}$/i.test(w);
 
   const wege = [chat, beitrag, kommentar, antrag].filter(istKennung);
@@ -185,7 +196,7 @@ module.exports = async (req, res) => {
        die Person. Steht sie nicht im Gespräch, liefert RLS eine leere
        Liste, und hier ist Schluss. */
     const mitglieder = await hole(
-      `chat_mitglieder?chat_id=eq.${chat}&select=user_id`, { apikey: ANON, token });
+      `chat_mitglieder?chat_id=eq.${chat}&select=user_id,stumm`, { apikey: ANON, token });
 
     if (!mitglieder.ok) {
       console.error(`[push] Abbruch: Supabase hat die Mitgliederliste zu ${chat} nicht herausgegeben — Status ${mitglieder.status}, Antwort: ${mitglieder.roh}`);
@@ -196,16 +207,54 @@ module.exports = async (req, res) => {
       return res.status(403).json({ fehler: 'Kein Zugriff auf dieses Gespräch.' });
     }
 
-    ziele = mitglieder.daten.map(m => m.user_id).filter(u => u !== ich);
-    if (!ziele.length) {
+    const andere = mitglieder.daten.filter(m => m.user_id !== ich);
+    if (!andere.length) {
       console.log(`[push] ${chat}: ausser der sendenden Person ist niemand im Gespräch.`);
       return res.status(200).json({ gesendet: 0 });
     }
+
+    /* Wer erwähnt wurde, steht im gespeicherten Text und wird hier
+       gelesen — nicht dem Aufruf geglaubt, genau wie beim Feed. Ohne
+       Nachrichtenkennung gibt es eben keine Erwähnungen; ein Foto hat
+       ohnehin keinen Text. */
+    let erwaehnt = [];
+    if (istKennung(nachricht)) {
+      const n = await hole(
+        `nachrichten?id=eq.${nachricht}&select=chat_id,absender,text`, { apikey: ANON, token });
+      const zeile = Array.isArray(n.daten) ? n.daten[0] : null;
+      if (zeile && zeile.chat_id === chat && zeile.absender === ich) {
+        erwaehnt = erwaehnungenAus(zeile.text).filter(u => u !== ich);
+      } else if (zeile) {
+        console.error(`[push] ${nachricht} gehoert nicht zu ${chat} oder nicht zu ${ich}; Erwaehnungen daraus bleiben unbeachtet.`);
+      }
+    }
+
+    /* Stumm heisst leise, nicht blind: die Nachricht steht für alle im
+       Gespräch, nur das Telefon schweigt. Eine Erwähnung kommt trotzdem
+       durch — sie richtet sich an eine bestimmte Person und nicht an die
+       Runde, und wer namentlich angesprochen wird, soll das mitbekommen.
+       Geschnitten wird sie an der Mitgliederliste: an eine Kennung, die
+       gar nicht im Gespräch sitzt, geht nichts hinaus. */
+    const drin = andere.map(m => m.user_id);
+    const laut = andere.filter(m => !m.stumm).map(m => m.user_id);
+    ziele = [...new Set([...laut, ...erwaehnt.filter(u => drin.includes(u))])];
+
+    if (!ziele.length) {
+      console.log(`[push] ${chat}: alle ${drin.length} anderen haben das Gespraech stumm gestellt und niemand ist erwaehnt.`);
+      return res.status(200).json({ gesendet: 0, grund: 'alle stumm' });
+    }
   } else if (istKennung(antrag)) {
-    /* Ein Antrag meldet sich genau einmal: wenn er entschieden wurde, bei
-       der Person, die ihn eingereicht hat. Wer entschieden hat, steht in
-       der Zeile und wird vom Trigger gesetzt — diese Funktion glaubt der
-       App also nicht, sondern liest nach. */
+    /* Ein Antrag meldet sich zweimal, in zwei Richtungen:
+
+         beim Einreichen  bei der Person, die diese Art entscheidet —
+                          Spesen und Ferien gehen an verschiedene Leute,
+                          und beide sollen nur bekommen, was sie angeht.
+         beim Entscheid   bei der Person, die ihn eingereicht hat.
+
+       Welcher der beiden Fälle vorliegt, sagt der Status in der Zeile,
+       nicht der Aufruf. Diese Funktion glaubt der App grundsätzlich
+       nicht, sondern liest nach: was gemeldet wird und an wen, soll auch
+       dann stimmen, wenn jemand den Aufruf von Hand nachbaut. */
     const a = await hole(
       `antraege?id=eq.${antrag}&select=art,status,erstellt_von,entschieden_von`, { apikey: ANON, token });
 
@@ -218,20 +267,46 @@ module.exports = async (req, res) => {
       console.error(`[push] Abbruch: ${ich} sieht den Antrag ${antrag} nicht, RLS liefert eine leere Liste.`);
       return res.status(403).json({ fehler: 'Kein Zugriff auf diesen Antrag.' });
     }
-    if (zeile.status === 'eingereicht') {
-      console.log(`[push] ${antrag}: noch nicht entschieden, es gibt nichts zu melden.`);
-      return res.status(200).json({ gesendet: 0, grund: 'nicht entschieden' });
-    }
-    if (zeile.entschieden_von !== ich) {
-      console.error(`[push] Abbruch: ${ich} hat den Antrag ${antrag} nicht entschieden.`);
-      return res.status(403).json({ fehler: 'Diesen Antrag haben Sie nicht entschieden.' });
-    }
 
-    // Wer den eigenen Antrag entscheidet, braucht dazu keine Meldung.
-    ziele = [zeile.erstellt_von].filter(u => u && u !== ich);
-    if (!ziele.length) {
-      console.log(`[push] ${antrag}: eigener Antrag, keine Meldung noetig.`);
-      return res.status(200).json({ gesendet: 0 });
+    if (zeile.status === 'eingereicht') {
+      /* Melden darf die Einreichung nur, wer sie gemacht hat. Sonst
+         könnte jeder, der den Antrag sieht — und das ist die ganze
+         Geschäftsleitung —, dieselbe Meldung ein zweites Mal auslösen. */
+      if (zeile.erstellt_von !== ich) {
+        console.error(`[push] Abbruch: ${ich} hat den Antrag ${antrag} nicht eingereicht.`);
+        return res.status(403).json({ fehler: 'Das ist nicht Ihr Antrag.' });
+      }
+
+      /* Wer zuständig ist, steht in der Datenbank und nicht in dieser
+         Datei. Zwei Namen hier fest einzutragen hiesse: wer die
+         Zuständigkeit abgibt, braucht dafür eine neue Bereitstellung. */
+      const z = await hole(
+        `mitarbeiter?geloescht_am=is.null&user_id=not.is.null&zustaendig_fuer=cs.{${zeile.art}}&select=user_id`,
+        { apikey: ANON, token });
+      if (!z.ok) {
+        console.error(`[push] Abbruch: die Zustaendigkeit fuer ${zeile.art} liess sich nicht lesen — Status ${z.status}, Antwort: ${z.roh}`);
+        return res.status(502).json({ fehler: 'Die Zustaendigkeit liess sich nicht lesen.' });
+      }
+
+      ziele = (z.daten || []).map(m => m.user_id).filter(u => u && u !== ich);
+      if (!ziele.length) {
+        /* Kein Fehler, aber auch nichts, was man übersehen sollte: ein
+           Antrag, von dem niemand erfährt, bleibt liegen. */
+        console.error(`[push] ${antrag}: fuer "${zeile.art}" ist niemand zustaendig (mitarbeiter.zustaendig_fuer ist leer), es geht keine Meldung hinaus.`);
+        return res.status(200).json({ gesendet: 0, grund: 'niemand zustaendig' });
+      }
+    } else {
+      if (zeile.entschieden_von !== ich) {
+        console.error(`[push] Abbruch: ${ich} hat den Antrag ${antrag} nicht entschieden.`);
+        return res.status(403).json({ fehler: 'Diesen Antrag haben Sie nicht entschieden.' });
+      }
+
+      // Wer den eigenen Antrag entscheidet, braucht dazu keine Meldung.
+      ziele = [zeile.erstellt_von].filter(u => u && u !== ich);
+      if (!ziele.length) {
+        console.log(`[push] ${antrag}: eigener Antrag, keine Meldung noetig.`);
+        return res.status(200).json({ gesendet: 0 });
+      }
     }
   } else if (istKennung(kommentar)) {
     /* Ein Kommentar meldet sich nur bei den Leuten, die darin erwähnt

@@ -257,3 +257,168 @@ button.ch-admin:hover{ border-color:var(--navy); color:var(--navy); }
   .ch-verlauf{ padding-bottom:12px; }
   .ch-blase, .ch-bildblase{ max-width:82%; }
 }
+
+/* === Reaktionen ============================================================ */
+
+/* Die Zeile sitzt unter der Fusszeile und gehört sichtbar zur Blase,
+   ragt aber ein Stück heraus — so liest man sie als Antwort auf die
+   Nachricht und nicht als Teil ihres Textes. */
+.ch-reaktionen{
+  display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; align-self:flex-start;
+}
+.ch-blase.ich .ch-reaktionen{ align-self:flex-end; }
+
+.ch-reaktion{
+  display:inline-flex; align-items:center; gap:4px;
+  height:26px; padding:0 9px; border-radius:13px;
+  border:1px solid var(--border); background:var(--card);
+  font-size:13px; line-height:1; cursor:pointer;
+}
+.ch-reaktion span{ font-size:11.5px; font-weight:700; color:var(--text-dim); }
+/* Die eigene Reaktion ist die einzige, die ein Tipp wieder wegnimmt —
+   also muss man sie erkennen, ohne die Namen zu lesen. */
+.ch-reaktion.meine{ border-color:var(--navy); background:var(--bg); }
+.ch-reaktion.meine span{ color:var(--navy); }
+.ch-blase.ich .ch-reaktion{ background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.28); }
+.ch-blase.ich .ch-reaktion span{ color:rgba(255,255,255,.8); }
+.ch-blase.ich .ch-reaktion.meine{ background:#fff; border-color:#fff; }
+.ch-blase.ich .ch-reaktion.meine span{ color:var(--navy); }
+
+/* Die Auswahl im Blatt von unten. Gross genug für einen Daumen mit
+   Handschuh — auf der Baustelle zielt niemand auf zwanzig Pixel. */
+.ch-reaktionswahl{ display:flex; gap:10px; justify-content:space-between; }
+.ch-reaktionswahl button{
+  flex:1; height:58px; border-radius:15px; font-size:27px; line-height:1;
+  border:1.5px solid var(--border); background:var(--card); cursor:pointer;
+}
+.ch-reaktionswahl button.meine{ border-color:var(--navy); background:var(--bg); }
+
+/* Wer selbst gemeint ist, soll es sehen, ohne zu lesen. */
+.ch-erwaehnt{ font-weight:700; color:var(--navy); text-decoration:none; }
+.ch-blase.ich .ch-erwaehnt{ color:#9fd8ff; }
+.ch-blase.anMich{ border-left:3px solid var(--red); }
+
+/* Nach dem Sprung aus den Medien oder der Suche: ein Hinweis, keine
+   Markierung — er verschwindet von selbst wieder. */
+.ch-blase.gefunden{ box-shadow:0 0 0 2px var(--warn); transition:box-shadow .3s; }
+
+/* === Reiter: Verlauf, Medien, Suche ======================================== */
+
+.ch-reiter{
+  display:flex; gap:6px; padding:8px 14px;
+  border-bottom:1px solid var(--border); background:var(--card);
+}
+.ch-reiter button{
+  display:inline-flex; align-items:center; gap:6px;
+  height:34px; padding:0 12px; border-radius:10px;
+  border:none; background:transparent; color:var(--text-dim);
+  font-size:13px; font-weight:700; cursor:pointer;
+}
+.ch-reiter button[aria-pressed="true"]{ background:var(--navy); color:#fff; }
+
+/* === Medien ================================================================ */
+
+/* Im Medienblick trägt der Verlauf ein Raster statt Blasen. Dieselbe
+   Fläche, anderer Inhalt — deshalb eine Klasse und kein zweiter
+   Behälter. */
+.ch-verlauf.medien{ display:block; }
+
+.ch-medienkopf{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-bottom:12px; font-size:12.5px; font-weight:700; color:var(--text-dim);
+}
+.ch-medienkopf button{
+  display:inline-flex; align-items:center; gap:6px;
+  height:34px; padding:0 12px; border-radius:10px;
+  border:1.5px solid var(--border); background:var(--card);
+  color:var(--navy); font-size:12.5px; font-weight:700; cursor:pointer;
+}
+
+.ch-raster{ display:grid; grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); gap:8px; }
+.ch-kachel{
+  position:relative; aspect-ratio:1; border-radius:12px; overflow:hidden;
+  border:1px solid var(--border); background:var(--bg); padding:0; cursor:pointer;
+}
+.ch-kachel img{ width:100%; height:100%; object-fit:cover; display:block; }
+.ch-kachel .platzhalter{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  padding:8px; text-align:center; font-size:11px; color:var(--text-dim);
+}
+/* Die Zeit liegt auf dem Bild und braucht deshalb einen dunklen Grund —
+   auf einem hellen Foto wäre weisse Schrift sonst nicht zu lesen. */
+.ch-kachel .wann{
+  position:absolute; left:0; right:0; bottom:0; padding:12px 6px 4px;
+  font-size:10.5px; font-weight:700; color:#fff; text-align:right;
+  background:linear-gradient(to top, rgba(0,0,0,.55), transparent);
+}
+
+/* === Suche ================================================================= */
+
+.ch-suchkopf{ margin-bottom:12px; }
+#ch-suchfeld{
+  width:100%; height:44px; border-radius:12px; border:1.5px solid var(--border);
+  padding:0 14px; font-size:15px; color:var(--text); background:var(--card);
+  box-sizing:border-box;
+}
+.ch-treffer{ display:flex; flex-direction:column; gap:8px; }
+.ch-treffer button{
+  display:flex; flex-direction:column; gap:4px; width:100%; text-align:left;
+  padding:11px 13px; border-radius:12px;
+  border:1px solid var(--border); background:var(--card); cursor:pointer;
+}
+.ch-treffer .oben{ display:flex; justify-content:space-between; gap:10px; font-size:11.5px; }
+.ch-treffer .wer{ font-weight:700; color:var(--navy); }
+.ch-treffer .wann{ color:var(--text-dim); white-space:nowrap; }
+.ch-treffer .was{
+  font-size:14px; line-height:1.4; color:var(--text);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+.ch-treffer mark{ background:#ffe9a8; color:inherit; border-radius:3px; padding:0 1px; }
+
+/* === Fotos sichern ========================================================= */
+
+.ch-sicherbanner{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-bottom:10px; padding:10px 12px; border-radius:12px;
+  background:var(--card); border:1px solid var(--navy);
+  font-size:12.5px; font-weight:700; color:var(--navy);
+  position:sticky; top:0; z-index:2;
+}
+.ch-sicherbanner button{
+  display:inline-flex; align-items:center; gap:6px; flex-shrink:0;
+  height:32px; padding:0 12px; border-radius:9px; border:none;
+  background:var(--navy); color:#fff; font-size:12.5px; font-weight:700; cursor:pointer;
+}
+
+/* Das kleine Zeichen in der Gesprächsliste. Es steht vor dem Zähler:
+   stumm heisst leise, nicht blind, und der Zähler läuft weiter. */
+.ch-stummzeichen{ display:flex; align-items:center; color:var(--text-dim); }
+
+/* === Die eigenen Schalter im Gesprächsmenü ================================= */
+
+.ch-schalter{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.ch-schalter button{
+  display:flex; align-items:flex-start; gap:11px; width:100%; text-align:left;
+  padding:12px 13px; border-radius:13px;
+  border:1.5px solid var(--border); background:var(--card); color:var(--navy); cursor:pointer;
+}
+.ch-schalter button[aria-checked="true"]{ border-color:var(--navy); }
+.ch-schalter .mitte{ flex:1; min-width:0; }
+.ch-schalter .titel{ display:block; font-size:14.5px; font-weight:700; }
+.ch-schalter .unter{
+  display:block; margin-top:3px; font-size:12px; line-height:1.45;
+  font-weight:400; color:var(--text-dim);
+}
+/* Ein Kippschalter und kein Häkchen: er sagt "an oder aus" und nicht
+   "ausgewählt oder nicht" — das ist hier der Unterschied. */
+.ch-schalter .knebel{
+  flex-shrink:0; width:40px; height:24px; border-radius:12px;
+  background:var(--border); position:relative; transition:background .15s; margin-top:2px;
+}
+.ch-schalter .knebel::after{
+  content:''; position:absolute; top:3px; left:3px; width:18px; height:18px;
+  border-radius:50%; background:#fff; transition:transform .15s;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.ch-schalter button[aria-checked="true"] .knebel{ background:var(--navy); }
+.ch-schalter button[aria-checked="true"] .knebel::after{ transform:translateX(16px); }

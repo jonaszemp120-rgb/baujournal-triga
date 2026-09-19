@@ -181,13 +181,17 @@ async function pushAbmelden() {
    Der Aufruf wartet nicht: was gemeldet wird, steht längst in der
    Datenbank und ist bei den anderen angekommen. Die Meldung ist die
    Zugabe, nicht der Weg. */
-function pushSenden({ chat, beitrag, kommentar, antrag, titel, text, ziel }) {
+function pushSenden({ chat, nachricht, beitrag, kommentar, antrag, titel, text, ziel }) {
   (async () => {
     try {
       if (!istOnline()) return;
       const s = await session();
       if (!s) return;
       const rumpf = { titel, text, ziel };
+      /* nachricht ist kein eigener Weg, sondern eine Beilage zu chat:
+         die Function liest daraus den gespeicherten Text und schneidet
+         die Erwähnungen selbst heraus. */
+      if (nachricht) rumpf.nachricht = nachricht;
       if (chat) rumpf.chat = chat;
       else if (beitrag) rumpf.beitrag = beitrag;
       else if (kommentar) rumpf.kommentar = kommentar;

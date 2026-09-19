@@ -38,11 +38,22 @@
     haken: '<path d="M20 6 9 17l-5-5"/>',
     eimer: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
     einHaken: '<path d="M4 12.5 9 17.5 20 6.5"/>',
-    zweiHaken: '<path d="M1 12.5 6 17.5 17 6.5"/><path d="M8 12.5 11 15.5 22 4.5"/>'
+    zweiHaken: '<path d="M1 12.5 6 17.5 17 6.5"/><path d="M8 12.5 11 15.5 22 4.5"/>',
+    stumm: '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6"/><path d="m17 9 6 6"/>',
+    laut: '<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>',
+    sichern: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+    lupe: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+    raster: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    blase: '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.9L3 21l2-4.9A8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z"/>'
   };
   const svg = (d, g = 16) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
   const breit = () => matchMedia('(min-width:1024px)').matches;
+
+  /* Die fünf Reaktionen. Dieselben wie in der Prüfregel der Datenbank —
+     steht hier eine sechste, weist die Datenbank sie ab, und das ist die
+     richtige Reihenfolge: die Regel gehört dorthin, die Knöpfe hierhin. */
+  const REAKTIONEN = ['👍', '❤️', '✅', '😂', '❗'];
 
   let ich = null;              // auth.users.id
   let leute = [];              // alle Mitarbeitenden mit Konto
@@ -51,6 +62,28 @@
   let nachrichten = [];
   let kanal = null;            // Echtzeit für das offene Gespräch
   let kanalListe = null;       // Echtzeit für die Liste
+
+  /* Reaktionen des offenen Gesprächs, nach Nachricht gebündelt. Roh als
+     Zeilen und nicht als fertige Zahl: der Zähler ist ihre Anzahl, und
+     wer reagiert hat, steht als Name im Titel. Eine gepflegte Zahl
+     daneben wiche beim ersten verlorenen Update ab. */
+  let reaktionen = {};         // nachricht_id -> [{ user_id, emoji }]
+
+  /* Welcher der drei Ausschnitte gerade gezeigt wird: der Verlauf, die
+     Medien oder die Suche. Die Nachrichten bleiben dieselben, nur der
+     Blick darauf ändert sich — deshalb ein Zustand und nicht drei
+     Seiten. */
+  let blick = 'verlauf';
+  let suchbegriff = '';
+
+  /* Die eigenen Einstellungen zum offenen Gespräch. Sie stehen an der
+     Mitgliedszeile, nicht am Chat: stumm stellt jede Person für sich. */
+  let meineZeile = { stumm: false, fotos_sichern: false };
+
+  /* Fotos, die seit dem letzten Sichern eingetroffen sind. Nur im
+     Arbeitsspeicher: was gesichert wurde, weiss allein das Gerät, und
+     das gehört niemandem sonst. */
+  let zuSichern = [];
   /* Wann hat wer zuletzt gelesen. Die Lesebestätigung rechnet sich daraus
      aus, nicht aus einem Vermerk pro Nachricht — dieselbe Angabe, die
      schon den Ungelesen-Zähler trägt. Ein zweiter Ort dafür würde früher
@@ -58,6 +91,29 @@
   let lesestand = {};          // user_id -> zuletzt_gelesen (ISO)
 
   const nameVon = u => leute.find(l => l.user_id === u)?.name || 'Unbekannt';
+
+  /* Erwähnungen: genau dasselbe Werkzeug wie im Feed, aus js/app.js. Kein
+     zweiter Nachbau — sonst bekommt der eine Bereich irgendwann die Regel
+     für umbenannte Personen und der andere nicht.
+     Die Klassen heissen hier anders, weil eine Erwähnung in einer roten
+     Blase anders aussehen muss als auf weissem Grund. Die Logik dahinter
+     ist dieselbe. */
+  const erw = macheErwaehnungen({
+    leute: () => leute,
+    ich: () => ich,
+    marke: 'ch-erwaehnt',
+    liste: 'fd-erwaehnliste',
+    avatar: 'fd-avatar'
+  });
+
+  /* Bin ich in diesem Text gemeint? Danach richtet sich, ob die Nachricht
+     hervorgehoben dasteht — und in api/push.js, ob die Meldung auch durch
+     eine Stummschaltung kommt. */
+  const meintMich = text => erwaehnungenAus(text).includes(String(ich).toLowerCase());
+
+  /* Der Schlüssel für die gemerkten Erwähnungen. Es gibt nur ein
+     Eingabefeld im Chat, also genügt ein fester Name. */
+  const FELD = 'chat';
 
   /* --- Daten ---------------------------------------------------------------- */
 
@@ -83,7 +139,7 @@
 
     const [{ data: koepfe }, { data: alleMitglieder }, { data: letzte }] = await Promise.all([
       sb.from('chats').select('id, art, name, erstellt_von, erstellt_am').in('id', ids),
-      sb.from('chat_mitglieder').select('chat_id, user_id, admin').in('chat_id', ids),
+      sb.from('chat_mitglieder').select('chat_id, user_id, admin, stumm').in('chat_id', ids),
       sb.from('nachrichten')
         .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am, geloescht_am')
         .in('chat_id', ids).order('erstellt_am', { ascending: false }).limit(500)
@@ -99,6 +155,7 @@
         ...c,
         mitglieder: mit,
         admins: zeilen.filter(m => m.admin).map(m => m.user_id),
+        stumm: !!zeilen.find(m => m.user_id === ich)?.stumm,
         zuletzt_gelesen: gelesen[c.id],
         letzte: eigene[0] || null,
         ungelesen: eigene.filter(n =>
@@ -175,6 +232,135 @@
     return andere.every(u => lesestand[u] && new Date(lesestand[u]) >= gesendet);
   }
 
+  /* --- Reaktionen ------------------------------------------------------------ */
+
+  async function ladeReaktionen() {
+    reaktionen = {};
+    const ids = nachrichten.map(n => n.id);
+    if (!ids.length) return;
+    const { data, error } = await sb.from('nachrichten_reaktionen')
+      .select('nachricht_id, user_id, emoji').in('nachricht_id', ids);
+    if (meckern('Reaktionen laden', error)) return;
+    for (const r of data || []) (reaktionen[r.nachricht_id] ||= []).push(r);
+  }
+
+  const meineReaktion = (id, emoji) =>
+    (reaktionen[id] || []).some(r => r.user_id === ich && r.emoji === emoji);
+
+  /* Die Zeile unter der Blase: je Emoji ein Knopf mit der Anzahl. Wer
+     selbst dabei ist, sieht seinen Knopf hervorgehoben — und ein Tipp
+     darauf nimmt die eigene Reaktion zurück. Der Titel nennt die Namen,
+     damit in einer Gruppe nachvollziehbar bleibt, wer zugestimmt hat. */
+  function reaktionsZeile(n) {
+    const alle = reaktionen[n.id] || [];
+    if (!alle.length) return '';
+    const nach = {};
+    for (const r of alle) (nach[r.emoji] ||= []).push(r.user_id);
+
+    /* In der Reihenfolge der Auswahl und nicht nach Anzahl: eine Zeile,
+       die bei jeder neuen Reaktion die Plätze tauscht, ist unruhig und
+       man tippt daneben. */
+    return `<span class="ch-reaktionen">${REAKTIONEN.filter(e => nach[e]).map(e => {
+      const wer = nach[e].map(u => u === ich ? 'Sie' : nameVon(u)).join(', ');
+      return `<button type="button" class="ch-reaktion${meineReaktion(n.id, e) ? ' meine' : ''}"
+                      data-reagiere="${esc(n.id)}" data-emoji="${esc(e)}"
+                      title="${esc(wer)}" aria-label="${esc(`${e} von ${wer}`)}"
+                      aria-pressed="${meineReaktion(n.id, e)}">${e}<span>${nach[e].length}</span></button>`;
+    }).join('')}</span>`;
+  }
+
+  /* Setzen und Zurücknehmen sind derselbe Tipp: entweder steht die eigene
+     Reaktion schon da, dann geht sie weg, oder sie kommt dazu. Zwei
+     Knöpfe dafür wären einer zu viel.
+
+     Die Oberfläche geht dabei voraus und wartet nicht auf die Datenbank —
+     ein Daumen, der eine halbe Sekunde später erscheint, fühlt sich
+     kaputt an. Geht es schief, wird zurückgenommen, was zu früh dastand. */
+  async function reagiere(nachrichtId, emoji) {
+    if (!istOnline()) return toast('Reaktionen brauchen eine Verbindung', true);
+    const hatte = meineReaktion(nachrichtId, emoji);
+    const liste = (reaktionen[nachrichtId] ||= []);
+
+    if (hatte) liste.splice(liste.findIndex(r => r.user_id === ich && r.emoji === emoji), 1);
+    else liste.push({ nachricht_id: nachrichtId, user_id: ich, emoji });
+    await zeichneVerlauf();
+
+    const { error } = hatte
+      ? await sb.from('nachrichten_reaktionen').delete()
+          .eq('nachricht_id', nachrichtId).eq('user_id', ich).eq('emoji', emoji)
+      : await sb.from('nachrichten_reaktionen')
+          .insert({ nachricht_id: nachrichtId, user_id: ich, emoji });
+
+    if (error) {
+      await ladeReaktionen();
+      await zeichneVerlauf();
+      toast(error.message, true);
+    }
+  }
+
+  /* Die Auswahl beim langen Drücken. Fünf Zeichen, gross genug für einen
+     Daumen — auf einer Baustelle mit Handschuhen zielt niemand auf
+     zwanzig Pixel. Was schon gesetzt ist, steht hervorgehoben da und ein
+     Tipp nimmt es zurück. */
+  function reaktionWaehlen(nachrichtId) {
+    const n = nachrichten.find(x => x.id === nachrichtId);
+    if (!n || n.geloescht_am) return;
+    const s = sheet(`
+      <div style="font-size:15px; font-weight:800; color:var(--navy); margin-bottom:12px;">Reagieren</div>
+      <div class="ch-reaktionswahl">
+        ${REAKTIONEN.map(e => `
+          <button type="button" data-waehle="${esc(e)}"
+                  class="${meineReaktion(nachrichtId, e) ? 'meine' : ''}"
+                  aria-pressed="${meineReaktion(nachrichtId, e)}"
+                  aria-label="${esc(e)}">${e}</button>`).join('')}
+      </div>
+    `);
+    $$('[data-waehle]', s.el).forEach(el => el.addEventListener('click', async () => {
+      s.schliessen();
+      await reagiere(nachrichtId, el.dataset.waehle);
+    }));
+  }
+
+  /* Antippen und Halten, beides auf derselben Blase. Auf dem Desktop
+     genügt der Rechtsklick, auf dem Handy das lange Drücken — und damit
+     ein Wischen durch den Verlauf nicht versehentlich eine Auswahl
+     aufklappt, zählt nur, wer den Finger ruhig hält. */
+  const HALTEN_MS = 450;
+  function haltenBinden(el, nachrichtId) {
+    let uhr = null, gewandert = false, start = null;
+
+    const los = e => {
+      gewandert = false;
+      const p = e.touches?.[0] || e;
+      start = { x: p.clientX, y: p.clientY };
+      uhr = setTimeout(() => {
+        uhr = null;
+        if (gewandert) return;
+        /* Ohne das bliebe nach dem Aufklappen der Finger als Auswahl im
+           Text stehen. */
+        getSelection()?.removeAllRanges();
+        reaktionWaehlen(nachrichtId);
+      }, HALTEN_MS);
+    };
+    const bewegt = e => {
+      if (!start) return;
+      const p = e.touches?.[0] || e;
+      if (Math.abs(p.clientX - start.x) > 10 || Math.abs(p.clientY - start.y) > 10) {
+        gewandert = true;
+        clearTimeout(uhr);
+        uhr = null;
+      }
+    };
+    const stopp = () => { clearTimeout(uhr); uhr = null; start = null; };
+
+    el.addEventListener('pointerdown', los);
+    el.addEventListener('pointermove', bewegt);
+    el.addEventListener('pointerup', stopp);
+    el.addEventListener('pointercancel', stopp);
+    el.addEventListener('pointerleave', stopp);
+    el.addEventListener('contextmenu', e => { e.preventDefault(); reaktionWaehlen(nachrichtId); });
+  }
+
   /* Die Fusszeile einer Nachricht: Zeit, bei eigenen dazu die Haken und
      der Weg zum Löschen. */
   function fuss(n, meine) {
@@ -213,6 +399,7 @@
         </span>
         <span class="rechts">
           <span class="wann">${esc(kurzeZeit(c.letzte?.erstellt_am))}</span>
+          ${c.stumm ? `<span class="ch-stummzeichen" role="img" aria-label="Stumm gestellt">${svg(IKON.stumm, 14)}</span>` : ''}
           ${c.ungelesen ? `<span class="zaehler" aria-label="${c.ungelesen} ungelesen">${c.ungelesen}</span>` : ''}
         </span>
       </button>`;
@@ -250,8 +437,13 @@
     const v = $('#verlauf');
     if (!offen) {
       v.innerHTML = `<div class="br-leer" style="margin:auto;">Links ein Gespräch auswählen.</div>`;
+      zeichneReiter();
       return;
     }
+    zeichneReiter();
+    if (blick === 'medien') return zeichneMedien();
+    if (blick === 'suche') return zeichneSuche();
+
     if (!nachrichten.length) {
       v.innerHTML = `<div class="br-leer" style="margin:auto;">Noch keine Nachricht. Schreiben Sie die erste.</div>`;
       return;
@@ -259,7 +451,7 @@
 
     let letzterTag = '';
     let letzterAbsender = '';
-    const teile = [];
+    const teile = [sicherBanner()];
 
     for (const n of nachrichten) {
       const tag = tagesTitel(n.erstellt_am);
@@ -277,22 +469,190 @@
       letzterAbsender = n.absender;
 
       if (n.geloescht_am) {
-        teile.push(`<div class="ch-blase geloescht ${meine ? 'ich' : 'andere'}"><span class="wort">Nachricht gelöscht</span>${fuss(n, meine)}</div>`);
+        teile.push(`<div class="ch-blase geloescht ${meine ? 'ich' : 'andere'}" id="n-${esc(n.id)}"><span class="wort">Nachricht gelöscht</span>${fuss(n, meine)}</div>`);
         continue;
       }
       if (n.bild_ablauf) teile.push(bildBlase(n, meine));
-      if (n.text) teile.push(`<div class="ch-blase ${meine ? 'ich' : 'andere'}"><span class="wort">${esc(n.text)}</span>${fuss(n, meine)}</div>`);
+      if (n.text) {
+        /* Wer selbst gemeint ist, soll es sehen, ohne zu lesen. Deshalb
+           ein eigener Rand an der Blase und nicht nur die Hervorhebung
+           des Namens im Text — in einer Gruppe mit vierzig Nachrichten
+           scrollt sonst niemand bis dorthin. */
+        const anMich = !meine && meintMich(n.text);
+        teile.push(`
+          <div class="ch-blase ${meine ? 'ich' : 'andere'}${anMich ? ' anMich' : ''}" id="n-${esc(n.id)}"
+               data-halten="${esc(n.id)}">
+            <span class="wort">${erw.mitErwaehnungen(n.text)}</span>
+            ${fuss(n, meine)}${reaktionsZeile(n)}
+          </div>`);
+      }
     }
 
     v.innerHTML = teile.join('');
+    v.classList.remove('medien');
     $$('#verlauf [data-loeschen]').forEach(el => el.addEventListener('click', e => {
       e.preventDefault();
       e.stopPropagation();
       nachrichtLoeschen(el.dataset.loeschen);
     }));
+    $$('#verlauf [data-reagiere]').forEach(el => el.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      reagiere(el.dataset.reagiere, el.dataset.emoji);
+    }));
+    $$('#verlauf [data-halten]').forEach(el => haltenBinden(el, el.dataset.halten));
+    $('#verlauf [data-sichern-jetzt]')?.addEventListener('click', () => sichereStapel());
     await bilderNachladen();
-    v.scrollTop = v.scrollHeight;
+    if (!zielNachricht) v.scrollTop = v.scrollHeight;
+    springeHin();
   }
+
+  /* --- Die drei Blicke --------------------------------------------------------- */
+
+  /* Verlauf, Medien und Suche sind derselbe Bestand, nur anders
+     angesehen. Die Reiter stehen deshalb im Gespräch und nicht in der
+     Hauptnavigation: sie wechseln den Blick, nicht den Ort. */
+  function zeichneReiter() {
+    const el = $('#g-reiter');
+    if (!el) return;
+    if (!offen) { el.hidden = true; return; }
+    el.hidden = false;
+    const wahl = [
+      ['verlauf', 'Verlauf', IKON.blase],
+      ['medien', 'Medien', IKON.raster],
+      ['suche', 'Suchen', IKON.lupe]
+    ];
+    el.innerHTML = wahl.map(([wert, titel, ikon]) => `
+      <button type="button" class="pressable" data-blick="${wert}"
+              aria-pressed="${blick === wert}">${svg(ikon, 15)}<span>${titel}</span></button>`).join('');
+    $$('[data-blick]', el).forEach(b => b.addEventListener('click', async () => {
+      blick = b.dataset.blick;
+      await zeichneVerlauf();
+      if (blick === 'suche') $('#ch-suchfeld')?.focus();
+    }));
+  }
+
+  /* Alle Bilder des Gesprächs als Raster, neueste zuerst. Ein Tipp führt
+     zur Nachricht, in der es steht — ein Foto ohne seinen Zusammenhang
+     ist auf einer Baustelle oft wertlos. */
+  let zielNachricht = null;
+
+  async function zeichneMedien() {
+    const v = $('#verlauf');
+    const bilder = nachrichten
+      .filter(n => n.bild_ablauf && !n.geloescht_am)
+      .sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+
+    if (!bilder.length) {
+      v.classList.remove('medien');
+      v.innerHTML = `<div class="br-leer" style="margin:auto;">In diesem Gespräch wurde noch kein Foto geschickt.</div>`;
+      return;
+    }
+
+    v.classList.add('medien');
+    v.innerHTML = `
+      <div class="ch-medienkopf">
+        <span>${bilder.length} ${bilder.length === 1 ? 'Foto' : 'Fotos'}</span>
+        <button type="button" class="pressable" data-alle-sichern>${svg(IKON.sichern, 14)} Alle sichern</button>
+      </div>
+      <div class="ch-raster">
+        ${bilder.map(n => `
+          <button type="button" class="ch-kachel pressable" data-hin="${esc(n.id)}"
+                  data-pfad="${esc(n.bild_pfad || '')}"
+                  aria-label="${esc(`Foto von ${nameVon(n.absender)}, ${nachrichtZeit(n.erstellt_am)}`)}">
+            <span class="platzhalter">${n.bild_pfad ? '' : 'nicht mehr verfügbar'}</span>
+            <span class="wann">${esc(kurzeZeit(n.erstellt_am))}</span>
+          </button>`).join('')}
+      </div>`;
+
+    $$('#verlauf [data-hin]').forEach(el => el.addEventListener('click', async () => {
+      zielNachricht = el.dataset.hin;
+      blick = 'verlauf';
+      await zeichneVerlauf();
+    }));
+    $('#verlauf [data-alle-sichern]')?.addEventListener('click', () => sichereAlle());
+    await bilderNachladen();
+  }
+
+  /* Nach dem Sprung aus den Medien soll die Nachricht nicht irgendwo
+     stehen, sondern ins Auge fallen. Der Rahmen verschwindet von selbst
+     wieder — er ist ein Hinweis und keine Markierung. */
+  function springeHin() {
+    if (!zielNachricht) return;
+    const el = $(`#n-${CSS.escape(zielNachricht)}`);
+    zielNachricht = null;
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('gefunden');
+    setTimeout(() => el.classList.remove('gefunden'), 2200);
+  }
+
+  /* Die Suche läuft über das, was ohnehin schon geladen ist: beim Öffnen
+     kommt das ganze Gespräch, eine zweite Abfrage brächte nichts Neues
+     und wäre ohne Empfang nur ein Fehler mehr. Gesucht wird im Klartext,
+     also ohne die Klammern einer Erwähnung — wer "@Thomas" tippt, soll
+     ihn finden und nicht seine Kennung. */
+  function zeichneSuche() {
+    const v = $('#verlauf');
+    v.classList.remove('medien');
+    const q = suchbegriff.trim().toLowerCase();
+    const treffer = !q ? [] : nachrichten
+      .filter(n => n.text && !n.geloescht_am
+                && erwaehnungKlartext(n.text).toLowerCase().includes(q))
+      .sort((a, b) => new Date(b.erstellt_am) - new Date(a.erstellt_am));
+
+    v.innerHTML = `
+      <div class="ch-suchkopf">
+        <input id="ch-suchfeld" type="search" placeholder="In diesem Gespräch suchen"
+               aria-label="In diesem Gespräch suchen" value="${esc(suchbegriff)}">
+      </div>
+      ${!q
+        ? '<div class="br-leer" style="margin:auto;">Tippen Sie ein Wort, das in einer Nachricht vorkommt.</div>'
+        : treffer.length
+          ? `<div class="ch-treffer">${treffer.map(n => `
+              <button type="button" class="pressable" data-hin="${esc(n.id)}">
+                <span class="oben">
+                  <span class="wer">${esc(n.absender === ich ? 'Sie' : nameVon(n.absender))}</span>
+                  <span class="wann">${esc(langeZeit(n.erstellt_am))}</span>
+                </span>
+                <span class="was">${hervor(erwaehnungKlartext(n.text), q)}</span>
+              </button>`).join('')}</div>`
+          : `<div class="br-leer" style="margin:auto;">Nichts gefunden zu „${esc(suchbegriff)}“.</div>`}`;
+
+    const feld = $('#ch-suchfeld');
+    feld.addEventListener('input', () => {
+      suchbegriff = feld.value;
+      const stand = feld.selectionStart;
+      zeichneSuche();
+      const neu = $('#ch-suchfeld');
+      neu.focus();
+      try { neu.setSelectionRange(stand, stand); } catch { /* egal */ }
+    });
+    $$('#verlauf [data-hin]').forEach(el => el.addEventListener('click', async () => {
+      zielNachricht = el.dataset.hin;
+      blick = 'verlauf';
+      await zeichneVerlauf();
+    }));
+  }
+
+  /* Das gesuchte Wort im Treffer hervorheben. Escapet wird stückweise,
+     sonst stünde das Markup als Text da. */
+  function hervor(text, q) {
+    const roh = String(text || '');
+    const unten = roh.toLowerCase();
+    let raus = '', i = 0, stelle;
+    while ((stelle = unten.indexOf(q, i)) >= 0) {
+      raus += esc(roh.slice(i, stelle)) + `<mark>${esc(roh.slice(stelle, stelle + q.length))}</mark>`;
+      i = stelle + q.length;
+    }
+    return raus + esc(roh.slice(i));
+  }
+
+  /* Im Treffer steht das volle Datum und nicht "Gestern": wer sucht,
+     will wissen, wann es war, und nicht, wie lange es her ist. */
+  const langeZeit = iso => new Date(iso).toLocaleDateString('de-CH',
+    { day: '2-digit', month: '2-digit', year: 'numeric' })
+    + ', ' + new Date(iso).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
 
   /* Ein Bild lebt 30 Tage. Danach bleibt die Stelle im Gespräch stehen und
      sagt, dass es das Bild einmal gab — keine Lücke, aus der man nicht
@@ -301,12 +661,14 @@
     const weg = !n.bild_pfad;
     const ablauf = new Date(n.bild_ablauf).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' });
     return `
-      <div class="ch-bildblase ${meine ? 'ich' : ''}" data-bild="${esc(n.id)}" data-pfad="${esc(n.bild_pfad || '')}">
+      <div class="ch-bildblase ${meine ? 'ich' : ''}" id="n-${esc(n.id)}"
+           data-bild="${esc(n.id)}" data-pfad="${esc(n.bild_pfad || '')}"
+           ${weg ? '' : `data-halten="${esc(n.id)}"`}>
         ${weg
           ? '<div class="platzhalter">Bild nicht mehr verfügbar.<br>Bilder werden nach 30 Tagen entfernt.</div>'
           : '<div class="platzhalter">Bild wird geladen…</div>'}
         ${weg ? '' : `<div class="ch-ablauf">${svg(IKON.uhr, 13)}<span>Verfügbar bis ${esc(ablauf)}, danach automatisch gelöscht</span></div>`}
-        ${fuss(n, meine)}
+        ${fuss(n, meine)}${reaktionsZeile(n)}
       </div>`;
   }
 
@@ -323,11 +685,154 @@
         if (platz) platz.textContent = 'Bild lässt sich gerade nicht laden.';
         return;
       }
-      if (platz) {
-        platz.outerHTML = `<a href="${esc(data.signedUrl)}" download target="_blank" rel="noopener">
-          <img src="${esc(data.signedUrl)}" alt="Gesendetes Bild" loading="lazy"></a>`;
-      }
+      if (!platz) return;
+      /* Im Verlauf führt ein Tipp aufs Bild zum Bild selbst, im Raster
+         zur Nachricht — dort ist die Kachel schon ein Knopf, und ein
+         Link darin wäre keiner mehr. */
+      platz.outerHTML = el.classList.contains('ch-kachel')
+        ? `<img src="${esc(data.signedUrl)}" alt="Gesendetes Bild" loading="lazy">`
+        : `<a href="${esc(data.signedUrl)}" download target="_blank" rel="noopener">
+            <img src="${esc(data.signedUrl)}" alt="Gesendetes Bild" loading="lazy"></a>`;
     }));
+  }
+
+  /* --- Fotos sichern ---------------------------------------------------------- */
+
+  /* Hier gibt iOS die Regeln vor, und sie sind eng: aus einer Web-App
+     kommt kein Code unbeaufsichtigt an die Fotomediathek. Es gibt dafür
+     keine Schnittstelle, weder in Safari noch in der zum
+     Startbildschirm hinzugefügten App. Wirklich in "Fotos" landet ein
+     Bild nur über das Teilen-Blatt des Systems, und das öffnet sich nur
+     auf einen Fingertipp hin.
+
+     Daraus folgt der Zuschnitt: automatisch ist alles bis auf diesen
+     einen Tipp. Ist der Schalter an, sammelt die App neu eintreffende
+     Fotos und legt oben im Gespräch einen Knopf hin; ein Tipp gibt alle
+     zusammen ans Teilen-Blatt weiter, dort "Bild sichern". Wo es kein
+     Teilen-Blatt gibt — Desktop, ältere Browser —, wird stattdessen
+     heruntergeladen.
+
+     Dass die App nicht still im Hintergrund speichert, ist also keine
+     Bequemlichkeit, sondern die Grenze der Plattform. Sie steht hier,
+     damit sie beim nächsten Lesen nicht für einen Fehler gehalten wird. */
+  const kannTeilen = () => typeof navigator.canShare === 'function'
+    && typeof navigator.share === 'function';
+
+  function sicherBanner() {
+    if (!meineZeile.fotos_sichern || !zuSichern.length) return '';
+    const n = zuSichern.length;
+    return `
+      <div class="ch-sicherbanner">
+        <span>${n} ${n === 1 ? 'neues Foto' : 'neue Fotos'} zum Sichern bereit</span>
+        <button type="button" class="pressable" data-sichern-jetzt>${svg(IKON.sichern, 14)} Sichern</button>
+      </div>`;
+  }
+
+  /* Eine Nachricht mit Bild holen und als Datei zurückgeben. Der Bucket
+     ist geschlossen, also braucht jedes Bild eine kurzlebige Adresse. */
+  async function alsDatei(n) {
+    if (!n.bild_pfad) return null;
+    const { data, error } = await sb.storage.from('chat-bilder')
+      .createSignedUrl(n.bild_pfad, 600);
+    if (error || !data?.signedUrl) return null;
+    try {
+      const antwort = await fetch(data.signedUrl);
+      if (!antwort.ok) return null;
+      const blob = await antwort.blob();
+      const endung = (n.bild_pfad.split('.').pop() || 'jpg').toLowerCase();
+      const wann = new Date(n.erstellt_am).toISOString().slice(0, 10);
+      return new File([blob], `TRIGA_${wann}_${n.id.slice(0, 8)}.${endung}`,
+                      { type: blob.type || 'image/jpeg' });
+    } catch { return null; }
+  }
+
+  /* Der gemeinsame Weg für beide Knöpfe. Das Teilen-Blatt nimmt mehrere
+     Dateien auf einmal, das ist der Fall, für den es gebaut ist. Wo es
+     fehlt, wird eines nach dem anderen heruntergeladen — auf dem iPhone
+     landet das in "Dateien" und nicht in "Fotos", und genau deshalb ist
+     das Teilen-Blatt der erste Weg und nicht der zweite. */
+  async function sichere(liste, wortDanach) {
+    if (!liste.length) return false;
+    if (!istOnline()) { toast('Zum Sichern braucht es eine Verbindung', true); return false; }
+
+    toast(liste.length === 1 ? 'Foto wird geholt…' : `${liste.length} Fotos werden geholt…`);
+    const dateien = (await Promise.all(liste.map(alsDatei))).filter(Boolean);
+    if (!dateien.length) { toast('Die Fotos liessen sich nicht laden', true); return false; }
+
+    if (kannTeilen() && navigator.canShare({ files: dateien })) {
+      try {
+        await navigator.share({ files: dateien });
+        toast(wortDanach);
+        return true;
+      } catch (e) {
+        /* Wer das Blatt zumacht, hat abgebrochen und keinen Fehler
+           gemacht — dann bleibt der Stapel stehen und der Knopf auch. */
+        if (e?.name === 'AbortError') return false;
+        console.warn('[TRIGA] Teilen ging nicht, es wird heruntergeladen:', e?.message || e);
+      }
+    }
+
+    for (const d of dateien) {
+      const adresse = URL.createObjectURL(d);
+      const auf = document.createElement('a');
+      auf.href = adresse;
+      auf.download = d.name;
+      document.body.appendChild(auf);
+      auf.click();
+      auf.remove();
+      setTimeout(() => URL.revokeObjectURL(adresse), 10000);
+    }
+    toast(kannTeilen() ? wortDanach : `${dateien.length === 1 ? 'Foto' : 'Fotos'} in den Downloads`);
+    return true;
+  }
+
+  async function sichereStapel() {
+    const liste = zuSichern.slice();
+    if (await sichere(liste, liste.length === 1 ? 'Foto gesichert' : 'Fotos gesichert')) {
+      zuSichern = zuSichern.filter(n => !liste.includes(n));
+      await zeichneVerlauf();
+    }
+  }
+
+  async function sichereAlle() {
+    const alle = nachrichten.filter(n => n.bild_pfad && !n.geloescht_am);
+    if (!alle.length) return toast('In diesem Gespräch gibt es kein Foto');
+    await sichere(alle, `${alle.length} ${alle.length === 1 ? 'Foto' : 'Fotos'} gesichert`);
+  }
+
+  /* Beim ersten Foto wird einmal gefragt, mit Begründung, und die
+     Antwort steht danach an der Mitgliedszeile. Wer Nein sagt, wird in
+     diesem Gespräch nicht wieder gefragt — die Frage kommt nur, solange
+     der Schalter noch nie gestellt wurde. */
+  let schonGefragt = false;
+
+  async function vielleichtFragen() {
+    if (schonGefragt || meineZeile.fotos_sichern || !offen) return;
+    schonGefragt = true;
+    const ja = await frage({
+      titel: 'Fotos aus diesem Gespräch sichern?',
+      text: `Neue Fotos aus „${chatName(offen)}“ werden dann gesammelt, und ein Tipp auf „Sichern“ legt sie in Ihre Fotos. Ganz ohne Tipp geht es nicht: in die Fotomediathek kommt eine App im Browser nur über das Teilen-Blatt. Umstellen lässt sich das jederzeit im Menü oben rechts.`,
+      knopf: 'Ja, sammeln'
+    });
+    if (!ja) return;
+    await schalterSetzen('fotos_sichern', true);
+  }
+
+  /* Beide Schalter gehen denselben Weg. Die Oberfläche geht voraus, die
+     Datenbank zieht nach; scheitert sie, kippt der Schalter zurück. */
+  async function schalterSetzen(feld, wert) {
+    const vorher = meineZeile[feld];
+    meineZeile[feld] = wert;
+    if (feld === 'stumm' && offen) offen.stumm = wert;
+    const { error } = await sb.from('chat_mitglieder')
+      .update({ [feld]: wert }).eq('chat_id', offen.id).eq('user_id', ich);
+    if (error) {
+      meineZeile[feld] = vorher;
+      if (feld === 'stumm' && offen) offen.stumm = vorher;
+      toast(error.message, true);
+      return false;
+    }
+    return true;
   }
 
   /* --- Öffnen und Lesen ------------------------------------------------------ */
@@ -347,11 +852,27 @@
       sb.from('nachrichten')
         .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am, geloescht_am')
         .eq('chat_id', id).order('erstellt_am', { ascending: true }),
-      sb.from('chat_mitglieder').select('user_id, zuletzt_gelesen').eq('chat_id', id)
+      sb.from('chat_mitglieder').select('user_id, zuletzt_gelesen, stumm, fotos_sichern').eq('chat_id', id)
     ]);
     if (meckern('Nachrichten laden', error)) return;
     nachrichten = data || [];
     lesestand = Object.fromEntries((staende || []).map(m => [m.user_id, m.zuletzt_gelesen]));
+
+    const meine = (staende || []).find(m => m.user_id === ich);
+    meineZeile = { stumm: !!meine?.stumm, fotos_sichern: !!meine?.fotos_sichern };
+    c.stumm = meineZeile.stumm;
+
+    /* Die Reaktionen kommen in einer Abfrage für das ganze Gespräch und
+       nicht je Nachricht: bei zweihundert Blasen wären das zweihundert
+       Anfragen für eine Handvoll Daumen. */
+    await ladeReaktionen();
+
+    /* Was schon dasteht, ist nicht neu. Beim Öffnen wird der Stapel
+       deshalb geleert und nicht gefüllt — sonst böte die App beim ersten
+       Öffnen eines alten Gesprächs an, vierzig Fotos zu sichern. */
+    zuSichern = [];
+    blick = 'verlauf';
+    suchbegriff = '';
     await zeichneVerlauf();
 
     await alsGelesen(c);
@@ -409,8 +930,37 @@
           const n = nutzlast.new;
           if (nachrichten.some(x => x.id === n.id)) return;
           nachrichten.push(n);
+
+          /* Ein fremdes Foto kommt auf den Stapel, wenn der Schalter an
+             ist. Eigene nicht: die liegen schon auf dem Gerät, von dem
+             sie kamen. */
+          if (n.bild_pfad && n.absender !== ich) {
+            if (meineZeile.fotos_sichern) zuSichern.push(n);
+            else vielleichtFragen();
+          }
+
           await zeichneVerlauf();
           if (n.absender !== ich) await alsGelesen(offen);
+        })
+      /* Reaktionen der anderen erscheinen, ohne dass jemand neu lädt.
+         Dieselbe Zeile liefert Kommen und Gehen: ein zurückgenommener
+         Daumen ist hier wirklich ein delete und kein Leeren. */
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'nachrichten_reaktionen' },
+        async nutzlast => {
+          const r = nutzlast.new?.nachricht_id ? nutzlast.new : nutzlast.old;
+          if (!r?.nachricht_id) return;
+          if (!nachrichten.some(x => x.id === r.nachricht_id)) return;
+          if (r.user_id === ich) return;      // die eigene steht längst da
+
+          const liste = (reaktionen[r.nachricht_id] ||= []);
+          const wo = liste.findIndex(x => x.user_id === r.user_id && x.emoji === r.emoji);
+          if (nutzlast.eventType === 'DELETE') {
+            if (wo >= 0) liste.splice(wo, 1);
+          } else if (wo < 0) {
+            liste.push({ nachricht_id: r.nachricht_id, user_id: r.user_id, emoji: r.emoji });
+          }
+          await zeichneVerlauf();
         })
       /* Gelöscht wird nicht wirklich gelöscht, sondern geleert — für die
          Echtzeit ist das eine Änderung, keine Entfernung. */
@@ -516,18 +1066,26 @@
 
   async function senden() {
     const feld = $('#e-text');
-    const text = feld.value.trim();
-    if (!text || !offen) return;
+    const roh = feld.value.trim();
+    if (!roh || !offen) return;
     if (!istOnline()) return toast('Nachrichten brauchen eine Verbindung', true);
+
+    /* Aus "@Thomas Zürcher" wird hier "@[Thomas Zürcher](kennung)" —
+       dieselbe Form wie im Feed, damit api/push.js in beiden Bereichen
+       dieselbe Zeichenkette liest. Im Feld stand die ganze Zeit nur der
+       Name. */
+    const text = erw.markiere(roh, erw.merkeFuer(FELD));
 
     feld.value = '';
     feld.style.height = 'auto';
+    erw.schliessen();
     const { data, error } = await sb.from('nachrichten')
       .insert({ chat_id: offen.id, absender: ich, text })
       .select().single();
-    if (error) { feld.value = text; return toast(error.message, true); }
+    if (error) { feld.value = roh; return toast(error.message, true); }
 
-    await nachDemSenden(data, text);
+    erw.vergiss(FELD);
+    await nachDemSenden(data, erwaehnungKlartext(text));
   }
 
   async function nachDemSenden(n, vorschauText) {
@@ -536,8 +1094,13 @@
       await zeichneVerlauf();
     }
     if (n) aktualisiereVorschau(n);
+    /* nachricht ist kein zweiter Weg, sondern die Beilage: api/push.js
+       liest daraus den gespeicherten Text und schneidet die Erwähnungen
+       selbst heraus. Wer erwähnt ist, bekommt die Meldung auch dann,
+       wenn er das Gespräch stumm gestellt hat. */
     pushSenden({
       chat: offen.id,
+      nachricht: n?.id,
       titel: offen.art === 'gruppe' ? offen.name : nameVon(ich),
       text: offen.art === 'gruppe' ? `${nameVon(ich).split(' ')[0]}: ${vorschauText}` : vorschauText,
       ziel: `chat.html?chat=${offen.id}`
@@ -742,9 +1305,42 @@
         </div>`;
     };
 
+    /* Die beiden eigenen Schalter stehen zuoberst und nicht bei den
+       Mitgliedern: sie gehen nur einen selbst an, und im Einzelchat gibt
+       es die Mitgliederliste gar nicht. */
+    const schalter = `
+      <div class="ch-schalter">
+        <button type="button" class="pressable" data-schalter="stumm"
+                role="switch" aria-checked="${meineZeile.stumm}">
+          ${svg(meineZeile.stumm ? IKON.stumm : IKON.laut, 17)}
+          <span class="mitte">
+            <span class="titel">Stumm</span>
+            <span class="unter">${meineZeile.stumm
+              ? 'Keine Meldung auf dem Bildschirm. Nachrichten und Zähler laufen weiter, und wenn Sie jemand mit @ anspricht, kommt es trotzdem durch.'
+              : 'Meldungen aus diesem Gespräch kommen aufs Telefon.'}</span>
+          </span>
+          <span class="knebel"></span>
+        </button>
+        <button type="button" class="pressable" data-schalter="fotos_sichern"
+                role="switch" aria-checked="${meineZeile.fotos_sichern}">
+          ${svg(IKON.sichern, 17)}
+          <span class="mitte">
+            <span class="titel">Fotos sichern</span>
+            <span class="unter">${meineZeile.fotos_sichern
+              ? 'Neue Fotos werden gesammelt; ein Tipp auf „Sichern“ legt sie in Ihre Fotos.'
+              : 'Neue Fotos bleiben im Gespräch und werden nicht gesammelt.'}</span>
+          </span>
+          <span class="knebel"></span>
+        </button>
+      </div>
+      <button type="button" id="g-allebilder" class="pressable" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:46px; border-radius:13px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:14.5px; margin-bottom:16px;">
+        ${svg(IKON.sichern, 16)} Alle Bilder dieses Chats sichern
+      </button>`;
+
     const s = sheet(`
       <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:4px;">${esc(chatName(offen))}</div>
       <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">${erklaerung}</div>
+      ${schalter}
       ${gruppe ? `
       <div class="ch-wahl" style="max-height:44dvh; overflow-y:auto;">
         <div class="ch-mitzeile">
@@ -779,6 +1375,31 @@
       s.schliessen();
       await gruppeVerlassen();
     });
+    $('#g-allebilder', s.el)?.addEventListener('click', async () => {
+      s.schliessen();
+      await sichereAlle();
+    });
+
+    /* Die beiden Schalter stehen jedem offen, auch ohne Admin-Recht —
+       sie ändern nichts am Gespräch, nur an der eigenen Zeile. Deshalb
+       vor dem Riegel weiter unten. */
+    $$('[data-schalter]', s.el).forEach(el => el.addEventListener('click', async () => {
+      const feld = el.dataset.schalter;
+      const neu = el.getAttribute('aria-checked') !== 'true';
+      el.setAttribute('aria-checked', String(neu));
+      if (!await schalterSetzen(feld, neu)) {
+        el.setAttribute('aria-checked', String(!neu));
+        return;
+      }
+      /* Wer das Sammeln ausschaltet, will auch den Stapel nicht mehr
+         sehen; wer es einschaltet, fängt bei null an und bekommt nicht
+         rückwirkend vierzig alte Fotos angeboten. */
+      if (feld === 'fotos_sichern') zuSichern = [];
+      s.schliessen();
+      zeichneListe();
+      await zeichneVerlauf();
+      gespraechMenue();
+    }));
 
     if (!binAdmin) return;
 
@@ -971,6 +1592,12 @@
     });
 
     const feld = $('#e-text');
+    /* Dieselbe Auswahlliste wie im Feed. Ein fester Schlüssel genügt,
+       anders als dort: im Feed stehen Beitrag und mehrere
+       Kommentarfelder gleichzeitig auf dem Schirm, hier gibt es genau
+       ein Eingabefeld. Nach jedem Senden wird die Karte ohnehin
+       geleert. */
+    erw.helfer(feld, FELD);
     feld.addEventListener('input', () => {
       feld.style.height = 'auto';
       feld.style.height = Math.min(feld.scrollHeight, 120) + 'px';

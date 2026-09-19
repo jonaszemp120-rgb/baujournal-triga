@@ -673,3 +673,156 @@ async function planMitNadeln(planBild, maengel) {
   }
   return leinwand.toDataURL('image/png');
 }
+
+/* --- Antrag: Spesen und Ferien ---------------------------------------------- */
+
+/* Ein Spesen- oder Ferienantrag als PDF, in derselben Vorlage wie das
+   Abnahmeprotokoll und das Sitzungsprotokoll: dunkler Balken mit dem
+   Logo oben, rote Abschnittstitel, Fusszeile. Es steht hier und nicht in
+   js/formulare.js, weil hier die ganze Maschinerie schon liegt.
+
+   Warum es das PDF überhaupt gibt: der Weg über Mail fällt weg, es gibt
+   keine verifizierte Absenderdomain. Ein Antrag soll trotzdem ein Blatt
+   sein, das man ablegen, ausdrucken und in die Buchhaltung geben kann —
+   die Zeile in der Datenbank ist das nicht.
+
+   Es entsteht beim Einreichen und nicht beim Anschauen. Ein PDF, das
+   jedes Mal neu gerechnet wird, zeigt den Antrag von heute; dieses hier
+   zeigt ihn so, wie er eingereicht wurde, und genau das ist der Sinn
+   eines Nachweises. Deshalb steht danach auch in der Datenbank, dass es
+   sich nicht mehr austauschen lässt.
+
+   Liefert den Blob; wohin er gehört, entscheidet der Aufrufer. */
+async function antragPdf({ antrag, wer, beleg, wann = new Date() }) {
+  await ladeSkript('vendor/jspdf-2.5.2.umd.min.js');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  let logo = null, logoBreite = 0;
+  const LOGO_H = 12;
+  try {
+    logo = await logoDatenUrl();
+    const masse = doc.getImageProperties(logo);
+    logoBreite = LOGO_H * masse.width / masse.height;
+  } catch (e) {
+    console.warn('[TRIGA] Logo fuer den Antrag nicht verfuegbar:', e.message);
+  }
+
+  const spesen = antrag.art === 'spesen';
+  const L = 18, R = 192, BREITE = R - L;
+  let y = 0;
+
+  const kopf = () => {
+    doc.setFillColor(0, 35, 63);
+    doc.rect(0, 0, 210, 26, 'F');
+    if (logo) doc.addImage(logo, 'PNG', L, (26 - LOGO_H) / 2, logoBreite, LOGO_H);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold').setFontSize(13);
+    doc.text(spesen ? 'Spesenantrag' : 'Ferienantrag', R, 15, { align: 'right' });
+    y = 38;
+  };
+  const platz = h => { if (y + h > 280) { doc.addPage(); kopf(); } };
+  const titel = t => {
+    platz(14);
+    doc.setFont('helvetica', 'bold').setFontSize(9);
+    doc.setTextColor(178, 0, 0);
+    doc.text(pdfText(t).toUpperCase(), L, y);
+    y += 2.5;
+    doc.setDrawColor(223, 228, 230).setLineWidth(0.3);
+    doc.line(L, y, R, y);
+    y += 5;
+  };
+
+  /* Begriff links, Wert rechts daneben. Ein Antrag ist eine Handvoll
+     Angaben, und die liest sich als Liste besser als als Fliesstext. */
+  const zeile = (was, wert) => {
+    const werte = doc.splitTextToSize(pdfText(wert ?? '-'), BREITE - 42);
+    platz(5 * werte.length + 2);
+    doc.setFont('helvetica', 'bold').setFontSize(10);
+    doc.setTextColor(92, 106, 112);
+    doc.text(pdfText(was), L, y);
+    doc.setFont('helvetica', 'normal').setFontSize(10);
+    doc.setTextColor(18, 24, 27);
+    doc.text(werte, L + 42, y);
+    y += 5 * werte.length + 1.5;
+  };
+
+  kopf();
+
+  doc.setFont('helvetica', 'bold').setFontSize(16);
+  doc.setTextColor(0, 35, 63);
+  doc.text(pdfText(wer || 'Mitarbeiter:in'), L, y);
+  y += 7;
+
+  doc.setFont('helvetica', 'normal').setFontSize(9.5);
+  doc.setTextColor(92, 106, 112);
+  doc.text(pdfText(`Eingereicht am ${new Date(antrag.erstellt_am || wann).toLocaleDateString('de-CH')}`), L, y);
+  y += 9;
+
+  titel('Antrag');
+  zeile('Art', spesen ? 'Spesen' : 'Ferien');
+  zeile('Name', wer || '-');
+  zeile('Datum', new Date(antrag.erstellt_am || wann).toLocaleDateString('de-CH'));
+
+  if (spesen) {
+    zeile('Betrag', 'CHF ' + Number(antrag.betrag || 0).toLocaleString('de-CH',
+      { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    zeile('Beschrieb', antrag.beschrieb);
+  } else {
+    const t = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('de-CH') : '-';
+    /* Beide Enden zaehlen mit: von Montag bis Freitag sind es fuenf Tage
+       und nicht vier. Dieselbe Rechnung wie am Bildschirm. */
+    const anzahl = antrag.von && antrag.bis
+      ? Math.round((new Date(antrag.bis + 'T00:00:00') - new Date(antrag.von + 'T00:00:00')) / 86400000) + 1
+      : null;
+    zeile('Zeitraum', `${t(antrag.von)} bis ${t(antrag.bis)}`);
+    zeile('Anzahl Tage', anzahl === null ? '-' : `${anzahl} ${anzahl === 1 ? 'Tag' : 'Tage'}`);
+    zeile('Bemerkung', antrag.bemerkung || '-');
+  }
+
+  /* Der Beleg gehoert ins selbe Blatt und nicht in einen zweiten Anhang:
+     ein Spesenantrag ohne Beleg ist in der Buchhaltung nichts wert, und
+     zwei Dateien gehen getrennte Wege. Ist das Bild nicht lesbar, steht
+     das PDF trotzdem — lieber ein Antrag ohne Bild als gar keiner. */
+  if (spesen) {
+    titel('Beleg');
+    if (beleg) {
+      try {
+        const masse = doc.getImageProperties(beleg);
+        const h = Math.min(170, BREITE * masse.height / masse.width);
+        const b = h * masse.width / masse.height;
+        platz(h + 6);
+        doc.addImage(beleg, masse.fileType || 'JPEG', L, y, b, h);
+        y += h + 6;
+      } catch (e) {
+        doc.setFont('helvetica', 'normal').setFontSize(10);
+        doc.setTextColor(18, 24, 27);
+        doc.text(pdfText('Der Beleg liess sich nicht einbetten.'), L, y);
+        y += 6;
+      }
+    } else {
+      doc.setFont('helvetica', 'normal').setFontSize(10);
+      doc.setTextColor(18, 24, 27);
+      doc.text(pdfText('Kein Beleg beigelegt.'), L, y);
+      y += 6;
+    }
+  }
+
+  /* Der Entscheid steht auf dem Blatt, wenn es einen gibt. Beim
+     Einreichen gibt es keinen, und dann sagt das Blatt genau das: es ist
+     der Antrag und nicht seine Bewilligung. */
+  titel('Entscheid');
+  const ENTSCHEID = { eingereicht: 'Eingereicht, noch offen', genehmigt: 'Genehmigt', abgelehnt: 'Abgelehnt' };
+  zeile('Status', ENTSCHEID[antrag.status] || 'Eingereicht, noch offen');
+  if (antrag.entschieden_am) {
+    zeile('Entschieden am', new Date(antrag.entschieden_am).toLocaleDateString('de-CH'));
+  }
+  if (antrag.entscheid_kommentar) zeile('Begruendung', antrag.entscheid_kommentar);
+
+  doc.setFont('helvetica', 'normal').setFontSize(8);
+  doc.setTextColor(140, 152, 158);
+  doc.text(pdfText(`Erstellt am ${wann.toLocaleDateString('de-CH')} · TRIGA Baumanagement AG`),
+           R, 288, { align: 'right' });
+
+  return doc.output('blob');
+}

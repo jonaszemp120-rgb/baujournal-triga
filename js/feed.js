@@ -75,43 +75,13 @@
      Eintrag je Feld: für den Dialog unter "neu", für jeden Kommentar
      unter der Kennung seines Beitrags. Die Einträge überleben das
      Neuzeichnen der Liste, genau wie der angefangene Text selbst. */
-  const gemerkt = {};
-  const merkeFuer = id => (gemerkt[id] ||= new Map());
-
-  /* Aus "@Thomas Zürcher" wird beim Absenden "@[Thomas Zürcher](kennung)".
-     Im Feld selbst bleibt der Name stehen — niemand soll beim Schreiben
-     Klammern und Kennungen vor sich haben.
-     Die längeren Namen zuerst, sonst verschluckt "Adrian Zemp" den
-     Anfang von "Adrian Zemper". */
-  function markiere(text, karte) {
-    let raus = String(text || '');
-    const namen = [...karte.keys()].sort((a, b) => b.length - a.length);
-    for (const name of namen) {
-      const marke = `@[${name}](${karte.get(name)})`;
-      if (raus.includes(marke)) continue;
-      const stelle = raus.indexOf(`@${name}`);
-      if (stelle < 0) continue;
-      raus = raus.slice(0, stelle) + marke + raus.slice(stelle + name.length + 1);
-    }
-    return raus;
-  }
-
-  /* Der Text fürs Auge: die Erwähnung wird hervorgehoben und führt auf
-     die Person im Adressbuch. Escapet wird stückweise und nicht am
-     Schluss — sonst stünde das eingesetzte Markup als Text da. */
-  function mitErwaehnungen(text) {
-    const roh = String(text || '');
-    let raus = '', i = 0;
-    for (const m of roh.matchAll(ERWAEHNUNG)) {
-      raus += esc(roh.slice(i, m.index));
-      const person = leute.find(l => String(l.user_id).toLowerCase() === m[2].toLowerCase());
-      raus += person
-        ? `<a class="fd-erwaehnt" href="mitarbeiter.html?person=${encodeURIComponent(person.id)}">@${esc(m[1])}</a>`
-        : `<span class="fd-erwaehnt">@${esc(m[1])}</span>`;
-      i = m.index + m[0].length;
-    }
-    return raus + esc(roh.slice(i));
-  }
+  /* Erwähnungen: dasselbe Werkzeug wie im Chat, nicht ein zweites, das
+     ihm heute gleicht. Es steht in js/app.js — was hier stand, ist Wort
+     für Wort dorthin gewandert. */
+  const erw = macheErwaehnungen({ leute: () => leute, ich: () => ich });
+  const { markiere, mitErwaehnungen, merkeFuer, vergiss } = erw;
+  const erwaehnungHelfer = erw.helfer;
+  const erwaehnungSchliessen = erw.schliessen;
 
   /* Jede eigene Änderung kommt über die Echtzeit noch einmal zurück, und
      zwar nicht unbedingt danach: die Meldung kann eintreffen, bevor die
@@ -122,101 +92,6 @@
     return liste.some(x => gleich(x, zeile)) ? liste : [...liste, zeile];
   }
   const gleicheId = (a, b) => a.id === b.id;
-
-  /* Die Auswahlliste beim Tippen. Sie hängt an document.body und steht
-     fest im Fenster, nicht im Feld: sowohl das Blatt von unten als auch
-     die Feed-Karte scrollen und schneiden ab, und eine Liste, die halb
-     hinter dem Rand verschwindet, hilft niemandem.
-     Gesucht wird nur zwischen @ und dem Cursor, und nur wenn davor ein
-     Leerzeichen oder der Zeilenanfang steht — eine E-Mail-Adresse im Text
-     soll keine Liste aufklappen. */
-  const VOR_CURSOR = /(^|\s)@([\p{L}\p{N}.\-' ]{0,40})$/u;
-  let auswahl = null;        // das Element, solange es offen ist
-  let trefferListe = [];
-  let markiert = 0;
-  let feldOffen = null;
-
-  function erwaehnungSchliessen() {
-    auswahl?.remove();
-    auswahl = null;
-    trefferListe = [];
-    feldOffen = null;
-  }
-
-  function erwaehnungHelfer(feld, schluessel) {
-    const pruefe = () => {
-      const bis = feld.value.slice(0, feld.selectionStart ?? feld.value.length);
-      const treffer = VOR_CURSOR.exec(bis);
-      if (!treffer) return erwaehnungSchliessen();
-
-      const suche = treffer[2].trim().toLowerCase();
-      trefferListe = leute
-        .filter(l => l.user_id !== ich)
-        .filter(l => !suche || l.name.toLowerCase().includes(suche))
-        .slice(0, 6);
-      if (!trefferListe.length) return erwaehnungSchliessen();
-
-      markiert = 0;
-      feldOffen = { feld, schluessel, anfang: treffer.index + treffer[1].length };
-      zeichneAuswahl();
-    };
-
-    feld.addEventListener('input', pruefe);
-    feld.addEventListener('click', pruefe);
-    feld.addEventListener('blur', () => setTimeout(erwaehnungSchliessen, 150));
-    feld.addEventListener('keydown', e => {
-      if (!auswahl) return;
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        markiert = (markiert + (e.key === 'ArrowDown' ? 1 : trefferListe.length - 1)) % trefferListe.length;
-        zeichneAuswahl();
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        e.stopPropagation();
-        waehleErwaehnung(trefferListe[markiert]);
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        erwaehnungSchliessen();
-      }
-    });
-  }
-
-  function zeichneAuswahl() {
-    if (!auswahl) {
-      auswahl = document.createElement('div');
-      auswahl.className = 'fd-erwaehnliste';
-      document.body.appendChild(auswahl);
-    }
-    auswahl.innerHTML = trefferListe.map((l, i) => `
-      <button type="button" class="pressable${i === markiert ? ' an' : ''}" data-wer="${esc(l.user_id)}">
-        <span class="fd-avatar">${esc(initialen(l.name))}</span><span>${esc(l.name)}</span>
-      </button>`).join('');
-    $$('[data-wer]', auswahl).forEach(el => el.addEventListener('mousedown', e => {
-      e.preventDefault();      // sonst verliert das Feld vorher den Fokus
-      waehleErwaehnung(trefferListe.find(l => l.user_id === el.dataset.wer));
-    }));
-
-    const k = feldOffen.feld.getBoundingClientRect();
-    auswahl.style.left = `${Math.max(8, Math.min(k.left, innerWidth - 268))}px`;
-    auswahl.style.width = `${Math.min(260, innerWidth - 16)}px`;
-    // Passt die Liste unten nicht mehr hin, klappt sie nach oben auf.
-    const hoehe = auswahl.offsetHeight || 200;
-    auswahl.style.top = (k.bottom + hoehe + 8 > innerHeight)
-      ? `${Math.max(8, k.top - hoehe - 6)}px`
-      : `${k.bottom + 6}px`;
-  }
-
-  function waehleErwaehnung(person) {
-    if (!person || !feldOffen) return;
-    const { feld, schluessel, anfang } = feldOffen;
-    const stand = feld.selectionStart ?? feld.value.length;
-    feld.value = `${feld.value.slice(0, anfang)}@${person.name} ${feld.value.slice(stand)}`;
-    const neu = anfang + person.name.length + 2;
-    merkeFuer(schluessel).set(person.name, person.user_id);
-    erwaehnungSchliessen();
-    feld.focus();
-    try { feld.setSelectionRange(neu, neu); } catch { /* egal */ }
-  }
 
   /* --- Zeit ---------------------------------------------------------------- */
 
@@ -652,7 +527,7 @@
       return toast(error.message, true);
     }
 
-    gemerkt[beitragId] = new Map();
+    vergiss(beitragId);
     kommentare = merke(kommentare, data, gleicheId);
     zeichneListe();
     setzeFeld('');
@@ -903,7 +778,7 @@
     /* Erwähnungen gibt es im Beitragstext. In der Frage einer Umfrage
        nicht: dort ginge es nicht darum, jemanden anzusprechen, sondern
        darum, von allen eine Antwort zu bekommen. */
-    gemerkt.neu = new Map();
+    vergiss('neu');
     erwaehnungHelfer($('#nb-text', s.el), 'neu');
 
     /* --- Umschalter --- */

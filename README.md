@@ -438,18 +438,36 @@ Abfrage gilt —, und sie setzt alle vier auf null, sobald `wetter` oder
 `temperatur` im Korrektursatz vorkommen. Die Änderung selbst steht ohnehin im
 Korrekturprotokoll.
 
-Das gilt für den Weg durch die Funktion und nicht darüber hinaus: die
-UPDATE-Policy auf `eintraege` steht auf `true`, und das Recht auf die Spalten
-liegt bei `authenticated`. Ein angemeldetes Konto könnte also mit einem
-direkten Aufruf an PostgREST jede Spalte jedes Eintrags umschreiben, an der
-Erlaubnisliste und am Korrekturprotokoll vorbei — die vier Wetterspalten
-eingeschlossen. Die App selbst tut das nirgends, sie geht ausschliesslich über
-`korrigiere_eintrag()`, `loesche_eintrag()` und `stelle_eintrag_wieder_her()`.
-Zuzumachen ist die Lücke nicht mit einem `revoke`: die drei Funktionen laufen
-als `security invoker` und leben genau von diesem Recht. Dafür müssten sie auf
-`security definer` umgestellt werden und ihre Berechtigungsprüfung selbst
-mitbringen. Das ist ein Eingriff in den Schutz der Kerntabelle und wartet auf
-einen eigenen Schritt.
+Und es gilt auch darüber hinaus, seit die Lücke zu ist, die beim Beweis zur
+Wetterspalte auffiel: die UPDATE-Policy auf `eintraege` stand auf `true` und
+das Recht auf die Spalten lag bei `authenticated`. Damit konnte jedes
+angemeldete Konto mit einem direkten Aufruf an PostgREST jede Spalte jedes
+Eintrags umschreiben — an der Erlaubnisliste vorbei, am Korrekturprotokoll
+vorbei. Für ein Journal, das im Streitfall als Beweismittel dient, ist das der
+wunde Punkt schlechthin: niemand könnte hinterher sagen, ob eine Zeile so
+geschrieben oder später still geändert wurde.
+
+**Jetzt gibt es nur noch einen Weg hinein.** Das Spaltenrecht ist weg
+(`revoke update on eintraege from authenticated, anon`), und die Policy steht
+als ausdrückliches Nein da statt zu verschwinden — eine Tabelle ohne
+UPDATE-Policy weist zwar ebenfalls alles ab, aber stumm, und wer hier später
+nachsieht, soll die Absicht lesen können. Zwei Riegel, weil einer allein zu
+wenig wäre: wer einen davon öffnet, stösst noch auf den anderen. Dasselbe
+Muster wie beim Löschen, wo auch keine Delete-Policy steht.
+
+Mit einem `revoke` allein war es nicht getan: `korrigiere_eintrag()`,
+`loesche_eintrag()` und `stelle_eintrag_wieder_her()` liefen als
+`security invoker` und lebten von genau diesem Recht. Sie laufen jetzt als
+`security definer` und bringen ihre Prüfung selbst mit —
+`darf_eintrag_aendern()` fragt, ob die Person im Adressbuch steht. Dieselbe
+Regel wie bisher in der Praxis, nur jetzt wirklich geprüft: nicht enger, denn
+auf einer Baustelle korrigiert auch mal der Stellvertreter und wer in den
+Ferien ist, soll keine Korrektur blockieren; nicht weiter, denn ein Konto ohne
+Adressbuchzeile gehört nicht zum Team.
+
+Für die App ändert sich nichts. Sie schreibt seit jeher ausschliesslich über
+die drei Funktionen; ein direktes `update` auf `eintraege` steht in keiner
+Datei.
 
 Die Spalte heisst weiterhin `wetter_gemessen_am` und nicht `…abgefragt_am`. Sie
 steht seit dem ersten Tag so in der Tabelle, und ein Eintrag, der in einer
@@ -684,9 +702,11 @@ alle acht Bereiche.
 - `antraege` — Spesen und Ferien in einer Tabelle, unterschieden durch `art`;
   eine Prüfregel hält auseinander, was nur zur einen Art gehört. `status` geht
   von `eingereicht` zu `genehmigt` oder `abgelehnt` und nie zurück. Der Trigger
-  `antrag_schutz()` lässt beim Entscheiden nur den Entscheid durch, nicht den
-  Inhalt — den Betrag eines fremden Antrags kann auch die Geschäftsleitung
-  nicht mitändern
+  `antrag_schutz()` lässt beim Entscheiden nur den Entscheid und seine
+  Begründung durch, nicht den Inhalt — den Betrag eines fremden Antrags kann
+  auch die Geschäftsleitung nicht mitändern, und das PDF in `pdf_pfad` nicht
+  austauschen. `entscheid_kommentar` trägt die Begründung einer Ablehnung; ohne
+  Entscheid weist die Prüfregel sie ab
 - `abnahmen`, `abnahme_plaene`, `maengel` — die Bauabnahme. Eine Abnahme trägt
   beliebig viele Grundrisse, einen je Haus und Geschoss; `abnahme_plaene.titel`
   ist der Name davon («Haus Magnolia, 1. OG») und `bild_pfad` zeigt auf die
@@ -721,7 +741,13 @@ alle acht Bereiche.
   `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
   `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
   `bild_ablauf` bleibt stehen — daran erkennt die App den Unterschied
-  zwischen «war nie ein Bild» und «Bild ist weg»
+  zwischen «war nie ein Bild» und «Bild ist weg». `stumm` und `fotos_sichern`
+  an der Mitgliedszeile gehen nur die eine Person an und lassen sich nur an der
+  eigenen Zeile stellen; siehe «Chat und Benachrichtigungen»
+- `nachrichten_reaktionen` — eine Zeile je Person, Nachricht und Emoji. Der
+  Zähler unter der Blase ist ihre Anzahl und keine gepflegte Zahl; der
+  Primärschlüssel verbietet dieselbe Reaktion zweimal. Fünf Zeichen sind
+  erlaubt, das hält eine Prüfregel fest
 - `push_geraete` — ein Abo je Gerät und Browser. Bewusst ohne Bezug zu einem
   Bereich: wenn später eine zugewiesene Pendenz melden soll, braucht es hier
   keine Zeile mehr
@@ -950,9 +976,10 @@ Oberfläche — ein entschiedener Antrag und eine unterschriebene Abnahme lassen
 sich auch dann nicht mehr ändern, wenn jemand die App umgeht.
 
 Beim Antrag macht das der Trigger `antrag_schutz()` mit einer Erlaubnisliste,
-derselben Bauart wie `mitarbeiter_schutz()`: durch darf nur der Entscheid, und
-`entschieden_von` setzt der Trigger selbst auf `auth.uid()`. Wer entscheidet,
-kann den Betrag eines fremden Antrags damit nicht mitändern. Bei der Abnahme
+derselben Bauart wie `mitarbeiter_schutz()`: durch dürfen nur der Entscheid und
+seine Begründung, und `entschieden_von` setzt der Trigger selbst auf
+`auth.uid()`. Wer entscheidet, kann den Betrag eines fremden Antrags damit
+nicht mitändern — und auch sein PDF nicht austauschen. Bei der Abnahme
 macht es `abnahme_gesperrt()` — als Trigger und nicht als Policy, weil eine
 Policy, die keine Zeile trifft, schweigt; hier soll eine Meldung erscheinen,
 damit klar wird, warum nichts passiert.
@@ -1048,6 +1075,70 @@ Schreibtisch kennt sie nicht —, wird die Datei heruntergeladen.
 begonnenes Protokoll ist in Sekunden neu angelegt. Ein abgeschlossenes lässt
 sich gar nicht mehr löschen, das PDF ist der massgebende Nachweis. Dasselbe gilt
 für einzelne Traktanden.
+
+### Der Antrag als Blatt, und wer davon erfährt
+
+**Kein Mailversand, und zwar aus einem handfesten Grund:** es gibt keine
+verifizierte Absenderdomain. Eine Mail von einer nicht verifizierten Adresse
+landet im Spam oder gar nicht, und ein Antrag, von dem niemand erfährt, ist
+schlimmer als gar keiner. Stattdessen bleibt alles in der App: das PDF liegt
+beim Antrag, und wer es sehen soll, bekommt eine Push-Meldung.
+
+**Das PDF entsteht beim Einreichen und nicht beim Anschauen.** Ein PDF, das
+jedes Mal neu gerechnet wird, zeigt den Antrag von heute; dieses hier zeigt
+ihn so, wie er eingereicht wurde, und genau das ist der Sinn eines Nachweises.
+Deshalb steht `pdf_pfad` auch in der Erlaubnisliste von `antrag_schutz()` als
+etwas, das feststeht — austauschen lässt es sich nicht mehr.
+
+Gebaut wird es von `antragPdf()` in `js/export.js`, in derselben Vorlage wie
+Abnahmeprotokoll und Sitzungsprotokoll: dunkler Balken mit dem Logo oben, rote
+Abschnittstitel, Fusszeile. Das Spesen-PDF trägt Name, Datum, Betrag, Beschrieb
+und den Beleg eingebettet — ein Spesenantrag ohne Beleg ist in der Buchhaltung
+nichts wert, und zwei Dateien gehen getrennte Wege. Das Ferien-PDF trägt Name,
+Datum, Zeitraum, Anzahl Tage und die Bemerkung.
+
+Es entsteht im Browser und nicht auf dem Server. Das Repo hat bewusst keine
+`package.json` und keinen Build-Schritt, und eine Serverless-Function könnte
+jsPDF nicht laden, ohne beides einzuführen; die Vorlage stünde dann ausserdem
+ein zweites Mal da. Misslingt das PDF trotzdem einmal, wird der Antrag
+eingereicht und es steht eben kein Knopf dabei — ein Antrag, der an einer
+Zeichenumsetzung scheitert, wäre das schlechteste aller Ergebnisse.
+
+Abgelegt wird es im Bucket `antrag-belege` unter der Kennung des Antrags, neben
+dem Beleg. Die Storage-Policy prüft dort den ersten Ordner gegen
+`antrag_darf_beleg()` und deckt damit jede Datei des Antrags ab — für das PDF
+war nichts Neues zu öffnen. Wer den Antrag sieht, sieht auch sein PDF.
+
+**Wer zuständig ist, steht in den Daten und nicht im Code.**
+`mitarbeiter.zustaendig_fuer` ist eine Liste aus `spesen` und `ferien`; heute
+entscheidet David die Spesen und Thomas die Ferien. Zwei Namen fest in eine
+Datei zu schreiben hiesse: wer die Zuständigkeit abgibt, braucht dafür einen
+Entwickler und eine neue Bereitstellung. So genügt eine Zeile im Dashboard, und
+bei Ferien oder Wechsel lässt sich die Zuständigkeit auch auf zwei Personen
+legen. Eine Liste und nicht eine Spalte je Art, damit eine dritte Antragsart
+ohne Schemaänderung dazukäme. Ändern darf das nur die erweiterte Stufe — die
+Spalte steht nicht in der Erlaubnisliste von `mitarbeiter_schutz()`, und damit
+macht sich niemand selbst zum Genehmiger der eigenen Spesen.
+
+**Gemeldet wird zweimal, in zwei Richtungen:** beim Einreichen bei der Person,
+die diese Art entscheidet, beim Entscheid bei der Person, die ihn eingereicht
+hat. Welcher Fall vorliegt, sagt der Status in der Zeile und nicht der Aufruf —
+`api/push.js` liest nach, auch beim Zuständigen. Wer den Antrag nicht selbst
+eingereicht hat, kann die Meldung nicht ein zweites Mal auslösen, obwohl die
+ganze Geschäftsleitung ihn sieht. Ist für eine Art niemand zuständig, geht
+nichts hinaus und es steht als Fehler im Log: ein Antrag ohne Empfänger bleibt
+liegen, und das soll niemand übersehen.
+
+**Eine Ablehnung ohne Grund ist keine Antwort, sondern ein Rätsel.** Deshalb
+fragt die App beim Ablehnen nach einer Begründung und lässt ohne sie nicht
+weiter. Sie wandert als `entscheid_kommentar` mit in die Datenbank und mit der
+Meldung hinaus — wer eine Ablehnung auf den Sperrbildschirm bekommt, soll nicht
+erst die App öffnen müssen. Unter «Meine Anträge» steht sie am Antrag, mit
+rotem Strich links: sie kommt von jemand anderem als der Rest der Zeile. Eine
+Begründung ohne Entscheid weist die Prüfregel
+`antraege_kommentar_nur_mit_entscheid` ab — sie wäre ein Vorwurf ohne Anlass.
+Bei einer Genehmigung ist sie erlaubt und wird nicht verlangt: ein Ja braucht
+keine Begründung.
 
 ## Die Prüfspur
 
@@ -1248,6 +1339,102 @@ eine Liste, ein Ort.
 Reihenfolge, weil der umgekehrte Weg im Fehlerfall eine Datei zurückliesse, die
 niemand mehr findet. So bleibt beim Abbruch höchstens ein Eintrag stehen, den
 der nächste Lauf erneut aufgreift.
+
+### Reaktionen
+
+**Eine eigene Tabelle und keine Spalte an der Nachricht.** Der Grund ist der
+Zähler: «drei Daumen hoch» ist nicht ein Wert, sondern drei Zeilen in
+`nachrichten_reaktionen`, und wer davon eine zurücknimmt, soll nicht eine
+gemeinsame Zahl herunterzählen müssen. Genau dort weichen zwei Geräte sonst
+voneinander ab, und niemand merkt es. Der Primärschlüssel trägt die ganze Regel:
+eine Person, eine Nachricht, ein Emoji — einmal. Verschiedene Emojis derselben
+Person sind erlaubt, wer etwas gleichzeitig lustig und wichtig findet, darf das
+sagen.
+
+Fünf Zeichen stehen zur Wahl und keine sechs. Die Liste steht in einer
+Prüfregel der Datenbank und noch einmal als Knöpfe in `js/chat.js` — die Regel
+gehört dorthin, die Knöpfe hierhin. Eine freie Auswahl klänge grosszügiger,
+brächte aber eine Nachricht mit vierzig verschiedenen Zeichen darunter, und
+unter einer Blase ist dafür kein Platz.
+
+Hier steht ausnahmsweise ein echtes `delete` in der Policy. Der Grundsatz, dass
+Inhalte nicht verschwinden, gilt für Nachrichten und Journaleinträge — nicht
+für ein Zeichen unter einer Blase. Ein Papierkorb für Daumen wäre albern.
+
+### Stumm, und warum eine Erwähnung trotzdem durchkommt
+
+**Stumm heisst leise, nicht blind.** `chat_mitglieder.stumm` unterdrückt die
+Push-Meldungen aus einem Gespräch; Nachrichten, Ungelesen-Zähler und Lesestand
+laufen unverändert weiter. Der Schalter sitzt an der Mitgliedszeile und nicht
+am Chat, denn jede Person stellt für sich stumm — am Chat stünde er für alle
+gleich, und das wäre falsch. Der Trigger `chat_mitglied_schutz()` lässt ihn
+deshalb nur an der eigenen Zeile zu.
+
+**Wer namentlich angesprochen wird, bekommt die Meldung trotzdem.** Eine
+Erwähnung richtet sich an eine bestimmte Person und nicht an die Runde. Das
+entscheidet `api/push.js` und nicht die App: die Function liest die Mitglieder
+samt ihrem `stumm`, liest die gesendete Nachricht und schneidet die Erwähnungen
+selbst aus dem gespeicherten Text. Wer im Aufruf steht, spielt dabei keine
+Rolle — geschnitten wird an der Mitgliederliste, an eine Kennung ausserhalb des
+Gesprächs geht nichts hinaus.
+
+Dafür trägt der Aufruf neben `chat` neu ein optionales `nachricht`. Kein
+zweiter Weg hinein, sondern eine Beilage: sie sagt, in welchem Text zu suchen
+ist. Ohne sie meldet das Gespräch wie eh und je an alle, die nicht stumm
+gestellt haben.
+
+### Fotos sichern, und wo iOS die Grenze zieht
+
+**Aus einer Web-App kommt kein Code unbeaufsichtigt an die iPhone-Fotomediathek.**
+Es gibt dafür keine Schnittstelle, weder in Safari noch in der zum
+Startbildschirm hinzugefügten App. Wirklich in «Fotos» landet ein Bild nur über
+das Teilen-Blatt des Systems, und das öffnet sich nur auf einen Fingertipp hin.
+Das ist keine Bequemlichkeit, sondern die Grenze der Plattform, und sie steht
+hier, damit sie beim nächsten Lesen nicht für einen Fehler gehalten wird.
+
+Daraus folgt der Zuschnitt: automatisch ist alles bis auf diesen einen Tipp.
+Ist `chat_mitglieder.fotos_sichern` gesetzt, sammelt die App neu eintreffende
+Fotos und legt oben im Gespräch einen Knopf hin; ein Tipp gibt alle zusammen
+ans Teilen-Blatt weiter, dort «Bild sichern». Dazu ein Knopf «Alle Bilder
+dieses Chats sichern» für das, was schon dasteht. Wo es kein Teilen-Blatt gibt
+— Desktop, ältere Browser —, wird heruntergeladen; auf dem iPhone landet das in
+«Dateien» und nicht in «Fotos», und genau deshalb ist das Teilen-Blatt der
+erste Weg und nicht der zweite.
+
+Gesammelt wird nur im Arbeitsspeicher und erst ab dem Einschalten. Was schon
+dasteht, ist nicht neu — sonst böte die App beim ersten Öffnen eines alten
+Gesprächs an, vierzig Fotos zu sichern. Am 30-Tage-Ablauf ändert das nichts:
+die Bilder verschwinden weiterhin aus dem Bucket, gesichert ist dann, was
+jemand gesichert hat.
+
+### Medien, Suche und Erwähnungen
+
+**Verlauf, Medien und Suche sind derselbe Bestand, nur anders angesehen.**
+Deshalb stehen die drei Reiter im Gespräch und nicht in der Hauptnavigation:
+sie wechseln den Blick, nicht den Ort. Die Medien zeigen alle Fotos als Raster,
+neueste zuerst; ein Tipp führt zur Nachricht, in der das Foto steht, denn ein
+Foto ohne seinen Zusammenhang ist auf einer Baustelle oft wertlos.
+
+Die Suche läuft über das, was ohnehin schon geladen ist — beim Öffnen kommt das
+ganze Gespräch, eine zweite Abfrage brächte nichts Neues und wäre ohne Empfang
+nur ein Fehler mehr. Gesucht wird im Klartext, also ohne die Klammern einer
+Erwähnung: wer «@Thomas» tippt, soll ihn finden und nicht seine Kennung. Am
+Treffer steht das volle Datum und nicht «Gestern» — wer sucht, will wissen,
+wann es war, und nicht, wie lange es her ist.
+
+**Die Erwähnungen sind dieselben wie im Feed, nicht eine zweite Fassung.** Das
+Werkzeug dafür stand in `js/feed.js` und ist nach `js/app.js` gewandert:
+`macheErwaehnungen()` liefert die Auswahlliste beim Tippen, die Umwandlung in
+`@[Name](Kennung)` beim Absenden und die Anzeige mit Hervorhebung. Feed und
+Chat holen sich dieselbe Funktion und geben nur ihre eigenen Klassennamen
+mit — in einer roten Blase muss eine Erwähnung anders aussehen als auf weissem
+Grund, die Logik dahinter ist dieselbe. Genau dort laufen zwei Nachbauten sonst
+auseinander: einer bekommt die Regel für umbenannte Personen, der andere nicht,
+und niemand merkt es, bis jemand heiratet.
+
+Wer selbst gemeint ist, sieht es an der Blase und nicht erst im Text: ein roter
+Rand links. In einer Gruppe mit vierzig Nachrichten scrollt sonst niemand bis
+dorthin.
 
 ## Logo
 

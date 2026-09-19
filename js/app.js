@@ -490,6 +490,170 @@ function erwaehnungKlartext(text) {
   return String(text || '').replace(ERWAEHNUNG, (_, name) => `@${name}`);
 }
 
+/* Das Werkzeug zum Schreiben und Anzeigen von Erwähnungen. Es steht hier
+   und nicht im Feed, weil der Chat dieselbe Sache braucht — und zwar
+   wirklich dieselbe und nicht eine zweite, die ihr heute gleicht. Genau
+   dort laufen zwei Fassungen auseinander: eine bekommt die Regel für
+   umbenannte Personen, die andere nicht, und niemand merkt es, bis
+   jemand heiratet.
+
+   leute ist eine Funktion und keine Liste: beide Bereiche laden ihr
+   Adressbuch nach, und eine einmal übergebene Liste wäre danach die
+   alte. Die Klassennamen kommen von aussen, weil Feed und Chat ihr
+   eigenes Aussehen haben — die Logik ist dieselbe, die Farbe nicht. */
+function macheErwaehnungen({ leute, ich, marke = 'fd-erwaehnt',
+                             liste = 'fd-erwaehnliste', avatar = 'fd-avatar' }) {
+  /* Wer beim Tippen ausgewählt wurde, Name zu Kennung. Je Feld eine
+     eigene Karte: im Feed stehen Beitrag und mehrere Kommentarfelder
+     gleichzeitig auf dem Schirm. */
+  const gemerkt = {};
+  const merkeFuer = id => (gemerkt[id] ||= new Map());
+
+  /* Nach dem Absenden ist die Karte verbraucht. Sie stehen zu lassen
+     hiesse: wer denselben Namen im nächsten Text ohne Auswahl tippt,
+     bekäme trotzdem eine Erwähnung daraus — und damit eine Meldung an
+     jemanden, den er gar nicht ansprechen wollte. */
+  const vergiss = id => { delete gemerkt[id]; };
+
+  /* Aus "@Thomas Zürcher" wird beim Absenden "@[Thomas Zürcher](kennung)".
+     Im Feld selbst bleibt der Name stehen — niemand soll beim Schreiben
+     Klammern und Kennungen vor sich haben.
+     Die längeren Namen zuerst, sonst verschluckt "Adrian Zemp" den
+     Anfang von "Adrian Zemper". */
+  function markiere(text, karte) {
+    let raus = String(text || '');
+    const namen = [...karte.keys()].sort((a, b) => b.length - a.length);
+    for (const name of namen) {
+      const m = `@[${name}](${karte.get(name)})`;
+      if (raus.includes(m)) continue;
+      const stelle = raus.indexOf(`@${name}`);
+      if (stelle < 0) continue;
+      raus = raus.slice(0, stelle) + m + raus.slice(stelle + name.length + 1);
+    }
+    return raus;
+  }
+
+  /* Der Text fürs Auge: die Erwähnung wird hervorgehoben und führt auf
+     die Person im Adressbuch. Escapet wird stückweise und nicht am
+     Schluss — sonst stünde das eingesetzte Markup als Text da.
+
+     Steht hinter der Kennung niemand mehr — umbenannt ist kein Problem,
+     gelöscht schon —, bleibt der Name als Text stehen, nur ohne Weg
+     dorthin. Der Satz soll lesbar bleiben; was damals geschrieben wurde,
+     wird nicht rückwirkend umgeschrieben. */
+  function mitErwaehnungen(text) {
+    const roh = String(text || '');
+    const alle = leute() || [];
+    let raus = '', i = 0;
+    for (const m of roh.matchAll(ERWAEHNUNG)) {
+      raus += esc(roh.slice(i, m.index));
+      const person = alle.find(l => String(l.user_id).toLowerCase() === m[2].toLowerCase());
+      raus += person
+        ? `<a class="${marke}" href="mitarbeiter.html?person=${encodeURIComponent(person.id)}">@${esc(m[1])}</a>`
+        : `<span class="${marke}">@${esc(m[1])}</span>`;
+      i = m.index + m[0].length;
+    }
+    return raus + esc(roh.slice(i));
+  }
+
+  /* Die Auswahlliste beim Tippen. Sie hängt an document.body und steht
+     fest im Fenster, nicht im Feld: sowohl das Blatt von unten als auch
+     die Feed-Karte scrollen und schneiden ab, und eine Liste, die halb
+     hinter dem Rand verschwindet, hilft niemandem.
+     Gesucht wird nur zwischen @ und dem Cursor, und nur wenn davor ein
+     Leerzeichen oder der Zeilenanfang steht — eine E-Mail-Adresse im Text
+     soll keine Liste aufklappen. */
+  const VOR_CURSOR = /(^|\s)@([\p{L}\p{N}.\-' ]{0,40})$/u;
+  let auswahl = null;
+  let trefferListe = [];
+  let markiert = 0;
+  let feldOffen = null;
+
+  function schliessen() {
+    auswahl?.remove();
+    auswahl = null;
+    trefferListe = [];
+    feldOffen = null;
+  }
+
+  function helfer(feld, schluessel) {
+    const pruefe = () => {
+      const bis = feld.value.slice(0, feld.selectionStart ?? feld.value.length);
+      const treffer = VOR_CURSOR.exec(bis);
+      if (!treffer) return schliessen();
+
+      const suche = treffer[2].trim().toLowerCase();
+      trefferListe = (leute() || [])
+        .filter(l => l.user_id !== ich())
+        .filter(l => !suche || l.name.toLowerCase().includes(suche))
+        .slice(0, 6);
+      if (!trefferListe.length) return schliessen();
+
+      markiert = 0;
+      feldOffen = { feld, schluessel, anfang: treffer.index + treffer[1].length };
+      zeichneAuswahl();
+    };
+
+    feld.addEventListener('input', pruefe);
+    feld.addEventListener('click', pruefe);
+    feld.addEventListener('blur', () => setTimeout(schliessen, 150));
+    feld.addEventListener('keydown', e => {
+      if (!auswahl) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        markiert = (markiert + (e.key === 'ArrowDown' ? 1 : trefferListe.length - 1)) % trefferListe.length;
+        zeichneAuswahl();
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        waehle(trefferListe[markiert]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        schliessen();
+      }
+    });
+  }
+
+  function zeichneAuswahl() {
+    if (!auswahl) {
+      auswahl = document.createElement('div');
+      auswahl.className = liste;
+      document.body.appendChild(auswahl);
+    }
+    auswahl.innerHTML = trefferListe.map((l, i) => `
+      <button type="button" class="pressable${i === markiert ? ' an' : ''}" data-wer="${esc(l.user_id)}">
+        <span class="${avatar}">${esc(initialen(l.name))}</span><span>${esc(l.name)}</span>
+      </button>`).join('');
+    $$('[data-wer]', auswahl).forEach(el => el.addEventListener('mousedown', e => {
+      e.preventDefault();      // sonst verliert das Feld vorher den Fokus
+      waehle(trefferListe.find(l => l.user_id === el.dataset.wer));
+    }));
+
+    const k = feldOffen.feld.getBoundingClientRect();
+    auswahl.style.left = `${Math.max(8, Math.min(k.left, innerWidth - 268))}px`;
+    auswahl.style.width = `${Math.min(260, innerWidth - 16)}px`;
+    // Passt die Liste unten nicht mehr hin, klappt sie nach oben auf.
+    const hoehe = auswahl.offsetHeight || 200;
+    auswahl.style.top = (k.bottom + hoehe + 8 > innerHeight)
+      ? `${Math.max(8, k.top - hoehe - 6)}px`
+      : `${k.bottom + 6}px`;
+  }
+
+  function waehle(person) {
+    if (!person || !feldOffen) return;
+    const { feld, schluessel, anfang } = feldOffen;
+    const stand = feld.selectionStart ?? feld.value.length;
+    feld.value = `${feld.value.slice(0, anfang)}@${person.name} ${feld.value.slice(stand)}`;
+    const neu = anfang + person.name.length + 2;
+    merkeFuer(schluessel).set(person.name, person.user_id);
+    schliessen();
+    feld.focus();
+    try { feld.setSelectionRange(neu, neu); } catch { /* egal */ }
+  }
+
+  return { markiere, mitErwaehnungen, helfer, schliessen, merkeFuer, vergiss };
+}
+
 /* --- Service Worker ----------------------------------------------------- */
 
 if ('serviceWorker' in navigator) {

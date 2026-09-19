@@ -60,6 +60,19 @@
   display:inline-flex; align-items:center; gap:6px; margin-top:6px;
   font-size:12.5px; font-weight:700; color:var(--navy);
 }
+/* Stehen Beleg und PDF nebeneinander, brauchen sie auf dem Handy Platz
+   zum Umbrechen — zwei Knöpfe auf einer Zeile passen dort nicht. */
+.fm-beleg + .fm-beleg{ margin-left:14px; }
+
+/* Der Grund einer Ablehnung. Der rote Strich links macht ihn zum Zitat
+   und nicht zu einer weiteren Angabe unter vielen: er kommt von jemand
+   anderem als der Rest der Zeile. */
+.fm-grund{
+  display:block; margin-top:6px; padding:7px 10px;
+  border-left:3px solid var(--red); border-radius:0 8px 8px 0;
+  background:var(--bg); color:var(--text);
+  font-size:12.5px; line-height:1.45; overflow-wrap:anywhere;
+}
 
 /* --- Das Formular --------------------------------------------------------- */
 
