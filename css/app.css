@@ -130,6 +130,27 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
 .chip[aria-pressed="true"]{ border-color:var(--navy); background:var(--navy); color:#fff; font-weight:600; }
 .chip.temp[aria-pressed="true"]{ border-color:var(--red); background:var(--red); color:#fff; }
 
+/* Wetter jetzt abrufen. Steht als Angebot in der Kopfzeile der Karte und
+   nicht als Hauptknopf: von Hand zu wählen bleibt der normale Weg. */
+.wt-knopf{
+  display:flex; align-items:center; gap:6px; flex-shrink:0;
+  border:1.5px solid var(--border); border-radius:999px;
+  padding:7px 12px; background:transparent;
+  color:var(--navy); font-size:12.5px; font-weight:700; line-height:1;
+}
+.wt-knopf:disabled{ opacity:.6; }
+.wt-knopf .spin{
+  width:14px; height:14px; border-width:2px;
+  border-color:rgba(0,35,63,.25); border-top-color:var(--navy);
+}
+
+/* Die Zeile darunter sagt, was gesetzt wurde oder warum nichts kam. Nie
+   als Fehlerdialog: das Formular laeuft in jedem Fall weiter. */
+.wt-hinweis{
+  margin-top:12px; font-size:12.5px; line-height:1.45; color:var(--text-dim);
+}
+.wt-hinweis.warn{ color:var(--red); font-weight:600; }
+
 /* Hinweiszeile unten, fuer Speichern, Sync und Fehler */
 .toast{
   position:fixed; left:50%; transform:translateX(-50%) translateY(20px);

@@ -263,6 +263,11 @@ genau das, was angetippt wurde. Führt ein Projekt keine Gebäude, fällt die Ze
 weg. Im Verlauf, in der Detailansicht und im Export steht die Auswahl neben den
 übrigen Angaben.
 
+**Wetter jetzt abrufen.** Ein Knopf in der Kopfzeile der Wetter-Karte holt den
+Standort über den Browser und fragt damit das aktuelle Wetter ab; danach stehen
+die passende Lage und der passende Temperaturbereich bereits ausgewählt da.
+Alles daran bleibt freiwillig, siehe den eigenen Abschnitt weiter unten.
+
 **Angaben vom letzten Eintrag übernehmen.** Füllt nur, was gerade leer ist.
 Schon getippter Text wird nie überschrieben.
 
@@ -319,6 +324,69 @@ Geprüft wird das nicht mehr am Aufbau der Seite, sondern am Bild: die Testreihe
 `safearea-ipad.mjs` fotografiert die oberste Zeile in acht iPad-Grössen auf
 jeder Seite der App und liest die Pixel.
 
+## Wetter jetzt abrufen
+
+**Ein Angebot, kein Weg.** Der Knopf steht in der Kopfzeile der Wetter-Karte
+und nicht als Hauptknopf darunter: von Hand zu wählen bleibt der normale Weg.
+Wer ihn nicht antippt, merkt nichts davon. Wer ihn antippt, bekommt die passende
+Lage und den passenden Bereich als ganz gewöhnliche Chips gesetzt — ein Tipp
+darauf ändert sie wie jede andere Auswahl auch, und dabei verschwindet die Zeile
+mit dem Messwert, weil sie dann nicht mehr zu den Chips passt.
+
+**Es gibt keinen Fall, in dem der Eintrag daran hängen bleibt.** Jeder
+Fehlschlag endet in einer Zeile Text unter den Chips: kein Dialog, keine Sperre,
+kein Toast, der etwas verdeckt. Offline wird gar nicht erst losgeschickt, das
+spart den Freigabe-Dialog für eine Abfrage, die ohnehin nicht durchkäme.
+
+**Open-Meteo, weil es dauerhaft frei ist.** Kein Konto, kein Schlüssel, keine
+Kreditkarte, keine Bezahlstufe, die später zuschnappt; die nicht gewerbliche
+Nutzung ist ausdrücklich freigegeben. Damit gibt es auch nichts in den
+Umgebungsvariablen zu hinterlegen und nichts, was ohne Schlüssel still stehen
+bliebe — anders als bei der Adresssuche über search.ch, die deshalb über eine
+eigene Serverless-Function läuft. Die Anfrage geht direkt aus dem Browser an
+`api.open-meteo.com` und damit an einen fremden Ursprung, den der Service Worker
+ohnehin in Ruhe lässt.
+
+**Der Standort verlässt das Gerät auf drei Nachkommastellen gerundet**, also
+gut hundert Meter genau. Für das Wetter über einer Baustelle reicht das bei
+weitem, und mehr als nötig soll niemand verschicken.
+
+**Die Zuordnung** steht in `js/wetter.js` und ist bewusst ohne Oberfläche
+prüfbar. `lageAus(code, wind)` bildet die WMO-Schlüssel auf die sieben Chips ab,
+`stufeAus(grad)` die Gradzahl auf die fünf Bereiche. Zwei Entscheide darin sind
+keine Selbstverständlichkeit: ein Gewitter (95–99) zählt zu *Sturm/Wind* und
+nicht zu *Regen*, denn auf dem Bau ist der Grund für den Unterbruch das Gewitter;
+und ab 62 km/h — Beaufort 8, der Beginn des Sturms — heisst die Lage *Sturm/Wind*
+unabhängig vom Himmel, weil dann Kran und Gerüst zum Thema werden. Eine
+kräftige Brise übersteuert dagegen nichts. Ist ein Schlüssel unbekannt oder
+fehlt ein Wert, wird nichts gesetzt statt etwas auf Verdacht.
+
+**Was iOS anders macht,** und was daraus folgt:
+
+- Der Standort wird nur erfragt, wenn der Aufruf an einem Fingertipp hängt.
+  Deshalb steht er hinter dem Knopf und nirgends sonst — kein Abruf beim Öffnen
+  des Formulars, so verlockend das wäre.
+- In der zum Startbildschirm hinzugefügten App meldet sich die Standortabfrage
+  gelegentlich überhaupt nicht zurück, weder mit Erfolg noch mit Fehler, und
+  auch das `timeout` der Browserfunktion läuft dann nicht ab. Dagegen läuft eine
+  eigene Uhr daneben; nach ihr ist Schluss, der Knopf wird wieder bedienbar.
+- Wer einmal ablehnt, wird nicht wieder gefragt: der Fehler kommt ab dann
+  sofort zurück. Die Zeile sagt deshalb nicht nur, dass der Standort fehlt,
+  sondern auch, dass sich die Freigabe in den Einstellungen des Geräts wieder
+  erteilen lässt.
+- `navigator.permissions.query({name:'geolocation'})` gibt es dort nicht, also
+  wird der Zustand nirgends vorab abgefragt. Gefragt wird, indem man es
+  versucht.
+
+Geprüft wird das in `wetter.mjs`, unter anderem mit iOS-Kennung, Touch-Bedienung
+und im Anzeigemodus der installierten App, auf iPhone- und iPad-Grösse. Was
+dabei nicht geht, sei offen gesagt: der Testcontainer hat nur Chromium, kein
+WebKit, und einen Freigabe-Dialog des Betriebssystems kann ohnehin kein Test
+bedienen. Geprüft ist damit alles, was in unserem Code steht — erteilt,
+verweigert, stumm, ohne Standortfunktion, kaputter Dienst, offline —, nicht die
+Maschinerie von iOS dahinter. Der erste Lauf auf einem echten iPhone bleibt
+Handarbeit.
+
 ## Aufbau
 
 ```
@@ -352,6 +420,8 @@ js/store.js          Datenzugriff Baujournal, lokaler Spiegel,
                      Offline-Warteschlange
 js/projekte.js js/projekt.js js/projekt-start.js
 js/journal.js js/eintrag.js js/papierkorb.js
+js/wetter.js          Wetter jetzt abrufen: Standort, Open-Meteo,
+                      Zuordnung auf die Chips
 js/verlauf.js        Eintragszeile und Filter, geteilt von Startseite
                      und Papierkorb
 js/export.js         PDF und Word
@@ -1078,6 +1148,10 @@ Vier, alle in den Projekteinstellungen von Vercel und keine davon im Repo:
 | `VAPID_PRIVAT` | signiert Push-Benachrichtigungen. Gegenstück zu `BJ_CONFIG.vapid` im Client |
 | `VAPID_ABSENDER` | `mailto:`-Adresse, die der Push-Dienst im Störungsfall anschreibt |
 | `SUPABASE_SERVICE_KEY` | liest die Push-Abos der anderen und räumt abgelaufene Chat-Bilder weg |
+
+Die Wetterabfrage im Baujournal steht bewusst nicht in dieser Tabelle:
+Open-Meteo braucht keinen Schlüssel, also gibt es auch nichts zu hinterlegen
+und nichts, was ohne Schlüssel still stehen bliebe.
 
 Jede fehlende Variable schaltet genau ihren Teil ab und sonst nichts: ohne
 VAPID kommen keine Benachrichtigungen, der Chat läuft weiter; ohne

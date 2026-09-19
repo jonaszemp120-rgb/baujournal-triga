@@ -58,6 +58,10 @@
       const an = b.getAttribute('aria-pressed') === 'true';
       $$('button', wrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
       b.setAttribute('aria-pressed', an ? 'false' : 'true');   // nochmals tippen hebt auf
+      /* Ab hier gilt die eigene Wahl. Ein Vermerk der Wetterabfrage
+         verschwindet damit, sonst stuende dort eine Zeile, die nicht
+         mehr zu den Chips passt. */
+      wetterHinweis('');
       entwurfSichern();
     }));
   }
@@ -65,6 +69,63 @@
   function chipWert(wrap) {
     const b = $('button[aria-pressed="true"]', wrap);
     return b ? b.dataset.wert : null;
+  }
+
+  /* --- Wetter jetzt abrufen ---------------------------------------------
+
+     Ein Angebot, kein Weg. Wer den Knopf nicht antippt, merkt nichts
+     davon; wer ihn antippt und den Standort nicht freigibt, bekommt eine
+     Zeile Text und waehlt wie bisher von Hand. Der Eintrag haengt an
+     keiner Stelle daran — es gibt keinen Zustand, in dem das Formular
+     auf die Abfrage wartet. */
+
+  function wetterHinweis(text, warn) {
+    const el = $('#wetter-hinweis');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('warn', !!warn);
+    el.hidden = !text;
+  }
+
+  function wetterKnopfBinden() {
+    const knopf = $('#wetter-jetzt');
+    if (!knopf) return;
+
+    /* Fehlt das Modul — etwa weil ein Geraet noch eine aeltere Fassung im
+       Cache hat —, verschwindet der Knopf einfach. Ein Knopf, der nichts
+       tut, ist schlimmer als keiner. */
+    if (typeof WETTER_JETZT === 'undefined') { knopf.hidden = true; return; }
+
+    const ruhe = knopf.innerHTML;
+    knopf.addEventListener('click', async () => {
+      wetterHinweis('');
+      knopf.disabled = true;
+      knopf.innerHTML = '<span class="spin"></span><span>Wird geholt …</span>';
+      try {
+        const w = await WETTER_JETZT.abrufen();
+        if (w.lage) chipSetzen($('#wetter'), w.lage);
+        if (w.stufe) chipSetzen($('#temperatur'), w.stufe);
+        entwurfSichern();
+
+        const uhr = new Date().toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        const gesetzt = [w.lage, w.stufe].filter(Boolean).join(' · ');
+        /* Die Gradzahl nur, wenn eine kam: fehlt sie in der Antwort,
+           stuende hier sonst "NaN °C". */
+        const grad = Number.isFinite(w.grad) ? ` (${Math.round(w.grad)} °C)` : '';
+        wetterHinweis(`Um ${uhr} gemessen: ${gesetzt}${grad}. `
+                    + 'Ein Tipp auf einen Chip ändert die Auswahl.');
+      } catch (e) {
+        /* Jeder Fehlschlag endet hier und nirgends sonst. Kein Dialog,
+           keine Sperre, nur die Zeile unter den Chips. */
+        const text = e && e.message ? e.message : WETTER_JETZT.TEXTE.unbekannt;
+        wetterHinweis(e && e.grund === 'verweigert'
+          ? `${text} Die Freigabe lässt sich in den Einstellungen des Geräts wieder erteilen.`
+          : text, true);
+      } finally {
+        knopf.disabled = false;
+        knopf.innerHTML = ruhe;
+      }
+    });
   }
 
   /* Gebaeude-Chips erlauben Mehrfachauswahl. "Alle" ist der Gegensatz
@@ -280,6 +341,7 @@
 
   chips($('#wetter'), WETTER, '', true);
   chips($('#temperatur'), TEMPERATUR, 'temp', false);
+  wetterKnopfBinden();
 
   // Fuehrt das Projekt keine Gebaeude, faellt die ganze Zeile weg.
   hatGebaeude = Array.isArray(projekt.gebaeude) && projekt.gebaeude.length > 0;
