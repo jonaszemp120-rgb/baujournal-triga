@@ -2,14 +2,13 @@
    Zwei Sitzungen: einmal mit erweiterter Stufe, einmal ohne. Geprüft wird
    nicht nur, was die Oberfläche anbietet, sondern was ein direkter Aufruf
    gegen die API ausrichtet. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-schutz`;
+const OUT = `${HIER}/ausgabe/shots-schutz`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 const BASIS = JSON.parse(fs.readFileSync(`${HIER}/saat.json`,'utf8'));
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -34,7 +33,7 @@ async function anmelden(breite, stufe) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(`${stufe}: ${m.text()}`); });
   p.on('pageerror', e => fehler.push(`${stufe}: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(800);
   return { ctx, p };
@@ -53,7 +52,7 @@ const direkt = (p, tabelle, felder, filter) => p.evaluate(async ([t, f, w]) => {
 for (const stufe of ['entwickler', 'geschaeftsleitung']) {
   console.log(`\n=== Stufe ${stufe}: darf verwalten ===`);
   const { ctx, p } = await anmelden(1440, stufe);
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1100);
 
   ok('Knopf zum Anlegen ist da', await p.locator('[data-neu]').first().isVisible());
@@ -68,7 +67,7 @@ for (const stufe of ['entwickler', 'geschaeftsleitung']) {
   const stufeSetzen = await direkt(p, 'mitarbeiter', { berechtigung: 'geschaeftsleitung' }, { id: 'm2' });
   ok('Stufe vergeben ist erlaubt', !stufeSetzen.fehler && stufeSetzen.zeilen === 1, stufeSetzen.fehler || '');
 
-  await p.goto('http://127.0.0.1:8123/papierkorb-bereich.html?bereich=mitarbeiter', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/papierkorb-bereich.html?bereich=mitarbeiter`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1100);
   ok('Wiederherstellen ist da', (await p.$$('.pk-zurueck')).length > 0);
 
@@ -153,7 +152,7 @@ for (const breite of [390, 1440]) {
   ok('Keine eingeschleuste Person', bestand.anzahl === 4, String(bestand.anzahl));
 
   // --- Was die Oberfläche dazu zeigt ---------------------------------------
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1100);
   ok('Kein Knopf zum Anlegen',
      (await p.$$eval('[data-neu]', e => e.filter(x => !x.hidden).length)) === 0);
@@ -168,7 +167,7 @@ for (const breite of [390, 1440]) {
   ok('Dafür ein Satz, der sagt warum',
      (await p.textContent('#ma-ansicht')).includes('Geschäftsleitung'));
 
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   const eigenNr = await p.$$eval('#liste .br-zeile', els =>
     els.findIndex(e => e.querySelector('.titel').textContent.trim() === 'Jonas Zemp'));
@@ -178,14 +177,14 @@ for (const breite of [390, 1440]) {
      (await p.getAttribute('#ma-ansicht a[href="profil.html"]', 'href')) === 'profil.html');
   await p.screenshot({ path:`${OUT}/${breite}-mitarbeiter-ohne-rechte.png`, fullPage:true });
 
-  await p.goto('http://127.0.0.1:8123/papierkorb-bereich.html?bereich=mitarbeiter', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/papierkorb-bereich.html?bereich=mitarbeiter`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1100);
   ok('Kein Wiederherstellen im Papierkorb', (await p.$$('.pk-zurueck')).length === 0);
   ok('Der Papierkorb sagt, wer es darf',
      (await p.textContent('#inhalt')).includes('Zurückholen darf die Geschäftsleitung'));
 
   // --- Mein Profil geht weiterhin ------------------------------------------
-  await p.goto('http://127.0.0.1:8123/profil.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/profil.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   await p.fill('#p-telefon', '079 222 33 44');
   await p.fill('#p-email', 'jonas@triga.ch');
@@ -231,7 +230,7 @@ for (const breite of [390, 1440]) {
 console.log('\n=== Eintraege: nur über korrigiere_eintrag und Co. ===');
 {
   const { ctx, p } = await anmelden(1440, 'entwickler');
-  await p.goto('http://127.0.0.1:8123/start.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/start.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(600);
 
   const eintrag = await p.evaluate(() =>

@@ -5,12 +5,12 @@
    muss also entstehen) und keine Teilen-Funktion, dort greift der
    Download als Rückfall. */
 
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-pk';
+const OUT = `${HIER}/ausgabe/shots-pk`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const STUB = fs.readFileSync('./stub.js', 'utf8');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 const ok = (n, b, zusatz = '') => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${b ? '' : `  → ${zusatz}`}`);
 
@@ -71,7 +71,7 @@ async function lauf(name, breite, { ordnerDa, kannTeilen }) {
   console.log(`\n=== ${name} (${breite}px, Ordner ${ordnerDa ? 'vorhanden' : 'fehlt'}, Teilen ${kannTeilen ? 'ja' : 'nein'}) ===`);
 
   const db = () => p.evaluate(() => JSON.parse(sessionStorage.getItem('__stub_db')));
-  const B = 'http://127.0.0.1:8123';
+  const B = SERVER;
 
   await p.goto(`${B}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch'); await p.fill('#pw', 'TestDurchlauf!2026');

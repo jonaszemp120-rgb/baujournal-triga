@@ -1,13 +1,12 @@
 /* Schritt 11: Zoom-Fix, Mein Profil, eigene Unterschrift.
    Geprüft wird die Liste aus Abschnitt 4 der Vorgabe. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-pr`;
+const OUT = `${HIER}/ausgabe/shots-pr`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 const SAAT = JSON.parse(fs.readFileSync(`${HIER}/saat.json`,'utf8'));
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -30,7 +29,7 @@ async function anmelden(breite) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(`${breite}: ${m.text()}`); });
   p.on('pageerror', e => fehler.push(`${breite}: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(800);
   return { ctx, p };
@@ -57,7 +56,7 @@ console.log('\n=== Zoom abgeschaltet ===');
   const { ctx, p } = await anmelden(390);
 
   for (const seite of SEITEN) {
-    await p.goto(`http://127.0.0.1:8123/${seite}`, { waitUntil:'domcontentloaded' });
+    await p.goto(`${SERVER}/${seite}`, { waitUntil:'domcontentloaded' });
     const m = await p.$eval('meta[name="viewport"]', e => e.content);
     const kurz = seite.split('?')[0];
     ok(`${kurz}: kein Hineinzoomen`,
@@ -66,14 +65,14 @@ console.log('\n=== Zoom abgeschaltet ===');
        /width=device-width/.test(m) && /viewport-fit=cover/.test(m));
   }
 
-  await p.goto('http://127.0.0.1:8123/start.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/start.html`, { waitUntil:'networkidle' });
   ok('Doppeltipp-Zoom per touch-action abgestellt',
      (await p.evaluate(() => getComputedStyle(document.documentElement).touchAction)) === 'manipulation');
   ok('Schriftgrössen bleiben unangetastet',
      (await p.evaluate(() => getComputedStyle(document.documentElement).webkitTextSizeAdjust ?? 'auto')) !== 'none',
      'kein text-size-adjust:none, die Systemvergrösserung greift weiter');
 
-  const manifest = await (await fetch('http://127.0.0.1:8123/manifest.json')).json();
+  const manifest = await (await fetch(`${SERVER}/manifest.json`)).json();
   ok('Manifest läuft im Vollbild', manifest.display === 'standalone', manifest.display);
 
   await ctx.close();
@@ -144,7 +143,7 @@ for (const breite of [390, 1440]) {
            .every(z => z.telefon !== '079 111 22 33' && z.email !== 'j.zemp@triga.ch'));
 
   // --- Und zwar überall ----------------------------------------------------
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   const jzNr = await p.$$eval('#liste .br-zeile', (els, name) => {
     const z = els.find(e => e.querySelector('.titel').textContent.trim() === name);
@@ -166,13 +165,13 @@ for (const breite of [390, 1440]) {
   ok('Mitarbeiter-Detail zeigt die neue Adresse', detail.includes('j.zemp@triga.ch'));
 
   // Auch dort, wo die Person einem Projekt zugeordnet ist.
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
   ok('Projektseite kennt die Person weiterhin',
      (await p.textContent('#personen')).includes('Adrian Zemp'));
 
   // --- Fremde Daten sind über diese Seite nicht erreichbar -----------------
-  await p.goto('http://127.0.0.1:8123/profil.html?id=m2&mitarbeiter=m2', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/profil.html?id=m2&mitarbeiter=m2`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   ok('Eine ID in der Adresszeile ändert nichts',
      (await p.textContent('.pr-kopfkarte .name')).trim() === 'Jonas Zemp');
@@ -195,7 +194,7 @@ for (const breite of [390, 1440]) {
 for (const breite of [390, 1440]) {
   console.log(`\n=== Unterschrift (${breite}px) ===`);
   const { ctx, p } = await anmelden(breite);
-  await p.goto('http://127.0.0.1:8123/profil.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/profil.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   ok('Leerzustand sagt, dass noch nichts da ist',

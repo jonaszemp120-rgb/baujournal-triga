@@ -4,9 +4,10 @@
  * selbst geschrieben habe: die Faelle ohne Schluessel, mit zu kurzer
  * Anfrage, mit einem Fehler der Gegenseite, und die Umformung der
  * Antwort. */
+import { WURZEL_URL, WURZEL } from './umgebung.mjs';
 import { createRequire } from 'node:module';
-const require = createRequire('file:///home/user/baujournal-triga/');
-const pfad = '/home/user/baujournal-triga/api/search-ch.js';
+const require = createRequire(WURZEL_URL);
+const pfad = `${WURZEL}api/search-ch.js`;
 
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };

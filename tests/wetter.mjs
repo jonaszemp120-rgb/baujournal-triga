@@ -11,16 +11,15 @@
    aus diesem Container nicht erreichbar, zweitens soll eine Suite nicht
    davon abhängen, wie das Wetter über Sarnen gerade ist. */
 
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
 
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-wetter`;
+const OUT = `${HIER}/ausgabe/shots-wetter`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`, 'utf8');
 const SAAT = JSON.parse(fs.readFileSync(`${HIER}/saat.json`, 'utf8'));
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz = '') => {
@@ -65,7 +64,7 @@ async function anmelden(ctx) {
   const erwartet = t => /503|ERR_FAILED|ERR_INTERNET_DISCONNECTED|Failed to load resource/.test(t);
   p.on('console', m => { if (m.type() === 'error' && !erwartet(m.text())) fehler.push(m.text()); });
   p.on('pageerror', e => { if (!erwartet(e.message)) fehler.push(e.message); });
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch');
   await p.fill('#pw', 'TestDurchlauf!2026');
   await p.click('#btn');
@@ -74,7 +73,7 @@ async function anmelden(ctx) {
 }
 
 const journal = async p => {
-  await p.goto('http://127.0.0.1:8123/journal.html?projekt=pw', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/journal.html?projekt=pw`, { waitUntil: 'networkidle' });
   await p.waitForSelector('#wetter .chip', { timeout: 15000 });
   await p.waitForTimeout(400);
 };
@@ -392,7 +391,7 @@ for (const breite of [390, 1024, 1440]) {
      gespeichert?.wetter_quelle === 'MeteoSchweiz', String(gespeichert?.wetter_quelle));
 
   /* Der eigentliche Punkt: nach dem Speichern wieder oeffnen. */
-  await p.goto(`http://127.0.0.1:8123/eintrag.html?id=${gespeichert.id}`, { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/eintrag.html?id=${gespeichert.id}`, { waitUntil: 'networkidle' });
   await p.waitForSelector('.karte', { timeout: 15000 });
   await p.waitForTimeout(600);
 
@@ -459,7 +458,7 @@ console.log('\n=== Messwert ueberlebt das Speichern ===');
   ok('Die Quelle steht als eigener Wert und nicht nur im Text',
      Object.keys(mitMessung).includes('wetter_quelle'));
 
-  await p.goto(`http://127.0.0.1:8123/eintrag.html?id=${mitMessung.id}`, { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/eintrag.html?id=${mitMessung.id}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   const imDetail = (await p.locator('.wt-hinweis').first().textContent()).trim();
   ok('Beim Wiederoeffnen steht dieselbe Zeile wie beim Erfassen',
@@ -486,7 +485,7 @@ console.log('\n=== Messwert ueberlebt das Speichern ===');
      && (vonHand?.wetter_quelle ?? null) === null,
      JSON.stringify({ g: vonHand?.wetter_grad, z: vonHand?.wetter_gemessen_am, q: vonHand?.wetter_quelle }));
 
-  await p.goto(`http://127.0.0.1:8123/eintrag.html?id=${vonHand.id}`, { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/eintrag.html?id=${vonHand.id}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   ok('Und die Detailseite zeigt keine Abruf-Zeile',
      await p.locator('.wt-hinweis').count() === 0);
@@ -527,7 +526,7 @@ console.log('\n=== Messwert ueberlebt das Speichern ===');
     sessionStorage.setItem('__stub_db', JSON.stringify(d));
     return e.id;
   });
-  await p.goto(`http://127.0.0.1:8123/eintrag.html?id=${alt}`, { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/eintrag.html?id=${alt}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   ok('Ein Eintrag von frueher zeigt nur die Chips, nichts wird nachgeruestet',
      await p.locator('.wt-hinweis').count() === 0
@@ -554,7 +553,7 @@ console.log('\n=== Korrektur hebt die Abfrage auf ===');
 
   const e = await p.evaluate(() => JSON.parse(sessionStorage.getItem('__stub_db'))
     .eintraege.find(x => x.fortschritt === 'Wird nachher korrigiert'));
-  await p.goto(`http://127.0.0.1:8123/eintrag.html?id=${e.id}`, { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/eintrag.html?id=${e.id}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(700);
   ok('Vor der Korrektur steht die Abruf-Zeile da', await p.locator('.wt-hinweis').count() === 1);
 
@@ -1002,7 +1001,7 @@ for (const [name, breite, hoch, art, oben, unten] of GERAETE) {
 
   const p = await ctx.newPage();
   p.on('pageerror', e => fehler.push(`${name}: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch');
   await p.fill('#pw', 'TestDurchlauf!2026');
   await p.tap('#btn');
@@ -1068,7 +1067,7 @@ console.log('\n=== Installierte App auf dem iPhone, Standort abgelehnt ===');
 
   const p = await ctx.newPage();
   p.on('pageerror', e => fehler.push(`iPhone abgelehnt: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch');
   await p.fill('#pw', 'TestDurchlauf!2026');
   await p.tap('#btn');

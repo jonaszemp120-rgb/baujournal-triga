@@ -1,13 +1,12 @@
 /* Schritt 10: Pendenzenliste und Rollen-Abzeichen.
    Geprüft wird die Liste aus Abschnitt 4 der Vorgabe. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-pd`;
+const OUT = `${HIER}/ausgabe/shots-pd`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 const SAAT = JSON.parse(fs.readFileSync(`${HIER}/saat.json`,'utf8'));
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -22,7 +21,7 @@ async function anmelden(breite) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(`${breite}: ${m.text()}`); });
   p.on('pageerror', e => fehler.push(`${breite}: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(800);
   return { ctx, p };
@@ -36,7 +35,7 @@ for (const breite of [390, 1440]) {
   const { ctx, p } = await anmelden(breite);
 
   // --- Der Abschnitt auf der Projektseite -----------------------------------
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   ok('Abschnitt Pendenzen vorhanden', await p.locator('#pendenzen').isVisible());
@@ -106,7 +105,7 @@ for (const breite of [390, 1440]) {
   await p.screenshot({ path:`${OUT}/${breite}-hub.png`, fullPage:true });
 
   // --- Die volle Liste -------------------------------------------------------
-  await p.goto('http://127.0.0.1:8123/pendenzen.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/pendenzen.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   const gruppen = await p.$$eval('#liste .pj-gruppe', e => e.map(x => x.textContent.trim()));
@@ -151,7 +150,7 @@ for (const breite of [390, 1440]) {
 
   // --- Kein seitlicher Überlauf ----------------------------------------------
   for (const seite of ['pendenzen.html?projekt=p1', 'projekt-detail.html?projekt=p1', 'mitarbeiter.html']) {
-    await p.goto(`http://127.0.0.1:8123/${seite}`, { waitUntil:'networkidle' });
+    await p.goto(`${SERVER}/${seite}`, { waitUntil:'networkidle' });
     await p.waitForTimeout(900);
     const ueber = await p.evaluate(() => {
       const b = [];
@@ -167,7 +166,7 @@ for (const breite of [390, 1440]) {
   }
 
   // --- Rollen-Abzeichen -------------------------------------------------------
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   const marken = await p.$$eval('#liste .pj-marke.stufe', e => e.map(x => x.textContent.trim()));
@@ -234,7 +233,7 @@ for (const breite of [390, 1440]) {
 
   // --- Im Detail ----------------------------------------------------------------
   for (const [nr, stufe] of [[1,'Geschäftsleitung'], [2,'Entwickler'], [3,'Mitarbeiter:in']]) {
-    await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+    await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
     await p.waitForTimeout(900);
     await p.click(`#liste .br-zeile:nth-child(${nr})`);
     await p.waitForTimeout(700);
@@ -262,12 +261,12 @@ for (const breite of [390, 1440]) {
   ok('Stufe überlebt das Speichern',
      (await p.$eval('#ma-ansicht .pj-marke.stufe', e => e.textContent.trim())) === 'Mitarbeiter:in');
 
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   await p.screenshot({ path:`${OUT}/${breite}-mitarbeiter.png`, fullPage:true });
 
   // --- Die Stufe schränkt nichts ein ------------------------------------------
-  await p.goto('http://127.0.0.1:8123/start.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/start.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(800);
   ok('Startseite zeigt weiterhin alle sechs Bereiche', (await p.$$('#raster a')).length === 6);
 

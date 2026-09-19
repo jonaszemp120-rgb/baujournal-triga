@@ -1,9 +1,9 @@
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-shell';
+const OUT = `${HIER}/ausgabe/shots-shell`;
 fs.mkdirSync(OUT, { recursive: true });
-const STUB = fs.readFileSync('/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/stub.js','utf8');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
+const browser = await chromium.launch();
 const fehler = [];
 const ok = (n, b) => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}`);
 
@@ -15,7 +15,7 @@ async function lauf(name, breite, hoehe) {
   p.on('pageerror', e => fehler.push(`${name}: ${e.message}`));
 
   console.log(`\n=== ${name} (${breite}px) ===`);
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn');
   await p.waitForURL('**/start.html', { timeout:20000 });
@@ -30,12 +30,12 @@ async function lauf(name, breite, hoehe) {
 
   // Ins Baujournal
   // Ein Projekt anlegen, damit die Kachel eine echte Zahl zeigt
-  await p.goto('http://127.0.0.1:8123/projekt.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(500);
   await p.fill('#f-name', 'Shell-Probe');
   await p.click('#speichern');
   await p.waitForURL('**/projekt-start.html**', { timeout:20000 });
-  await p.goto('http://127.0.0.1:8123/start.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/start.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
   const kachel = (await p.textContent('#raster a[href="projekte.html"]')).replace(/\s+/g,' ').trim();
   ok('Baujournal-Kachel zählt mit', /1 aktives Projekt|Projekte aktiv/.test(kachel));
@@ -56,14 +56,14 @@ async function lauf(name, breite, hoehe) {
   await p.screenshot({ path:`${OUT}/${name}-baujournal.png`, fullPage:true });
 
   // Die neuen Bereiche
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(800);
   ok('Bereich Mitarbeiter lädt', await p.locator('#suche').count() === 1);
-  await p.goto('http://127.0.0.1:8123/firmenpool.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/firmenpool.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('Bereich Firmenpool lädt', await p.locator('#gruppen').count() === 1);
   if (breite >= 1024) ok('Firmenpool aktiv markiert', (await p.locator('.tr-nav[aria-current="page"]').textContent()).trim() === 'Firmenpool');
-  await p.goto('http://127.0.0.1:8123/mitarbeiter.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(600);
   if (breite >= 1024) ok('Mitarbeiter aktiv markiert', (await p.locator('.tr-nav[aria-current="page"]').textContent()).trim() === 'Mitarbeiter');
   await p.screenshot({ path:`${OUT}/${name}-mitarbeiter.png`, fullPage:true });

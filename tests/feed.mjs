@@ -5,12 +5,12 @@
    Person mit der Stufe "mitarbeiter", auf dem Desktop die mit
    "entwickler". So wird beides geprüft und nicht nur die bequeme Hälfte. */
 
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-feed';
+const OUT = `${HIER}/ausgabe/shots-feed`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const STUB = fs.readFileSync('./stub.js', 'utf8');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 const ok = (n, b, zusatz = '') => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${b ? '' : `  → ${zusatz}`}`);
 
@@ -62,7 +62,7 @@ async function lauf(name, breite, stufe) {
 
   const db = () => p.evaluate(() => JSON.parse(sessionStorage.getItem('__stub_db')));
 
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch'); await p.fill('#pw', 'TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html');
   await p.waitForTimeout(900);
@@ -558,7 +558,7 @@ async function lauf(name, breite, stufe) {
 
   /* --- 10. Projekt-Hub --------------------------------------------------- */
 
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1200);
   ok('Der Projekt-Hub hat einen Feed-Block',
      (await p.textContent('#feed')).includes('Feed — Beiträge zu diesem Projekt'));
@@ -570,7 +570,7 @@ async function lauf(name, breite, stufe) {
 
   /* --- 11. Eigenen Beitrag löschen --------------------------------------- */
 
-  await p.goto('http://127.0.0.1:8123/feed.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/feed.html`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1000);
   const vorher = (await p.$$('#liste .fd-karte')).length;
   await p.locator('#liste .fd-karte', { hasText: 'Bodenplatte' }).locator('[data-weg]').click();
@@ -650,14 +650,14 @@ async function echtzeit() {
     const s = await ctx.newPage();
     s.on('console', m => { if (m.type() === 'error') fehler.push(`echtzeit: ${m.text()}`); });
     s.on('pageerror', e => fehler.push(`echtzeit: ${e.message}`));
-    await s.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+    await s.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
     if (await s.locator('#email').count()) {
       await s.fill('#email', 'test.durchlauf@triga.ch');
       await s.fill('#pw', 'TestDurchlauf!2026');
       await s.click('#btn');
       await s.waitForURL('**/start.html');
     }
-    await s.goto('http://127.0.0.1:8123/feed.html', { waitUntil: 'networkidle' });
+    await s.goto(`${SERVER}/feed.html`, { waitUntil: 'networkidle' });
     await s.waitForTimeout(900);
     return s;
   };

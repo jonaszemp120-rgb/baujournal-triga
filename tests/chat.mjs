@@ -1,9 +1,8 @@
 /* Schritt 12: Chat und Benachrichtigungen.
    Geprüft wird die Liste aus Abschnitt 4 der Vorgabe. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-ch`;
+const OUT = `${HIER}/ausgabe/shots-ch`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 /* Die gemeinsame Saat kennt drei Personen mit Konto. Für den Chat braucht
@@ -17,7 +16,7 @@ const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 const HEUTE = new Date().toISOString().slice(0, 10);
 const heute = t => String(t).replaceAll('2026-09-18', HEUTE);
 
-const BASIS = (() => {
+const SAAT = (() => {
   const d = JSON.parse(heute(fs.readFileSync(`${HIER}/saat.json`, 'utf8')));
   d.mitarbeiter.push(
     { id:'m5', name:'Thomas Zürcher', rolle:'Projektleiter', telefon:'079 957 58 44',
@@ -31,7 +30,7 @@ const BASIS = (() => {
   );
   return d;
 })();
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -39,7 +38,7 @@ const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '
 /* Die Frage nach Benachrichtigungen kommt beim ersten Öffnen und würde
    sonst jeden Klick verdecken. Wo sie selbst geprüft wird, bleibt der
    Merker weg. */
-async function baueKontext(breite, { saat = BASIS, gefragt = true, geteilt = false } = {}) {
+async function baueKontext(breite, { saat = SAAT, gefragt = true, geteilt = false } = {}) {
   const ctx = await browser.newContext({
     viewport:{ width:breite, height: breite>=1024?900:844 },
     locale:'de-CH', serviceWorkers:'block'
@@ -61,7 +60,7 @@ async function anmelden(ctx) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(m.text()); });
   p.on('pageerror', e => fehler.push(e.message));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(600);
   return p;
@@ -99,7 +98,7 @@ for (const breite of [390, 1440]) {
   console.log(`\n=== Chat (${breite}px) ===`);
   const ctx = await baueKontext(breite);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   ok('Beide Gespräche stehen in der Liste', (await namen(p)).length === 2);
@@ -188,7 +187,7 @@ for (const breite of [390, 1440]) {
 
 console.log('\n=== Ungelesen ===');
 {
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   // Zwei Nachrichten nach dem letzten Lesen, eine davon von einem selbst.
   saat.nachrichten.push(
     { id:'n9', chat_id:'c1', absender:'u9-adrian', text:'Noch etwas', bild_pfad:null, bild_ablauf:null, erstellt_am:heute('2026-09-18T09:00:00.000Z') },
@@ -197,7 +196,7 @@ console.log('\n=== Ungelesen ===');
   );
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   const zaehler = await p.$$eval('#gespraeche .zaehler', e => e.map(x => x.textContent.trim()));
@@ -222,11 +221,11 @@ console.log('\n=== Echtzeit ===');
 {
   const ctx = await baueKontext(1440, { geteilt: true });
   const eins = await anmelden(ctx);
-  await eins.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await eins.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await eins.waitForTimeout(1000);
 
   const zwei = await anmelden(ctx);
-  await zwei.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await zwei.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await zwei.waitForTimeout(1000);
 
   ok('Beide Tabs zeigen dasselbe Gespräch',
@@ -245,7 +244,7 @@ console.log('\n=== Echtzeit ===');
      drueben.filter(t => t === 'Kommt das drüben an?').length === 1);
 
   // Auch die Liste im anderen Tab zieht nach.
-  await zwei.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await zwei.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await zwei.waitForTimeout(800);
   await eins.fill('#e-text', 'Und zurück');
   await eins.click('#e-senden');
@@ -262,7 +261,7 @@ for (const breite of [390, 1440]) {
   console.log(`\n=== Gruppe erstellen (${breite}px) ===`);
   const ctx = await baueKontext(breite);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   await p.locator('[data-neu]:visible').first().click();
@@ -325,7 +324,7 @@ console.log('\n=== Einzelchat ===');
 {
   const ctx = await baueKontext(1440);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   const vorher = (await namen(p)).length;
 
@@ -361,7 +360,7 @@ console.log('\n=== Einzelchat ===');
 
 console.log('\n=== Bilder ===');
 {
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   const in30 = new Date(Date.now() + 30 * 86400000).toISOString();
   saat.nachrichten.push(
     { id:'nb1', chat_id:'c1', absender:'u9-adrian', text:null,
@@ -374,7 +373,7 @@ console.log('\n=== Bilder ===');
   );
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   const ablauf = await p.$$eval('#verlauf .ch-ablauf', e => e.map(x => x.textContent.trim()));
@@ -419,7 +418,7 @@ console.log('\n=== Benachrichtigungen ===');
 {
   const ctx = await baueKontext(1440, { gefragt: false });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   ok('Beim ersten Öffnen wird gefragt', await p.locator('.sheet').isVisible());
@@ -457,12 +456,12 @@ console.log('\n=== Benachrichtigungen ===');
 
 console.log('\n=== Zugriff ===');
 {
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   // Ein Konto ohne Eintrag im Adressbuch.
   saat.mitarbeiter.find(m => m.user_id === 'u1').user_id = null;
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   ok('Ohne Eintrag im Adressbuch kein Chat',
@@ -478,7 +477,7 @@ console.log('\n=== Anlegen ohne Henne-Ei ===');
 {
   const ctx = await baueKontext(1440);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
 
   /* Genau der Weg, der gescheitert ist: ein Gespräch anlegen und sich
@@ -544,7 +543,7 @@ console.log('\n=== Nachricht löschen ===');
 {
   const ctx = await baueKontext(1440);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   ok('Nur an der eigenen Nachricht steht ein Löschknopf',
@@ -619,7 +618,7 @@ console.log('\n=== Nachricht löschen ===');
 
 console.log('\n=== Gruppe ohne Admin-Recht ===');
 {
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   // Die Gruppe gehört jemand anderem, und der führt sie auch.
   saat.chats.find(c => c.id === 'c1').erstellt_von = 'u9-adrian';
   saat.chat_mitglieder.forEach(m => {
@@ -628,7 +627,7 @@ console.log('\n=== Gruppe ohne Admin-Recht ===');
 
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   await p.click('#g-mehr');
@@ -693,7 +692,7 @@ console.log('\n=== Admin ernennen und weitergeben ===');
 {
   const ctx = await baueKontext(1440);   // hier ist u1 selbst Admin von c1
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   await p.click('#g-mehr');
@@ -736,7 +735,7 @@ console.log('\n=== Der letzte Admin bleibt ===');
 {
   const ctx = await baueKontext(1440);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   await p.click('#g-mehr');
@@ -768,7 +767,7 @@ console.log('\n=== Der letzte Admin bleibt ===');
 
 console.log('\n=== Gespräch löschen ===');
 {
-  const saat = structuredClone(BASIS);   // u1 ist Admin von c1
+  const saat = structuredClone(SAAT);   // u1 ist Admin von c1
   saat.nachrichten.push({ id:'nb9', chat_id:'c1', absender:'u1', text:null,
     bild_pfad:'c1/plan.jpg', bild_ablauf:new Date(Date.now() + 30*86400000).toISOString(),
     erstellt_am:heute('2026-09-18T07:30:00.000Z') });
@@ -776,7 +775,7 @@ console.log('\n=== Gespräch löschen ===');
 
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   await p.click('#g-mehr');
@@ -838,7 +837,7 @@ console.log('\n=== Einzelchat bleibt wie bisher ===');
 {
   const ctx = await baueKontext(1440);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c2', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c2`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   await p.click('#g-mehr');
@@ -877,14 +876,14 @@ console.log('\n=== Einzelchat bleibt wie bisher ===');
 
 console.log('\n=== Zeit und Haken ===');
 {
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   saat.nachrichten.unshift({ id:'nalt', chat_id:'c1', absender:'u9-adrian',
     text:'Vom letzten Monat', bild_pfad:null, bild_ablauf:null,
     erstellt_am:'2026-08-20T11:05:00.000Z' });
 
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   const wann = await p.$$eval('#verlauf .ch-fuss .wann', e => e.map(x => x.textContent.trim()));
@@ -905,13 +904,13 @@ console.log('\n=== Zeit und Haken ===');
 
 {
   // Alle anderen haben gelesen: zwei Haken.
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   for (const m of saat.chat_mitglieder) {
     if (m.chat_id === 'c1' && m.user_id !== 'u1') m.zuletzt_gelesen = heute('2026-09-18T08:00:00.000Z');
   }
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
   ok('Haben alle gelesen, stehen zwei Haken',
      (await p.$$('#verlauf .ch-blase.ich .haken.gelesen')).length === 1);
@@ -920,12 +919,12 @@ console.log('\n=== Zeit und Haken ===');
 
 {
   // In der Gruppe genügt eine Person nicht.
-  const saat = structuredClone(BASIS);
+  const saat = structuredClone(SAAT);
   const einer = saat.chat_mitglieder.find(m => m.chat_id === 'c1' && m.user_id === 'u9-adrian');
   einer.zuletzt_gelesen = heute('2026-09-18T08:00:00.000Z');
   const ctx = await baueKontext(1440, { saat });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
   ok('In der Gruppe reicht eine Person nicht für zwei Haken',
      (await p.$$('#verlauf .ch-blase.ich .haken.gelesen')).length === 0);
@@ -940,7 +939,7 @@ for (const breite of [390, 1440]) {
   console.log(`\n=== Fusszeile lesbar (${breite}px) ===`);
   const ctx = await baueKontext(breite);
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
 
   const mass = await p.evaluate(() => {
@@ -975,12 +974,12 @@ for (const breite of [390, 1440]) {
   console.log('\n=== Haken in Echtzeit ===');
   const ctx = await baueKontext(1440, { geteilt: true });
   const eins = await anmelden(ctx);
-  await eins.goto('http://127.0.0.1:8123/chat.html?chat=c1', { waitUntil:'networkidle' });
+  await eins.goto(`${SERVER}/chat.html?chat=c1`, { waitUntil:'networkidle' });
   await eins.waitForTimeout(1200);
   ok('Vorher ein Haken', (await eins.$$('#verlauf .ch-blase.ich .haken.gelesen')).length === 0);
 
   const zwei = await anmelden(ctx);
-  await zwei.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await zwei.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await zwei.waitForTimeout(900);
   /* Die Gegenseite liest — im echten Betrieb tut das ihre App beim
      Öffnen, von ihrem Konto aus. Von hier aus lässt sich das nicht
@@ -1025,9 +1024,9 @@ for (const breite of [390, 1440]) {
 console.log('\n=== Benachrichtigungen: Fehler sichtbar ===');
 {
   const ctx = await baueKontext(1440);
-  await ctx.grantPermissions(['notifications'], { origin: 'http://127.0.0.1:8123' });
+  await ctx.grantPermissions(['notifications'], { origin: SAAT });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
 
   const nachbilden = art => p.evaluate(a => {
@@ -1107,7 +1106,7 @@ console.log('\n=== Benachrichtigungen: Fehler sichtbar ===');
    zeigen haben. Es steht nur hier, damit die Zahlen der anderen
    Abschnitte gleich bleiben. */
 const SAAT_PLUS = (() => {
-  const d = JSON.parse(JSON.stringify(BASIS));
+  const d = JSON.parse(JSON.stringify(SAAT));
   const T = (h, m) => `${HEUTE}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00.000Z`;
   const morgen = new Date(Date.now() + 25 * 86400000).toISOString();
   d.nachrichten.push(
@@ -1146,7 +1145,7 @@ console.log('\n=== Reaktionen an einer Nachricht ===');
 {
   const ctx = await baueKontext(390, { saat: SAAT_PLUS });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1225,7 +1224,7 @@ console.log('\n=== Chat stummschalten ===');
 {
   const ctx = await baueKontext(390, { saat: SAAT_PLUS });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1270,7 +1269,7 @@ console.log('\n=== Chat stummschalten ===');
   });
   /* Ohne ?chat= in der Adresse, sonst öffnet sich das Gespräch beim
      Neuladen gleich wieder und gilt damit als gelesen. */
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('Und der Ungelesen-Zähler zählt trotz Stumm weiter',
      await p.locator('#gespraeche .zaehler').count() >= 1 && zaehler);
@@ -1302,7 +1301,7 @@ console.log('\n=== Fotos aus dem Chat sichern ===');
     navigator.canShare = d => !!d?.files?.length;
     navigator.share = async d => { window.__geteilt.push(d.files.map(f => f.name)); };
   });
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1379,7 +1378,7 @@ console.log('\n=== Medien-Reiter ===');
 {
   const ctx = await baueKontext(390, { saat: SAAT_PLUS });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1428,7 +1427,7 @@ console.log('\n=== Suche im Gespräch ===');
 {
   const ctx = await baueKontext(390, { saat: SAAT_PLUS });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1488,7 +1487,7 @@ console.log('\n=== @-Erwähnungen im Chat ===');
     rufe.push(JSON.parse(r.request().postData() || '{}'));
     await r.fulfill({ status:200, contentType:'application/json', body:'{"gesendet":1}' });
   });
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 
@@ -1554,7 +1553,7 @@ console.log('\n=== Alles zusammen im selben Gespräch ===');
 {
   const ctx = await baueKontext(1440, { saat: SAAT_PLUS });
   const p = await anmelden(ctx);
-  await p.goto('http://127.0.0.1:8123/chat.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(700);
   await gruppeAuf(p);
 

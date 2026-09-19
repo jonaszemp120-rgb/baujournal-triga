@@ -1,11 +1,11 @@
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-dok';
+const OUT = `${HIER}/ausgabe/shots-dok`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const PDF = `${OUT}/Anstellungsbedingungen_2026.pdf`;
 fs.writeFileSync(PDF, Buffer.from('%PDF-1.4\n%stub\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n'.repeat(40)));
 const STUB = fs.readFileSync('./stub.js','utf8');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 const ok = (n, b) => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}`);
 
@@ -17,7 +17,7 @@ async function lauf(name, breite) {
   p.on('pageerror', e => fehler.push(`${name}: ${e.message}`));
   console.log(`\n=== ${name} (${breite}px) ===`);
 
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html');
   await p.waitForSelector('#raster a[href="dokumente.html"]');
@@ -108,7 +108,7 @@ async function lauf(name, breite) {
   }
   ok('Papierkorb geleert', (await p.$$('#inhalt .pk-zeile')).length === 0);
 
-  await p.goto('http://127.0.0.1:8123/dokumente.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/dokumente.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   ok('Ordner wieder da', (await p.$$('#ordner .dk-ordnerzeile')).length === 2);
   await ctx.close();

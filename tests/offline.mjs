@@ -1,12 +1,12 @@
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER_OFFLINE } from './umgebung.mjs';
 import fs from 'node:fs';
 
-const BASE = 'http://127.0.0.1:8124';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-offline';
+const BASE = SERVER_OFFLINE;
+const OUT = `${HIER}/ausgabe/shots-offline`;
 fs.mkdirSync(OUT, { recursive: true });
 
 const fehler = [];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, locale: 'de-CH' });
 const page = await ctx.newPage();
 page.on('console', m => { if (m.type() === 'error') fehler.push('console: ' + m.text()); });

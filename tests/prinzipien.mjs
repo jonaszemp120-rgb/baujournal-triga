@@ -1,14 +1,13 @@
 /* Schritt 7: die durchgaengigen Prinzipien, quer durch alle Bereiche.
  * Nicht noch einmal jede Funktion, sondern genau das, was ueberall
  * gleich sein muss. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER_OFFLINE, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-prinzipien`;
+const OUT = `${HIER}/ausgabe/shots-prinzipien`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
 const SAAT = JSON.parse(fs.readFileSync(`${HIER}/saat.json`,'utf8'));
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -23,7 +22,7 @@ async function neu(breite) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(m.text()); });
   p.on('pageerror', e => fehler.push(e.message));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(600);
   return { ctx, p };
@@ -33,12 +32,12 @@ async function neu(breite) {
 {
   console.log('\n=== Projekt: archivieren statt löschen ===');
   const { ctx, p } = await neu(1440);
-  await p.goto('http://127.0.0.1:8123/projekte.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekte.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('kein Löschen-Knopf in der Übersicht', (await p.locator('text=/löschen/i').count()) === 0);
   ok('zwei aktive Projekte sichtbar', (await p.$$('#liste a[href*="projekt-start"]')).length === 2);
 
-  await p.goto('http://127.0.0.1:8123/projekt.html?id=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt.html?id=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('Archiv-Schalter da, kein Löschen', await p.locator('#f-archiviert').count() === 1
      && (await p.locator('text=Projekt löschen').count()) === 0);
@@ -49,7 +48,7 @@ async function neu(breite) {
   ok('Schalter reagiert auf den sichtbaren Knopf', await p.isChecked('#f-archiviert'));
   await p.click('#speichern');
   await p.waitForTimeout(1600);
-  await p.goto('http://127.0.0.1:8123/projekte.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekte.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('archiviertes Projekt raus aus der Hauptliste', (await p.$$('#liste a[href*="projekt-start"]')).length === 1);
   await p.click('#filter');
@@ -58,13 +57,13 @@ async function neu(breite) {
   await p.screenshot({ path:`${OUT}/archiv.png`, fullPage:true });
 
   // zurueckdrehen
-  await p.goto('http://127.0.0.1:8123/projekt.html?id=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt.html?id=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   await p.click('#archiv-knopf');
   ok('Schalter lässt sich zurückdrehen', !(await p.isChecked('#f-archiviert')));
   await p.click('#speichern');
   await p.waitForTimeout(1600);
-  await p.goto('http://127.0.0.1:8123/projekte.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekte.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   ok('wieder aktiv', (await p.$$('#liste a[href*="projekt-start"]')).length === 2);
   await ctx.close();
@@ -80,7 +79,7 @@ async function neu(breite) {
   await ctx.addInitScript(s => { if (!sessionStorage.getItem('__stub_db')) sessionStorage.setItem('__stub_db', JSON.stringify(s)); }, SAAT);
   const p = await ctx.newPage();
   p.on('pageerror', e => fehler.push(e.message));
-  const B = 'http://127.0.0.1:8124';
+  const B = SERVER_OFFLINE;
   await p.goto(`${B}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(600);
@@ -136,7 +135,7 @@ async function neu(breite) {
     ['Papierkorb Dokumente', 'papierkorb-bereich.html?bereich=ordner']
   ];
   for (const [name, pfad] of seiten) {
-    await p.goto(`http://127.0.0.1:8123/${pfad}`, { waitUntil:'networkidle' });
+    await p.goto(`${SERVER}/${pfad}`, { waitUntil:'networkidle' });
     await p.waitForTimeout(900);
     const text = await p.textContent('body');
     ok(`${name.padEnd(24)} ohne "endgültig"`, !/endgültig/i.test(text));
@@ -144,7 +143,7 @@ async function neu(breite) {
 
   // Der Firmenpool darf das Wort genau zweimal fuehren, bei den beiden
   // Unterdetails einer Firma. Das ist die abgesprochene Ausnahme.
-  await p.goto('http://127.0.0.1:8123/firmenpool.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/firmenpool.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1000);
   ok('Firmenpool-Liste ohne "endgültig"', !/endgültig/i.test(await p.textContent('body')));
   await p.locator('#gruppen [data-firma="f1"]').click(); await p.waitForTimeout(1000);
@@ -166,7 +165,7 @@ async function neu(breite) {
   for (const [name, bereich, erwartet] of [
     ['Mitarbeiter', 'mitarbeiter', 1], ['Firmenpool', 'firmen', 2], ['Dokumente', 'ordner', 2]
   ]) {
-    await p.goto(`http://127.0.0.1:8123/papierkorb-bereich.html?bereich=${bereich}`, { waitUntil:'networkidle' });
+    await p.goto(`${SERVER}/papierkorb-bereich.html?bereich=${bereich}`, { waitUntil:'networkidle' });
     await p.waitForTimeout(1100);
     const zeilen = await p.$$('#inhalt .pk-zeile');
     ok(`${name.padEnd(12)} zeigt die gelöschten Einträge`, zeilen.length === erwartet, `${zeilen.length} statt ${erwartet}`);

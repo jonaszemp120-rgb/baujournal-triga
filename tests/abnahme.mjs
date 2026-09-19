@@ -5,12 +5,12 @@
    von pdf.js gerendert — also genau dem Weg, den die App auch nimmt. Ein
    Bild statt eines PDF würde den halben Ablauf überspringen. */
 
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots-ba';
+const OUT = `${HIER}/ausgabe/shots-ba`;
 fs.rmSync(OUT, { recursive: true, force: true }); fs.mkdirSync(OUT, { recursive: true });
 const STUB = fs.readFileSync('./stub.js', 'utf8');
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 const ok = (n, b, zusatz = '') => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${b ? '' : `  → ${zusatz}`}`);
 
@@ -67,13 +67,13 @@ async function lauf(name, breite) {
 
   const db = () => p.evaluate(() => JSON.parse(sessionStorage.getItem('__stub_db')));
 
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil: 'networkidle' });
   await p.fill('#email', 'test.durchlauf@triga.ch'); await p.fill('#pw', 'TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html');
 
   /* --- 1. Ohne Plan: Aufforderung statt Fehler --------------------------- */
 
-  await p.goto('http://127.0.0.1:8123/abnahme.html?projekt=p1', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/abnahme.html?projekt=p1`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1100);
   ok('Ohne Plan kommt die Aufforderung, einen hochzuladen',
      (await p.textContent('#inhalt')).includes('noch kein Plan'));
@@ -502,7 +502,7 @@ async function lauf(name, breite) {
 
   /* --- 8. Der Weg dorthin vom Projekt ------------------------------------------ */
 
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil: 'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(1200);
   ok('Die Projektseite hat einen Bauabnahme-Block',
      (await p.textContent('#abnahmen')).includes('Bauabnahme'));

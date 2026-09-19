@@ -1,12 +1,12 @@
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
 
-const BASE = 'http://127.0.0.1:8123';
-const OUT = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/shots';
+const BASE = SERVER;
+const OUT = `${HIER}/ausgabe/shots`;
 fs.mkdirSync(OUT, { recursive: true });
 
 const fehler = [];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 // BREITE=1440 fährt denselben Durchlauf in Desktop-Breite.
 const BREITE = Number(process.env.BREITE || 390);
 const ctx = await browser.newContext({
@@ -15,7 +15,7 @@ const ctx = await browser.newContext({
 });
 console.log(`(Viewport ${BREITE}px)`);
 // Der echte Supabase-Endpunkt ist aus diesem Container gesperrt.
-const STUB = fs.readFileSync('/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad/stub.js', 'utf8');
+const STUB = fs.readFileSync(`${HIER}/stub.js`, 'utf8');
 await ctx.route('**/vendor/supabase-js-2.58.0.js', r =>
   r.fulfill({ status: 200, contentType: 'application/javascript', body: STUB }));
 const page = await ctx.newPage();

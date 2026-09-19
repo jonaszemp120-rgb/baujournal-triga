@@ -1,12 +1,11 @@
 /* Schritt 9: der Bereich Projekte und alles, was daran hängt.
    Geprüft wird die Liste aus Abschnitt 11 des Prompts. */
-import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, HIER, SERVER } from './umgebung.mjs';
 import fs from 'node:fs';
-const HIER = '/tmp/claude-0/-home-user-baujournal-triga/ad655f9d-451a-55b0-aac9-986e124c8f6f/scratchpad';
-const OUT = `${HIER}/shots-pj`;
+const OUT = `${HIER}/ausgabe/shots-pj`;
 fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:true });
 const STUB = fs.readFileSync(`${HIER}/stub.js`,'utf8');
-const browser = await chromium.launch({ executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch();
 const fehler = [];
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz='') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };
@@ -36,7 +35,7 @@ async function anmelden(breite) {
   const p = await ctx.newPage();
   p.on('console', m => { if (m.type()==='error') fehler.push(`${breite}: ${m.text()}`); });
   p.on('pageerror', e => fehler.push(`${breite}: ${e.message}`));
-  await p.goto('http://127.0.0.1:8123/index.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/index.html`, { waitUntil:'networkidle' });
   await p.fill('#email','test.durchlauf@triga.ch'); await p.fill('#pw','TestDurchlauf!2026');
   await p.click('#btn'); await p.waitForURL('**/start.html'); await p.waitForTimeout(800);
   return { ctx, p };
@@ -93,7 +92,7 @@ for (const breite of [390, 1440]) {
   ok('Beschrieb sichtbar', (await p.textContent('#stammdaten')).includes('Gesamtsanierung'));
 
   // --- Bestehendes Projekt: Mille Fiori bleibt heil -------------------------
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1300);
   ok('Mille Fiori lädt', (await p.textContent(breite>=1024 ? '#d-name' : '#m-name')).includes('Mille Fiori'));
   ok('Unternehmerliste mit zwei Firmen', (await p.textContent('#unternehmer')).includes('Unternehmerliste · 2'));
@@ -145,7 +144,7 @@ for (const breite of [390, 1440]) {
 
   // --- Rückwärtsanzeige auf der Firmenseite --------------------------------
   const zurFirma = await p.locator('#unternehmer a[href*="firmenpool.html?firma="]').first().getAttribute('href');
-  await p.goto('http://127.0.0.1:8123/' + zurFirma, { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/` + zurFirma, { waitUntil:'networkidle' });
   await p.waitForTimeout(1300);
   ok('Firmenseite zeigt den Projekte-Abschnitt', (await p.textContent('#firma-links')).includes('Projekte · 1'));
   ok('mit Projektname und Status',
@@ -171,7 +170,7 @@ for (const breite of [390, 1440]) {
   await p.screenshot({ path:`${OUT}/${breite}-firma-projekte.png`, fullPage:true });
 
   // --- Mitarbeiter zuordnen -------------------------------------------------
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1300);
   await p.click('#person-dazu'); await p.waitForTimeout(600);
   const rollen = await p.$$eval('#mf-vorschlag .pj-chip', e => e.map(x => x.dataset.rolle));
@@ -192,7 +191,7 @@ for (const breite of [390, 1440]) {
   ok('Zuordnung entfernt', (await p.$$('#personen .pj-zeile')).length === 2);
 
   // --- Ordner einem Projekt zuordnen ---------------------------------------
-  await p.goto('http://127.0.0.1:8123/dokumente.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/dokumente.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1200);
   ok('zugeordneter Ordner nennt sein Projekt',
      (await p.textContent('#ordner')).includes('WUB Garten Mille Fiori'));
@@ -209,12 +208,12 @@ for (const breite of [390, 1440]) {
      (await p.locator('#detail a[href*="projekt-detail.html"]').count()) === 1);
   ok('Dateien im Ordner sichtbar', (await p.$$('#detail .dk-datei')).length === 2);
 
-  await p.goto('http://127.0.0.1:8123/projekt-detail.html?projekt=p1', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/projekt-detail.html?projekt=p1`, { waitUntil:'networkidle' });
   await p.waitForTimeout(1300);
   ok('Projektseite zeigt jetzt beide Ordner', (await p.$$('#dokumente .pj-zeile')).length === 2);
 
   // --- Globale Suche --------------------------------------------------------
-  await p.goto('http://127.0.0.1:8123/suche.html', { waitUntil:'networkidle' });
+  await p.goto(`${SERVER}/suche.html`, { waitUntil:'networkidle' });
   await p.waitForTimeout(900);
   const feld = breite >= 1024 ? '#d-q' : '#m-q';
   await p.fill(feld, 'sarnen'); await p.waitForTimeout(900);
@@ -238,7 +237,7 @@ for (const breite of [390, 1440]) {
 
   // --- Scrollverhalten Firmenpool (nur Desktop) ----------------------------
   if (breite >= 1024) {
-    await p.goto('http://127.0.0.1:8123/firmenpool.html', { waitUntil:'networkidle' });
+    await p.goto(`${SERVER}/firmenpool.html`, { waitUntil:'networkidle' });
     await p.waitForTimeout(1400);
     const scrollbar = await p.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 50);
     ok('Seite ist lang genug zum Scrollen', scrollbar);

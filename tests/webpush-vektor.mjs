@@ -2,9 +2,10 @@
    Dort stehen alle Eingaben fest, auch der ephemere Schlüssel und das
    Salz — genau deshalb lässt sich das Ergebnis Zeichen für Zeichen
    vergleichen. */
+import { WURZEL } from './umgebung.mjs';
 import { createRequire } from 'node:module';
-const require = createRequire('/home/user/baujournal-triga/api/');
-const wp = require('/home/user/baujournal-triga/api/_webpush.js');
+const require = createRequire(`${WURZEL}api/`);
+const wp = require(`${WURZEL}api/_webpush.js`);
 
 let gut = 0, schlecht = 0;
 const ok = (n, b, zusatz = '') => { b ? gut++ : schlecht++; console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}${zusatz ? '  → ' + zusatz : ''}`); };

@@ -4,10 +4,43 @@
 Chromium. Sie laufen nicht gegen die echte Datenbank, sondern gegen einen
 handgeschriebenen Supabase-Ersatz.
 
+## Fahren
+
+```sh
+sh tests/lauf-alles.sh      # alles am Stück
+node tests/chat.mjs         # eine einzelne Suite
+```
+
+Die beiden Server startet `lauf-alles.sh` selbst, wenn sie nicht schon
+laufen. Daran hat sonst jedes Mal jemand nicht gedacht, und dann stehen
+zwei Suiten rot da, ohne dass am Code etwas falsch wäre — genau das ist
+hier schon passiert. Für eine einzelne Suite braucht es den Server auf
+8123 von Hand:
+
+```sh
+python3 -m http.server 8123 --bind 127.0.0.1 &
+```
+
+Alles, was bei einem Lauf entsteht — Bildschirmfotos, Protokolle, die
+Kopie der App —, landet in `tests/ausgabe/` und steht in `.gitignore`.
+
+Gebraucht wird Playwright samt Chromium. Ist es global installiert, wird
+es gefunden; sonst zeigt `TRIGA_PLAYWRIGHT` auf sein `index.mjs`. Der
+Browser kommt über Playwrights eigene Ablage oder über
+`PLAYWRIGHT_BROWSERS_PATH`.
+
+| Variable | wofür |
+|---|---|
+| `TRIGA_PLAYWRIGHT` | Pfad zu `playwright/index.mjs`, falls die gewöhnliche Auflösung fehlschlägt |
+| `TRIGA_BASIS` | Adresse des Servers, sonst `http://127.0.0.1:8123` |
+| `TRIGA_BASIS_OFFLINE` | dasselbe für die Offline-Kopie, sonst `:8124` |
+| `TRIGA_HAFEN`, `TRIGA_HAFEN_OFFLINE` | welche Häfen `lauf-alles.sh` öffnet |
+| `TRIGA_AUSGABE` | wohin Bildschirmfotos und Protokolle gehen |
+
 ## Warum ein eigener Stub und kein echter Supabase
 
 `stub.js` tritt an die Stelle von `vendor/supabase-js`. Die Suiten leiten
-den Aufruf darauf um, die App merkt nichts davon. Das hat zwei Gründe. Der
+den Abruf darauf um, die App merkt nichts davon. Das hat zwei Gründe. Der
 eine ist praktisch: aus der Entwicklungsumgebung ist der echte Endpunkt
 gesperrt. Der andere wiegt schwerer — ein Test, der eine gemeinsame
 Datenbank verändert, ist nach dem dritten Durchlauf ein anderer Test.
@@ -20,48 +53,22 @@ Genau das ist schon vorgekommen: der Grundbestand kannte kein Adressbuch,
 und damit lief eine Prüfung durch, die in der echten Datenbank abgewiesen
 worden wäre.
 
-Deshalb gilt: **jede Regel wird zuerst auf der echten Datenbank
-nachgewiesen**, mit einem `DO`-Block, der am Schluss `raise exception`
-wirft und damit alles zurückrollt. Erst danach lernt der Stub dieselbe
-Regel. Der Nachweis ist das Original, der Stub die Kopie.
-
-## Fahren
-
-```sh
-# Server für die App
-cd /pfad/zum/repo && python3 -m http.server 8123 --bind 127.0.0.1 &
-
-# Zweiter Server für die Offline-Suite: eine Kopie der App mit dem Stub
-# fest eingebaut, weil der Service Worker dort mitspielen muss
-sh tests/neustart8124.sh
-
-# Alles am Stück
-sh tests/lauf-alles.sh      # schreibt tests/alles.log
-
-# Einzeln
-node tests/chat.mjs
-```
-
-## Was hier noch nicht stimmt
-
-Die Pfade in den Suiten sind absolut und auf den Container gemünzt, in dem
-sie entstanden sind — `/tmp/claude-0/…/scratchpad` für die Ausgaben,
-`/opt/node22/…` für Playwright, `/opt/pw-browsers/…` für Chromium. Auf
-einer anderen Maschine laufen sie so nicht. Sie stehen trotzdem hier: eine
-Suite mit 2300 Prüfungen, die nur in einem Container liegt, ist beim
-nächsten Neustart weg.
-
-Umzustellen wäre das an drei Stellen je Datei, und danach müsste alles
-einmal komplett durchlaufen. Das ist ein eigener Schritt und keine
-Nebenbei-Änderung.
+Deshalb gilt die Reihenfolge: **jede Regel wird zuerst auf der echten
+Datenbank nachgewiesen**, mit einem `DO`-Block, der am Schluss
+`raise exception` wirft und damit alles zurückrollt. Erst danach lernt der
+Stub dieselbe Regel. Der Nachweis ist das Original, der Stub die Kopie.
 
 ## Aufbau
 
 ```
+umgebung.mjs         wo alles liegt: Playwright, die Server, der Stub.
+                     Jede Suite holt sich das von dort und kennt selbst
+                     keinen einzigen absoluten Pfad
 stub.js              der Supabase-Ersatz: Abfragen, Policies, Trigger,
                      Storage, Echtzeit
 saat.json            der gemeinsame Anfangsbestand
-lauf-alles.sh        fährt alle Suiten und schreibt alles.log
+import-test.csv      Testdaten für den Import im Bereich Mitarbeiter
+lauf-alles.sh        fährt alle Suiten, startet die Server dafür selbst
 neustart8124.sh      baut die Kopie für die Offline-Suite
 
 shell mitarbeiter dokumente firmenpool test offline durchgang
@@ -73,3 +80,23 @@ searchch
 `schutz` und `serverfunktionen` sind die beiden, die am ehesten etwas
 finden: die eine prüft, was ein direkter Aufruf an der Oberfläche vorbei
 ausrichtet, die andere die Serverless-Funktionen ohne Netz.
+
+Die Offline-Suite braucht einen zweiten Server, weil dort der Service
+Worker mitspielen muss — und der holt seine Dateien selbst und lässt sich
+nicht umleiten wie ein gewöhnlicher Abruf. `neustart8124.sh` legt deshalb
+eine Kopie der App an, in der der Stub fest an der Stelle von supabase-js
+liegt.
+
+## Was hier nicht geprüft wird
+
+Zwei Dinge gehen mit dieser Einrichtung grundsätzlich nicht, und das
+steht hier, damit es niemand für eine Lücke hält:
+
+**Das Teilen-Blatt von iOS.** Chromium hat keines. Beim Sichern von Fotos
+aus dem Chat wird deshalb die Schnittstelle nachgebaut, die iOS anbietet —
+mehr weiss die App über sie ohnehin nicht. Ob das Gerät beim ersten
+echten Antippen mitspielt, sieht man nur auf einem iPhone.
+
+**Freigabe-Dialoge des Betriebssystems.** Standort, Benachrichtigungen,
+Kamera: geprüft ist alles, was in unserem Code steht — erteilt,
+verweigert, stumm, kaputt, offline —, nicht die Maschinerie dahinter.
