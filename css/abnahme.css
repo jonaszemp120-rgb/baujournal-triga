@@ -9,6 +9,32 @@
   color:var(--text-dim); margin:16px 0 10px;
 }
 
+/* --- Die Planleiste ------------------------------------------------------- */
+
+/* Ein Streifen über dem Grundriss, einer je Haus und Geschoss. Er darf
+   seitlich laufen, statt umzubrechen: auf dem Handy wären drei Zeilen
+   Reiter mehr Leiste als Plan. */
+.ba-planleiste{
+  display:flex; align-items:center; gap:8px; margin-bottom:10px;
+  overflow-x:auto; padding-bottom:2px; scrollbar-width:thin;
+}
+.ba-planchip{
+  display:flex; align-items:center; gap:7px; flex-shrink:0;
+  height:36px; padding:0 13px; border-radius:18px;
+  border:1.5px solid var(--border); background:var(--card);
+  color:var(--navy); font-size:13px; font-weight:700; line-height:1;
+}
+.ba-planchip .name{ white-space:nowrap; }
+.ba-planchip.an{ border-color:var(--navy); background:var(--navy); color:#fff; }
+.ba-planchip .zahl{
+  display:flex; align-items:center; justify-content:center;
+  min-width:19px; height:19px; padding:0 5px; border-radius:10px;
+  background:var(--red); color:#fff; font-size:11px; font-weight:800;
+}
+.ba-planchip.an .zahl{ background:#fff; color:var(--red); }
+.ba-planchip.neu{ border-style:dashed; color:var(--text-dim); }
+.ba-planchip.weg{ padding:0 11px; color:var(--red); }
+
 /* --- Der Plan ------------------------------------------------------------- */
 
 /* Der Rahmen ist die Bezugsfläche der Stecknadeln: x und y stehen in der
@@ -60,6 +86,7 @@
   padding:12px 14px;
 }
 .ba-mangel + .ba-mangel{ margin-top:10px; }
+.ba-mangel{ cursor:pointer; }
 .ba-mangel .zahl{
   width:26px; height:26px; border-radius:50%; background:var(--red); color:#fff;
   display:flex; align-items:center; justify-content:center;

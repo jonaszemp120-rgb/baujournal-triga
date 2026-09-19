@@ -128,7 +128,7 @@ wurde.
 | `start.html` | Die Startseite nach dem Login: die sechs Kacheln mit Zahlen aus der Datenbank, darüber auf dem Handy die Zeilen zu Feed und Formularen. |
 | `feed.html` | Der Feed: Beiträge und Umfragen, mit Filter, Herz und Kommentaren, in Echtzeit. |
 | `formulare.html` | Spesen- und Ferienanträge: einreichen, zurückziehen, entscheiden. |
-| `abnahme.html` | Die Bauabnahme eines Projekts: Plan, Mängel, Abschluss, `?projekt=` und optional `?abnahme=`. |
+| `abnahme.html` | Die Bauabnahme eines Projekts: Grundrisse, Mängel, Abschluss, `?projekt=` und optional `?abnahme=`. |
 | `protokolle.html` | Die Sitzungsprotokolle eines Projekts als Liste, `?projekt=`. |
 | `protokoll.html` | Ein Sitzungsprotokoll: Kopfdaten, Teilnehmende, Traktanden, Abschluss, `?protokoll=`. |
 | `suche.html` | Die globale Suche über Projekte, Firmen, Mitarbeiter und Dokumente. |
@@ -344,7 +344,7 @@ js/shell.js          die Seitenleiste ab 1024px, die acht Bereiche,
 js/start.js          die Startseite mit der Bereichsauswahl
 js/feed.js           der Feed: Beiträge, Umfragen, Herz, Kommentare
 js/formulare.js      Spesen- und Ferienanträge
-js/abnahme.js        die Bauabnahme: Plan, Mängel, Abschluss
+js/abnahme.js        die Bauabnahme: Grundrisse, Mängel, Abschluss
 js/protokolle.js     die Sitzungsprotokolle eines Projekts als Liste
 js/protokoll.js      ein Sitzungsprotokoll: Kopfdaten, Teilnehmende,
                      Traktanden, Abschluss, Teilen
@@ -366,7 +366,8 @@ js/projekte-bereich.js js/projekt-detail.js js/pendenzen.js
 js/suche.js           die globale Suche
 js/profil.js          Mein Profil: eigene Kontaktdaten, Unterschrift
                       auf einem Canvas erfassen und zuschneiden
-js/chat.js            der Chat: Liste, Gespräch, Echtzeit, Gruppen, Löschen
+js/chat.js            der Chat: Liste, Gespräch, Echtzeit, Gruppen,
+                      Admins, Löschen
 js/push.js            Benachrichtigungen, ohne Bezug zu einem Bereich
 css/chat.css          die zwei Spalten des Chats
 api/push.js           verschickt eine Meldung an die anderen Mitglieder
@@ -464,12 +465,19 @@ alle acht Bereiche.
   `antrag_schutz()` lässt beim Entscheiden nur den Entscheid durch, nicht den
   Inhalt — den Betrag eines fremden Antrags kann auch die Geschäftsleitung
   nicht mitändern
-- `abnahmen`, `maengel` — die Bauabnahme. `plan_bild_pfad` zeigt auf die einmal
-  gerenderte Fassung des Grundrisses im Bucket `abnahme`; `x` und `y` eines
-  Mangels stehen als Anteil zwischen 0 und 1 und nicht in Pixeln, damit die
-  Nadel auf dem Handy und am Bildschirm am selben Fleck sitzt. Sobald
-  `abgeschlossen_am` steht, sperrt der Trigger `abnahme_gesperrt()` beide
-  Tabellen: kein Mangel kommt dazu, keiner verschwindet, keiner ändert sich
+- `abnahmen`, `abnahme_plaene`, `maengel` — die Bauabnahme. Eine Abnahme trägt
+  beliebig viele Grundrisse, einen je Haus und Geschoss; `abnahme_plaene.titel`
+  ist der Name davon («Haus Magnolia, 1. OG») und `bild_pfad` zeigt auf die
+  einmal gerenderte Fassung im Bucket `abnahme`. Jeder Mangel gehört über
+  `plan_id` an genau einen dieser Pläne, abgesichert mit dem zusammengesetzten
+  Fremdschlüssel `maengel_plan_passt` auf `(plan_id, abnahme_id)` — ein Plan aus
+  einer fremden Abnahme kommt damit nicht in Frage. `x` und `y` stehen als
+  Anteil dieses Bildes zwischen 0 und 1 und nicht in Pixeln, damit die Nadel auf
+  dem Handy und am Bildschirm am selben Fleck sitzt. Sobald `abgeschlossen_am`
+  steht, sperrt der Trigger `abnahme_gesperrt()` alle drei Tabellen: kein Mangel
+  kommt dazu, keiner verschwindet, keiner ändert sich. `plan_nur_ohne_maengel()`
+  hält einen Plan fest, solange Nadeln darauf stecken — sie gingen sonst still
+  mit ihm
 - `protokolle`, `protokoll_teilnehmer`, `protokoll_traktanden` — die
   Sitzungsprotokolle. Die `nummer` läuft pro Projekt und vergibt der Trigger
   `protokoll_nummer()`, nicht die App: zwei Geräte, die im selben Moment
@@ -480,7 +488,14 @@ alle acht Bereiche.
   zusätzlich als Momentaufnahme, damit ein Protokoll lesbar bleibt, wenn die
   Person später umbenannt oder aus dem Adressbuch entfernt wird. Sobald
   `abgeschlossen_am` steht, sperrt `protokoll_gesperrt()` alle drei Tabellen
-- `chats`, `chat_mitglieder`, `nachrichten` — der Chat. Ein Bild liegt im Bucket
+- `pruefspur` — wer wann was an einer Bauabnahme oder einem Sitzungsprotokoll
+  geändert hat. Beides kann rechtlich zählen, also schreibt die Datenbank mit
+  und nicht die App: sechs AFTER-Trigger auf `pruefspur_schreiben()` hängen an
+  `abnahmen`, `abnahme_plaene`, `maengel`, `protokolle`, `protokoll_teilnehmer`
+  und `protokoll_traktanden`. Siehe «Die Prüfspur» weiter unten
+- `chats`, `chat_mitglieder`, `nachrichten` — der Chat. `chat_mitglieder.admin`
+  gilt nur in Gruppen: Mitglieder pflegen, weitere Admins ernennen, die Gruppe
+  für alle löschen. Ein Bild liegt im Bucket
   `chat-bilder` unter `<chat_id>/<zufall>`, der Pfad steht in
   `nachrichten.bild_pfad`. Läuft es ab, wird der Pfad geleert und
   `bild_ablauf` bleibt stehen — daran erkennt die App den Unterschied
@@ -645,6 +660,19 @@ Im Eingabefeld selbst steht immer nur der Name. Wer `@` tippt, bekommt eine
 Auswahlliste; was daraus gewählt wurde, merkt sich die App und setzt beim
 Absenden die Klammern. Niemand soll beim Schreiben Kennungen vor sich haben.
 
+**Daraus folgt, was passiert, wenn die erwähnte Person umbenannt oder entfernt
+wird.** Ein alter Beitrag behält den Namen, der beim Schreiben galt — dasselbe
+Muster wie bei den Teilnehmenden eines Sitzungsprotokolls: die Momentaufnahme
+steht im Text und wird nicht bei jeder Anzeige neu nachgeschlagen. Ein
+Kommentar von damals liest sich also weiterhin so, wie er gemeint war, und
+niemand rätselt, warum dort plötzlich ein anderer Name steht. Verknüpft wird
+über die Kennung, und die ändert sich beim Umbenennen nicht, also führt der Link
+weiterhin zur richtigen Person. Ist die Person aus dem Adressbuch entfernt,
+findet `mitErwaehnungen()` in `js/feed.js` niemanden mehr und setzt statt des
+Links eine hervorgehobene Textstelle: der Name bleibt lesbar, aber der Weg führt
+nicht ins Leere. Neu geschrieben wird selbstverständlich der neue Name
+vorgeschlagen — die Auswahlliste liest das Adressbuch von heute.
+
 **Vier Wege gehen durch `api/push.js`:** ein Gespräch, ein Feed-Beitrag, ein
 Feed-Kommentar und ein entschiedener Antrag. Welcher gilt, sagt genau eines der
 Felder `chat`, `beitrag`, `kommentar` oder `antrag`; wer melden darf und an
@@ -714,6 +742,24 @@ gewählte Seite wird deshalb einmal zu einem PNG gerendert und liegt danach fest
 im Bucket `abnahme`. Jede Nadel steht als Anteil der Bildbreite und -höhe
 zwischen 0 und 1 und sitzt damit auf jedem Bildschirm am selben Fleck.
 
+**Was bei einer neuen Planversion passiert: nichts.** Die Nadel bezieht sich auf
+das gerenderte Bild und nicht auf die Quelldatei in den Dokumenten. Wird dort ein
+neues PDF hochgeladen, bleibt dieses Bild, wie es ist — eine Nadel verschiebt
+sich nie unbemerkt, und dafür braucht es keine Warnung beim Hochladen. Wer einen
+neueren Stand markieren will, legt ihn als weiteren Plan an; der alte bleibt
+samt seinen Mängeln daneben stehen. Im Datenmodell steht dasselbe noch einmal:
+`maengel.plan_id` ist Pflicht und zeigt auf genau die Planzeile, deren Bild
+gemeint ist.
+
+**Mehrere Pläne je Abnahme.** Fünf Häuser mit je drei Geschossen hiessen früher
+fünfzehn Abnahmen und fünfzehn Protokolle, denn eine Abnahme trug genau einen
+Grundriss. Heute trägt sie beliebig viele: über der Zeichnung steht ab dem
+zweiten Plan eine Reiterleiste mit Namen wie «Haus Magnolia, 1. OG» und der Zahl
+der offenen Mängel, ein Tipp wechselt den Grundriss, und der Mangel, den man
+darauf setzt, gehört zu diesem Plan. Die Mängelliste bleibt daneben vollständig
+und nennt bei jedem Eintrag den Plan; ein Tipp darauf führt zum passenden
+Grundriss. Im Protokoll erscheint jeder Plan mit seinen eigenen Nadeln.
+
 Gerendert wird mit **pdf.js im Browser**, aus `vendor/`, beim ersten Öffnen der
 Abnahme. Der Spec sah dafür einen Server vor; diese App hat aber keinen
 Build-Schritt und keine npm-Abhängigkeiten, und ein PDF im Serverless-Umfeld zu
@@ -781,6 +827,69 @@ begonnenes Protokoll ist in Sekunden neu angelegt. Ein abgeschlossenes lässt
 sich gar nicht mehr löschen, das PDF ist der massgebende Nachweis. Dasselbe gilt
 für einzelne Traktanden.
 
+## Die Prüfspur
+
+**Bauabnahme und Sitzungsprotokoll können rechtlich zählen** — eine Mängelrüge
+mit Frist, ein Beschluss mit Teilnehmerliste. Dann zählt nicht nur, was am
+Schluss dasteht, sondern auch, wer es wann eingetragen und wer es später
+geändert hat. `erstellt_von` und `erstellt_am` sagen, wer angefangen hat, und
+sonst nichts. Deshalb `public.pruefspur`.
+
+**Geschrieben wird sie von der Datenbank, nicht von der App.** Sechs
+AFTER-Trigger rufen `pruefspur_schreiben()` auf: an `abnahmen`,
+`abnahme_plaene`, `maengel`, `protokolle`, `protokoll_teilnehmer` und
+`protokoll_traktanden`. Was an der Oberfläche vorbei geändert wird, steht damit
+genauso drin wie das, was über einen Bildschirm läuft. AFTER und nicht BEFORE:
+erst wenn eine Änderung durch ist — an den Sperr-Triggern und den Policies
+vorbei —, ist sie ein Vorgang; ein abgewiesener Versuch rollt mit zurück und
+hinterlässt nichts.
+
+**Ändern lässt sie sich nicht.** Es gibt genau eine Policy, `select` für jede
+TRIGA-Person. Kein `insert`, kein `update`, kein `delete` — die Trigger kommen
+durch, weil sie `security definer` sind, jede Hand von aussen nicht. Es gibt
+auch keinen Fremdschlüssel auf die Abnahme oder das Protokoll: verschwindet der
+Vorgang, bleibt die Spur stehen, sonst wäre das Löschen der bequemste Weg, die
+eigenen Spuren zu verwischen.
+
+Eine Zeile hält `bereich` (`abnahme` oder `protokoll`), `vorgang_id` (die
+Abnahme oder das Protokoll), `projekt_id`, `tabelle`, `zeile_id`, `was`
+(`erstellt`, `geaendert`, `geloescht`), einen lesbaren `bezug` wie «Mangel 3:
+Türzarge verkratzt», bei einer Änderung `aenderungen` als
+`{"frist": {"vorher": …, "nachher": …}}`, dazu `wer`, `wer_name` und `wann`.
+Der Name steht als Momentaufnahme daneben, denn ein Konto kann später weg sein.
+Lange Werte werden bei 200 Zeichen gekürzt — eine Unterschrift als Data-URL
+gehört nicht in ein Protokollbuch. Ein Update, das nichts ändert, schreibt
+nichts.
+
+**Abgefragt** wird sie ohne eigene Oberfläche, im SQL-Editor von Supabase oder
+über die REST-Schnittstelle:
+
+```sql
+-- Alles zu einer Abnahme, in der Reihenfolge des Geschehens
+select wann, wer_name, was, bezug, aenderungen
+  from public.pruefspur
+ where vorgang_id = '<abnahme-id>'
+ order by wann;
+
+-- Alles zu einem Projekt, neueste zuerst
+select wann, wer_name, bereich, was, bezug
+  from public.pruefspur
+ where projekt_id = '<projekt-id>'
+ order by wann desc;
+
+-- Nur die Fristen, die jemand nachträglich verschoben hat
+select wann, wer_name, bezug,
+       aenderungen -> 'frist' ->> 'vorher'  as vorher,
+       aenderungen -> 'frist' ->> 'nachher' as nachher
+  from public.pruefspur
+ where tabelle = 'maengel' and aenderungen ? 'frist'
+ order by wann desc;
+```
+
+Aus der App heraus geht dasselbe mit
+`sb.from('pruefspur').select('*').eq('vorgang_id', …).order('wann')` — sollte
+später eine Ansicht dazukommen, braucht es dafür keine Änderung am Datenmodell.
+
 ## Chat und Benachrichtigungen
 
 **Wer mitreden darf, steht an genau einem Ort:** `chat_mitglieder`. Daran hängt
@@ -790,8 +899,30 @@ unter der Gesprächs-ID als erstem Ordner, und die Storage-Policy fragt dieselbe
 Funktion. Wer aus einer Gruppe fliegt, verliert damit auch die Bilder daraus,
 ohne dass irgendwo ein zweiter Schalter umgelegt werden müsste.
 
-Eintragen darf, wer das Gespräch angelegt hat — beim Anlegen selbst und
-später beim Hinzufügen weiterer Personen. Dafür gibt es `ist_chat_ersteller()`,
+**In der Gruppe gibt es Admins, im Einzelchat nicht.** Wer eine Gruppe anlegt,
+führt sie: Mitglieder pflegen, weitere Admins ernennen, die Gruppe für alle
+löschen. Das Häkchen setzt nicht die App, sondern der Trigger
+`chat_ersteller_ist_admin()` — ein vergessenes Häkchen ergäbe eine Gruppe, die
+niemand mehr verwalten und niemand mehr löschen kann. Alle anderen können gehen,
+ohne die Gruppe mitzunehmen; für die übrigen läuft sie weiter. Der Grund ist der
+Unterschied zwischen zwei und acht Leuten: im Einzelchat darf weiterhin jedes
+der beiden Mitglieder beenden, in einer Gruppe löschte sonst eine Person den
+Verlauf von sieben anderen mit. `chats_delete` schreibt genau das hin — bei
+`art = 'gruppe'` verlangt es `ist_chat_admin()`, sonst wie bisher
+`ist_chat_mitglied()`.
+
+Was sich an einer Mitgliedszeile ändern lässt, hält `chat_mitglied_schutz()`
+fest, mit derselben Erlaubnisliste wie `mitarbeiter_schutz()`: an der eigenen
+Zeile nur der Lesestand, an einer fremden nur das Admin-Häkchen und das nur als
+Admin. Zum Admin macht einen also immer jemand anderes; ohne diese Regel genügte
+ein Aufruf an der Oberfläche vorbei, um sich selbst die Gruppe zu übernehmen.
+`chat_admin_bleibt()` lässt den letzten Admin erst gehen, wenn jemand anderes
+die Gruppe führt — steht das Gespräch selbst nicht mehr da, greift die Regel
+nicht, denn dann räumt der Fremdschlüssel ab und nichts soll dazwischenfunken.
+
+Eintragen darf, wer das Gespräch angelegt hat oder Admin ist — beim Anlegen
+selbst und später beim Hinzufügen weiterer Personen. Dafür gibt es
+`ist_chat_ersteller()` und `ist_chat_admin()`,
 und zwar mit `security definer`, aus einem Grund, der einmal Geld gekostet hat:
 **eine Policy darf keine Tabelle mit RLS direkt lesen.** Die erste Fassung
 prüfte die Berechtigung mit einer Unterabfrage auf `chats` — die lief selbst
@@ -818,8 +949,11 @@ einzelne Nachricht löscht nur, wer sie geschrieben hat: Policy
 `nachrichten_update` erlaubt die Änderung überhaupt, der Trigger
 `nachricht_nur_loeschen()` lässt genau eine davon durch — Inhalt raus,
 `geloescht_am` rein. Ohne den Trigger wäre aus dem Löschen ein Bearbeiten
-geworden. Ein ganzes Gespräch löscht jedes Mitglied (`chats_delete`), und die
-Fremdschlüssel nehmen Mitgliedschaften und Nachrichten mit. Die Bilder im
+geworden. Ein ganzes Gespräch löscht im Einzelchat jedes der beiden Mitglieder
+und in der Gruppe nur ein Admin (`chats_delete`), und die
+Fremdschlüssel nehmen Mitgliedschaften und Nachrichten mit. Wer eine Gruppe nur
+verlassen will, entfernt seine eigene Mitgliedszeile — die Gruppe bleibt für
+die übrigen stehen. Die Bilder im
 Bucket gehen **zuerst**: danach ist die Mitgliedschaft weg, und ohne sie lässt
 die Storage-Policy keine Datei mehr entfernen — sie läge für immer dort, ohne
 dass noch eine Zeile auf sie zeigt.

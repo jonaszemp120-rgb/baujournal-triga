@@ -1,7 +1,8 @@
 /* Bauabnahme: Mängel auf dem Grundriss, digitale Unterschrift.
  *
- * Der Weg: einen Plan aus den Projekt-Dokumenten wählen, Mängel durch
- * Tippen auf dem Plan verorten, am Schluss unterschreiben. Mit der
+ * Der Weg: Pläne aus den Projekt-Dokumenten wählen — einen je Haus und
+ * Geschoss —, Mängel durch Tippen auf dem jeweiligen Plan verorten, am
+ * Schluss unterschreiben. Mit der
  * Unterschrift entsteht ein PDF-Protokoll, das im Bereich Dokumente des
  * Projekts landet — und ab dann ist die Abnahme zu. Kein Mangel kommt
  * dazu, keiner verschwindet, keiner ändert sich. Das hält nicht diese
@@ -14,6 +15,13 @@
  * gerendert und liegt danach fest im Bucket. Jede Nadel steht als Anteil
  * der Bildbreite und -höhe zwischen 0 und 1 und sitzt damit auf jedem
  * Bildschirm am selben Fleck.
+ *
+ * Daraus folgt auch die Antwort auf die Frage, was bei einer neuen
+ * Planversion passiert: nichts. Die Nadel bezieht sich auf das gerenderte
+ * Bild und nicht auf die Quelldatei in den Dokumenten. Wird dort ein neues
+ * PDF hochgeladen, bleibt dieses Bild, wie es ist — eine Nadel verschiebt
+ * sich nie unbemerkt. Wer einen anderen Stand braucht, legt ihn als
+ * weiteren Plan an; der alte bleibt samt seiner Mängel daneben stehen.
  *
  * Gerendert wird im Browser, mit pdf.js aus vendor/. Der Spec sah dafür
  * einen Server vor; diese App hat aber keinen Build-Schritt und keine
@@ -43,9 +51,11 @@
   let projekt = null;
   let abnahme = null;
   let maengel = [];
-  let plaene = [];          // PDF und Bilder aus den Projekt-Dokumenten
+  let plaene = [];          // die Grundrisse dieser Abnahme (abnahme_plaene)
+  let dokumente = [];       // PDF und Bilder aus den Projekt-Dokumenten
   let firmen = [];          // die Unternehmerliste des Projekts
   let leute = [];
+  let aktiv = null;         // welcher Plan gerade am Bildschirm steht
   let planUrl = null;
   let ansicht = 'plan';     // plan | abschluss
 
@@ -53,13 +63,17 @@
   const firmaVon = id => firmen.find(f => f.id === id)?.name || '';
   const zu = () => !!abnahme?.abgeschlossen_am;
 
+  const planVon = id => plaene.find(p => p.id === id) || null;
+  const aktiverPlan = () => planVon(aktiv) || plaene[0] || null;
+  const maengelAuf = id => maengel.filter(m => m.plan_id === id);
+
   /* --- Laden ---------------------------------------------------------------- */
 
   /* Welche Dateien kommen als Plan in Frage: alles, was in einem Ordner
      dieses Projekts liegt. Die Dokumentenablage nimmt heute nur PDF an,
      Bilder sind trotzdem vorgesehen — ein abfotografierter Plan ist auf
      der Baustelle nichts Ungewöhnliches. */
-  async function ladePlaene() {
+  async function ladeDokumente() {
     const { data: ordner } = await sb.from('ordner')
       .select('id, name').eq('projekt_id', projektId).is('geloescht_am', null);
     const ids = (ordner || []).map(o => o.id);
@@ -71,19 +85,33 @@
       d.typ === 'application/pdf' || String(d.typ || '').startsWith('image/'));
   }
 
+  /* Die Pläne und die Mängel einer Abnahme. Getrennt von ladeAlles(),
+     weil beides nach jeder Änderung wieder frisch gebraucht wird. */
+  async function ladeInhalt() {
+    if (!abnahme) { plaene = []; maengel = []; aktiv = null; return; }
+    const [pl, ma] = await Promise.all([
+      sb.from('abnahme_plaene').select('*').eq('abnahme_id', abnahme.id)
+        .order('reihenfolge').order('erstellt_am'),
+      sb.from('maengel').select('*').eq('abnahme_id', abnahme.id).order('nummer')
+    ]);
+    plaene = pl.data || [];
+    maengel = ma.data || [];
+    if (!plaene.some(p => p.id === aktiv)) aktiv = plaene[0]?.id || null;
+  }
+
   async function ladeAlles() {
     const gewuenscht = P.get('abnahme');
-    const [ma, pj, ab, fi, pl] = await Promise.all([
+    const [ma, pj, ab, fi, dk] = await Promise.all([
       sb.from('mitarbeiter').select('user_id, name').not('user_id', 'is', null).is('geloescht_am', null),
       PJ.projekt(projektId),
       sb.from('abnahmen').select('*').eq('projekt_id', projektId).order('erstellt_am', { ascending: false }),
       PJ.einsaetze(projektId),
-      ladePlaene()
+      ladeDokumente()
     ]);
     leute = ma.data || [];
     projekt = pj;
     firmen = (fi || []).map(e => e.firmen).filter(Boolean);
-    plaene = pl;
+    dokumente = dk;
 
     const alle = ab.data || [];
     abnahme = gewuenscht
@@ -94,12 +122,7 @@
        zweite Abnahme aufzumachen wäre zu viel des Guten. */
     if (!abnahme && !gewuenscht && alle.length) abnahme = alle[0];
 
-    maengel = [];
-    if (abnahme) {
-      const { data } = await sb.from('maengel')
-        .select('*').eq('abnahme_id', abnahme.id).order('nummer');
-      maengel = data || [];
-    }
+    await ladeInhalt();
     return alle;
   }
 
@@ -107,12 +130,36 @@
 
   /* Einmal rendern, dann liegt es. Beim nächsten Öffnen wird nur noch die
      abgelegte Fassung geholt — auch auf jedem anderen Gerät. */
-  async function planBesorgen() {
-    if (!abnahme?.plan_bild_pfad) return null;
-    const { data, error } = await sb.storage.from('abnahme')
-      .createSignedUrl(abnahme.plan_bild_pfad, 3600);
+  async function planBesorgen(pfad) {
+    if (!pfad) return null;
+    const { data, error } = await sb.storage.from('abnahme').createSignedUrl(pfad, 3600);
     if (error || !data?.signedUrl) return null;
     return data.signedUrl;
+  }
+
+  /* Rendert eine Seite zu einem PNG und legt sie als weiteren Plan ab.
+     Die Datei in den Dokumenten bleibt, wo sie ist; massgebend für jede
+     Nadel ist von hier an dieses Bild. */
+  async function planAnlegen(datei, seite, titel) {
+    const blob = await planRendern(datei, seite);
+    const pfad = `${abnahme.id}/plan-${Date.now()}.png`;
+    const { error: hoch } = await sb.storage.from('abnahme')
+      .upload(pfad, blob, { contentType: 'image/png' });
+    if (hoch) throw new Error(hoch.message);
+
+    const { data, error } = await sb.from('abnahme_plaene').insert({
+      abnahme_id: abnahme.id, titel, datei_id: datei.id, seite,
+      bild_pfad: pfad,
+      reihenfolge: plaene.reduce((m, p) => Math.max(m, p.reihenfolge), -1) + 1,
+      erstellt_von: ich
+    }).select().single();
+    if (error) {
+      await sb.storage.from('abnahme').remove([pfad]);
+      throw new Error(error.message);
+    }
+    plaene = [...plaene, data];
+    aktiv = data.id;
+    return data;
   }
 
   async function planRendern(datei, seite) {
@@ -149,28 +196,18 @@
       blob = await new Promise(ok => leinwand.toBlob(ok, 'image/png'));
       if (!blob) throw new Error('Die Seite liess sich nicht in ein Bild umwandeln.');
     }
-
-    const pfad = `${abnahme.id}/plan-${Date.now()}.png`;
-    const { error: hoch } = await sb.storage.from('abnahme')
-      .upload(pfad, blob, { contentType: 'image/png' });
-    if (hoch) throw new Error(hoch.message);
-
-    const { data: neu, error: sichern } = await sb.from('abnahmen')
-      .update({ plan_datei_id: datei.id, plan_seite: seite, plan_bild_pfad: pfad })
-      .eq('id', abnahme.id).select().single();
-    if (sichern) throw new Error(sichern.message);
-    abnahme = neu;
+    return blob;
   }
 
   /* --- Zeichnen: Einrichten --------------------------------------------------- */
 
   function zeichneEinrichten() {
     $('#inhalt').classList.add('einspaltig');
-    if (!plaene.length) {
+    if (!dokumente.length) {
       $('#inhalt').innerHTML = `
         <div class="br-leer">
           Für dieses Projekt liegt noch kein Plan in den Dokumenten.<br>
-          Laden Sie zuerst den Grundriss als PDF hoch, danach lassen sich die Mängel darauf verorten.<br><br>
+          Laden Sie zuerst die Grundrisse als PDF hoch, danach lassen sich die Mängel darauf verorten.<br><br>
           <a class="pj-primaer pressable" style="display:inline-flex;" href="dokumente.html">Zum Bereich Dokumente</a>
         </div>`;
       return;
@@ -180,46 +217,26 @@
       <div class="ba-label">Neue Abnahme</div>
       <div style="background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px;">
         <div class="ba-label" style="margin-top:0;">Bezeichnung</div>
-        <input id="a-titel" type="text" class="fm-eingabe" placeholder="z. B. Erdgeschoss"
+        <input id="a-titel" type="text" class="fm-eingabe" placeholder="z. B. Rohbauabnahme Etappe 1"
                aria-label="Bezeichnung der Abnahme" maxlength="120"
                style="width:100%; height:48px; border-radius:11px; border:1.5px solid var(--border); padding:0 14px; font-size:15px; box-sizing:border-box;">
-        <div class="ba-label">Grundriss</div>
-        <div id="a-plaene" style="display:flex; flex-direction:column; gap:8px;"></div>
-        <div id="a-seite" hidden style="margin-top:14px;">
-          <div class="ba-label" style="margin-top:0;">Seite im PDF</div>
-          <input id="a-seite-nr" type="number" min="1" value="1" aria-label="Seitenzahl"
-                 style="width:110px; height:44px; border-radius:10px; border:1.5px solid var(--border); padding:0 12px; font-size:15px; box-sizing:border-box;">
-        </div>
+        ${planWahlMarkup('Erster Grundriss')}
         <div id="a-fehler" hidden style="font-size:12.5px; color:var(--red); font-weight:600; margin-top:14px;"></div>
         <button type="button" id="a-los" class="pj-primaer pressable" style="width:100%; height:50px; margin-top:18px; justify-content:center;">Abnahme beginnen</button>
-      </div>`;
+      </div>
+      <div class="ba-hinweis">Weitere Pläne — ein Haus, ein Geschoss — kommen danach mit einem Tipp dazu.</div>`;
 
-    let gewaehlt = null;
-    const zeichnePlaene = () => {
-      $('#a-plaene').innerHTML = plaene.map(d => `
-        <button type="button" class="pressable" data-plan="${esc(d.id)}"
-                style="display:flex; align-items:center; gap:10px; width:100%; padding:11px 12px; border-radius:10px; text-align:left;
-                       border:1.5px solid ${d.id === gewaehlt ? 'var(--navy)' : 'var(--border)'};
-                       background:${d.id === gewaehlt ? 'var(--bg)' : 'var(--card)'};">
-          <span style="color:var(--navy); display:flex;">${svg(IKON.datei, 17)}</span>
-          <span style="flex:1; min-width:0; font-weight:600; font-size:13.5px; overflow-wrap:anywhere;">${esc(d.name)}</span>
-        </button>`).join('');
-      $$('#a-plaene [data-plan]').forEach(el => el.addEventListener('click', () => {
-        gewaehlt = el.dataset.plan;
-        const d = plaene.find(x => x.id === gewaehlt);
-        $('#a-seite').hidden = String(d?.typ) !== 'application/pdf';
-        zeichnePlaene();
-      }));
-    };
-    zeichnePlaene();
+    const wahl = planWahlBinden();
 
     $('#a-los').addEventListener('click', async () => {
       const fehler = $('#a-fehler');
       fehler.hidden = true;
       const zeigeFehler = t => { fehler.textContent = t; fehler.hidden = false; };
       const titel = $('#a-titel').value.trim();
-      if (!titel) return zeigeFehler('Die Abnahme braucht eine Bezeichnung, etwa das Geschoss.');
-      if (!gewaehlt) return zeigeFehler('Bitte den Grundriss auswählen.');
+      const w = wahl.lesen();
+      if (!titel) return zeigeFehler('Die Abnahme braucht eine Bezeichnung.');
+      if (!w.datei) return zeigeFehler('Bitte den Grundriss auswählen.');
+      if (!w.titel) return zeigeFehler('Bitte dem Plan einen Namen geben, etwa «Haus Magnolia, 1. OG».');
       if (!istOnline()) return zeigeFehler('Dafür braucht es eine Verbindung.');
 
       const knopf = $('#a-los');
@@ -231,8 +248,8 @@
         if (error) throw error;
         abnahme = data;
         maengel = [];
-        await planRendern(plaene.find(d => d.id === gewaehlt),
-                          Number($('#a-seite-nr').value) || 1);
+        plaene = [];
+        await planAnlegen(w.datei, w.seite, w.titel);
         await zeichne();
       } catch (e) {
         knopf.disabled = false;
@@ -242,10 +259,133 @@
     });
   }
 
+  /* Die Auswahl eines Grundrisses. Zweimal gebraucht: beim Anlegen der
+     Abnahme und später bei jedem weiteren Plan. Deshalb einmal als
+     Markup und einmal als Bindung, statt zweimal derselbe Block. */
+  function planWahlMarkup(ueberschrift) {
+    return `
+      <div class="ba-label">${esc(ueberschrift)}</div>
+      <input id="a-plantitel" type="text" class="fm-eingabe" placeholder="z. B. Haus Magnolia, 1. OG"
+             aria-label="Bezeichnung des Plans" maxlength="120"
+             style="width:100%; height:48px; border-radius:11px; border:1.5px solid var(--border); padding:0 14px; font-size:15px; box-sizing:border-box; margin-bottom:12px;">
+      <div id="a-dokumente" style="display:flex; flex-direction:column; gap:8px; max-height:34dvh; overflow-y:auto;"></div>
+      <div id="a-seite" hidden style="margin-top:14px;">
+        <div class="ba-label" style="margin-top:0;">Seite im PDF</div>
+        <input id="a-seite-nr" type="number" min="1" value="1" aria-label="Seitenzahl"
+               style="width:110px; height:44px; border-radius:10px; border:1.5px solid var(--border); padding:0 12px; font-size:15px; box-sizing:border-box;">
+      </div>`;
+  }
+
+  function planWahlBinden(wurzel = document) {
+    let gewaehlt = null;
+    const zeichneDokumente = () => {
+      $('#a-dokumente', wurzel).innerHTML = dokumente.map(d => `
+        <button type="button" class="pressable" data-dok="${esc(d.id)}"
+                style="display:flex; align-items:center; gap:10px; width:100%; padding:11px 12px; border-radius:10px; text-align:left;
+                       border:1.5px solid ${d.id === gewaehlt ? 'var(--navy)' : 'var(--border)'};
+                       background:${d.id === gewaehlt ? 'var(--bg)' : 'var(--card)'};">
+          <span style="color:var(--navy); display:flex;">${svg(IKON.datei, 17)}</span>
+          <span style="flex:1; min-width:0; font-weight:600; font-size:13.5px; overflow-wrap:anywhere;">${esc(d.name)}</span>
+        </button>`).join('');
+      $$('#a-dokumente [data-dok]', wurzel).forEach(el => el.addEventListener('click', () => {
+        gewaehlt = el.dataset.dok;
+        const d = dokumente.find(x => x.id === gewaehlt);
+        $('#a-seite', wurzel).hidden = String(d?.typ) !== 'application/pdf';
+        /* Der Dateiname ist meist schon der halbe Plantitel. Wer nichts
+           eingetippt hat, bekommt ihn vorgeschlagen und ändert ihn. */
+        const feld = $('#a-plantitel', wurzel);
+        if (!feld.value.trim()) feld.value = String(d?.name || '').replace(/\.[a-z0-9]+$/i, '').slice(0, 120);
+        zeichneDokumente();
+      }));
+    };
+    zeichneDokumente();
+
+    return {
+      lesen: () => ({
+        datei: dokumente.find(d => d.id === gewaehlt) || null,
+        seite: Number($('#a-seite-nr', wurzel).value) || 1,
+        titel: $('#a-plantitel', wurzel).value.trim()
+      })
+    };
+  }
+
+  /* Ein weiterer Plan zur laufenden Abnahme. Bestehende Nadeln bleiben
+     unberührt: sie hängen an ihrem eigenen Plan und wissen nichts von
+     diesem hier. */
+  function planHinzufuegen() {
+    if (!dokumente.length) {
+      return toast('In den Dokumenten dieses Projekts liegt kein Plan', true);
+    }
+    const s = sheet(`
+      <div style="font-size:18px; font-weight:800; color:var(--navy); margin-bottom:6px;">Plan hinzufügen</div>
+      <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:8px;">
+        Die schon gesetzten Nadeln bleiben, wo sie sind — jede gehört zu ihrem eigenen Plan.
+      </div>
+      ${planWahlMarkup('Grundriss')}
+      <div id="p-fehler" hidden style="font-size:12.5px; color:var(--red); font-weight:600; margin-top:14px;"></div>
+      <button type="button" id="p-ja" class="btn-primary pressable" style="width:100%; height:50px; border:none; border-radius:13px; background:var(--red); color:#fff; font-weight:700; font-size:15px; margin-top:18px;">Plan hinzufügen</button>
+    `);
+    s.el.style.maxHeight = '90dvh';
+    s.el.style.overflowY = 'auto';
+
+    const wahl = planWahlBinden(s.el);
+    const fehler = $('#p-fehler', s.el);
+    const zeigeFehler = t => { fehler.textContent = t; fehler.hidden = false; };
+
+    $('#p-ja', s.el).addEventListener('click', async () => {
+      fehler.hidden = true;
+      const w = wahl.lesen();
+      if (!w.datei) return zeigeFehler('Bitte den Grundriss auswählen.');
+      if (!w.titel) return zeigeFehler('Bitte dem Plan einen Namen geben, etwa «Haus Magnolia, 1. OG».');
+      if (!istOnline()) return zeigeFehler('Dafür braucht es eine Verbindung.');
+
+      const knopf = $('#p-ja', s.el);
+      knopf.disabled = true;
+      knopf.innerHTML = '<span class="spin"></span>';
+      try {
+        await planAnlegen(w.datei, w.seite, w.titel);
+        s.schliessen();
+        await zeichne();
+        toast('Plan hinzugefügt');
+      } catch (e) {
+        knopf.disabled = false;
+        knopf.textContent = 'Plan hinzufügen';
+        zeigeFehler(e.message || 'Das hat nicht geklappt.');
+      }
+    });
+  }
+
+  /* Ein Plan geht nur weg, solange keine Nadel darauf steckt. Das sagt
+     auch die Datenbank; hier wird es nur vorher erklärt. */
+  async function planLoeschen(p) {
+    if (!p) return;
+    const darauf = maengelAuf(p.id).length;
+    if (darauf) {
+      return toast(`Auf «${p.titel}» stecken ${darauf} ${darauf === 1 ? 'Mangel' : 'Mängel'}`, true);
+    }
+    const ja = await frage({
+      titel: 'Plan entfernen?',
+      text: `„${p.titel}" verschwindet aus dieser Abnahme. Die Datei im Bereich Dokumente bleibt unberührt.`,
+      knopf: 'Entfernen'
+    });
+    if (!ja) return;
+    if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
+
+    const { error } = await sb.from('abnahme_plaene').delete().eq('id', p.id);
+    if (error) return toast(error.message, true);
+    await sb.storage.from('abnahme').remove([p.bild_pfad]);
+    plaene = plaene.filter(x => x.id !== p.id);
+    if (aktiv === p.id) aktiv = plaene[0]?.id || null;
+    await zeichne();
+    toast('Plan entfernt');
+  }
+
   /* --- Zeichnen: Plan und Mängel ---------------------------------------------- */
 
-  function nadeln() {
-    return maengel.map(m => `
+  /* Nur die Nadeln des gezeigten Plans. Eine Nadel von «Haus Magnolia,
+     1. OG» hat auf dem Grundriss des Dachgeschosses nichts verloren. */
+  function nadeln(planId) {
+    return maengelAuf(planId).map(m => `
       <button type="button" class="ba-nadel${m.erledigt_am ? ' erledigt' : ''}"
               style="left:${(m.x * 100).toFixed(3)}%; top:${(m.y * 100).toFixed(3)}%;"
               data-nadel="${esc(m.id)}" aria-label="Mangel ${m.nummer}: ${esc(m.beschrieb)}">
@@ -253,8 +393,33 @@
       </button>`).join('');
   }
 
+  /* Die Planleiste. Bei einem einzigen Plan wäre sie nur im Weg, deshalb
+     erscheint sie erst ab dem zweiten — der Knopf zum Hinzufügen steht
+     davon unabhängig da. */
+  function planLeiste() {
+    if (!plaene.length) return '';
+    const chips = plaene.map(p => {
+      const offen = maengelAuf(p.id).filter(m => !m.erledigt_am).length;
+      return `
+        <button type="button" class="ba-planchip pressable${p.id === aktiv ? ' an' : ''}"
+                data-plan="${esc(p.id)}" aria-pressed="${p.id === aktiv}">
+          <span class="name">${esc(p.titel)}</span>
+          ${offen ? `<span class="zahl">${offen}</span>` : ''}
+        </button>`;
+    }).join('');
+    return `
+      <div class="ba-planleiste">
+        ${plaene.length > 1 ? chips : ''}
+        ${zu() ? '' : `<button type="button" id="p-neu" class="ba-planchip neu pressable">${svg(IKON.plus, 14)}<span class="name">Plan</span></button>`}
+        ${zu() || plaene.length < 2 ? '' : `<button type="button" id="p-weg" class="ba-planchip weg pressable" aria-label="Diesen Plan entfernen">${svg(IKON.weg, 14)}</button>`}
+      </div>`;
+  }
+
   function mangelZeile(m) {
-    const teile = [firmaVon(m.firma_id), m.frist ? `Frist ${fmtDatum(m.frist)}` : '']
+    /* Bei mehreren Plänen gehört in die Zeile, wo der Mangel steckt —
+       sonst steht in der Liste zehnmal «Türzarge verkratzt» ohne Haus. */
+    const teile = [plaene.length > 1 ? planVon(m.plan_id)?.titel : '',
+                   firmaVon(m.firma_id), m.frist ? `Frist ${fmtDatum(m.frist)}` : '']
       .filter(Boolean).join(' · ');
     return `
       <div class="ba-mangel" data-mangel="${esc(m.id)}" data-erledigt="${m.erledigt_am ? 1 : 0}">
@@ -274,12 +439,14 @@
 
   async function zeichnePlan() {
     const offen = maengel.filter(m => !m.erledigt_am).length;
+    const p = aktiverPlan();
     $('#inhalt').classList.remove('einspaltig');
     $('#inhalt').innerHTML = `
       <div>
-        <div class="ba-label">Grundriss ${esc(abnahme.titel)} — Mängel verortet</div>
+        <div class="ba-label">${p ? esc(p.titel) : 'Grundriss'} — Mängel verortet</div>
+        ${planLeiste()}
         <div id="plan" class="ba-plan${zu() ? '' : ' setzen'}">
-          <div class="laden">Der Plan wird geladen…</div>
+          <div class="laden">${p ? 'Der Plan wird geladen…' : 'Für diese Abnahme liegt kein Plan bereit.'}</div>
         </div>
         ${zu()
           ? `<div class="ba-fertig" style="margin-top:12px;">${svg(IKON.haken, 17)}<span>Abgeschlossen am ${esc(fmtDatum(abnahme.abgeschlossen_am))}, unterschrieben von ${esc(abnahme.gast_name || '')}. Diese Abnahme lässt sich nicht mehr ändern.</span></div>`
@@ -289,19 +456,31 @@
       <div class="ba-spalte-liste">
         <div class="ba-kopfzeile">
           <h2>Mängel${maengel.length ? ` — ${offen} offen` : ''}</h2>
-          ${zu() ? '' : `<button type="button" id="m-neu" class="pj-umriss pressable">${svg(IKON.plus, 15)}<span>Mangel</span></button>`}
+          ${zu() || !p ? '' : `<button type="button" id="m-neu" class="pj-umriss pressable">${svg(IKON.plus, 15)}<span>Mangel</span></button>`}
         </div>
         ${maengel.length ? maengel.map(mangelZeile).join('')
           : '<div class="pj-leer">Noch kein Mangel erfasst.</div>'}
       </div>`;
 
-    planUrl = await planBesorgen();
+    /* Die Planleiste hängt nicht am Bild: sie soll auch dann bedienbar
+       sein, wenn der Grundriss gerade nicht lädt. */
+    $$('#inhalt [data-plan]').forEach(el => el.addEventListener('click', async () => {
+      if (el.dataset.plan === aktiv) return;
+      aktiv = el.dataset.plan;
+      await zeichnePlan();
+    }));
+    $('#p-neu')?.addEventListener('click', planHinzufuegen);
+    $('#p-weg')?.addEventListener('click', () => planLoeschen(aktiverPlan()));
+
     const plan = $('#plan');
+    planUrl = p ? await planBesorgen(p.bild_pfad) : null;
     if (!planUrl) {
-      plan.innerHTML = '<div class="laden">Der Plan lässt sich gerade nicht laden.</div>';
+      if (p) plan.innerHTML = '<div class="laden">Der Plan lässt sich gerade nicht laden.</div>';
+      bindeMaengel();
+      await fotosNachladen();
       return;
     }
-    plan.innerHTML = `<img src="${esc(planUrl)}" alt="Grundriss ${esc(abnahme.titel)}">${nadeln()}`;
+    plan.innerHTML = `<img src="${esc(planUrl)}" alt="Grundriss ${esc(p.titel)}">${nadeln(p.id)}`;
 
     if (!zu()) {
       plan.addEventListener('click', e => {
@@ -312,20 +491,35 @@
         const x = (e.clientX - b.left) / b.width;
         const y = (e.clientY - b.top) / b.height;
         if (x < 0 || x > 1 || y < 0 || y > 1) return;
-        mangelFormular(null, { x, y });
+        mangelFormular(null, { x, y, plan_id: p.id });
       });
-      $('#m-neu')?.addEventListener('click', () => mangelFormular(null, { x: 0.5, y: 0.5 }));
+      $('#m-neu')?.addEventListener('click', () => mangelFormular(null, { x: 0.5, y: 0.5, plan_id: p.id }));
     }
 
+    bindeMaengel();
+    await fotosNachladen();
+  }
+
+  /* Nadeln und Mängelzeilen zeigen auf dieselben Mängel, deshalb hier
+     beides beisammen. Ein Tipp auf eine Zeile führt nebenbei zum
+     passenden Plan: sonst klickt man auf einen Mangel von Haus C und
+     sieht weiter den Grundriss von Haus A. */
+  function bindeMaengel() {
     $$('[data-nadel]').forEach(el => el.addEventListener('click', () => {
       const m = maengel.find(x => x.id === el.dataset.nadel);
       if (m) mangelZeigen(m);
+    }));
+    $$('[data-mangel]').forEach(el => el.addEventListener('click', async e => {
+      if (e.target.closest('.tasten')) return;
+      const m = maengel.find(x => x.id === el.dataset.mangel);
+      if (!m) return;
+      if (m.plan_id !== aktiv) { aktiv = m.plan_id; await zeichnePlan(); }
+      mangelZeigen(m);
     }));
     $$('[data-haken]').forEach(el => el.addEventListener('click',
       () => hakenSetzen(maengel.find(x => x.id === el.dataset.haken))));
     $$('[data-mweg]').forEach(el => el.addEventListener('click',
       () => mangelLoeschen(maengel.find(x => x.id === el.dataset.mweg))));
-    await fotosNachladen();
   }
 
   async function fotosNachladen() {
@@ -338,7 +532,8 @@
   /* --- Ein Mangel ------------------------------------------------------------- */
 
   function mangelZeigen(m) {
-    const teile = [firmaVon(m.firma_id), m.frist ? `Frist ${fmtDatum(m.frist)}` : '',
+    const teile = [planVon(m.plan_id)?.titel, firmaVon(m.firma_id),
+                   m.frist ? `Frist ${fmtDatum(m.frist)}` : '',
                    m.erledigt_am ? 'erledigt' : 'offen'].filter(Boolean).join(' · ');
     const s = sheet(`
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
@@ -365,9 +560,16 @@
   function mangelFormular(vorhanden, stelle) {
     let foto = null;
     let vorschau = null;
+    /* Der Plan steht schon fest, bevor das Blatt aufgeht: die Nadel
+       sitzt auf dem, der gerade gezeigt wird. Hier steht er nur noch
+       im Klartext, damit niemand am falschen Haus markiert. */
+    const aufPlan = plaene.length > 1
+      ? planVon(vorhanden ? vorhanden.plan_id : stelle?.plan_id)
+      : null;
 
     const s = sheet(`
-      <div style="font-size:18px; font-weight:800; color:var(--navy); margin-bottom:16px;">${vorhanden ? `Mangel ${vorhanden.nummer} bearbeiten` : 'Mangel erfassen'}</div>
+      <div style="font-size:18px; font-weight:800; color:var(--navy); margin-bottom:${aufPlan ? '4px' : '16px'};">${vorhanden ? `Mangel ${vorhanden.nummer} bearbeiten` : 'Mangel erfassen'}</div>
+      ${aufPlan ? `<div style="font-size:12.5px; color:var(--text-dim); margin-bottom:16px;">auf ${esc(aufPlan.titel)}</div>` : ''}
 
       <div class="ba-label" style="margin-top:0;">Was ist der Mangel?</div>
       <textarea id="mf-text" placeholder="z. B. Türzarge Wohnung 1.02 verkratzt" aria-label="Beschrieb" maxlength="500"
@@ -453,7 +655,7 @@
              passen. */
           const nummer = maengel.reduce((m, x) => Math.max(m, x.nummer), 0) + 1;
           const { data, error } = await sb.from('maengel').insert({
-            abnahme_id: abnahme.id, nummer,
+            abnahme_id: abnahme.id, nummer, plan_id: stelle.plan_id,
             x: Number(stelle.x.toFixed(4)), y: Number(stelle.y.toFixed(4)),
             ...felder, erstellt_von: ich
           }).select().single();
@@ -653,7 +855,12 @@
   }
 
   async function protokollAblegen({ triga, gast, gastName, jetzt }) {
-    const planBild = await alsDatenUrl('abnahme', abnahme.plan_bild_pfad);
+    /* Jeder Plan kommt ins Protokoll, mit den Nadeln, die auf ihm
+       stecken. Ein Plan, der sich gerade nicht laden lässt, darf den
+       Abschluss nicht aufhalten — dann steht er ohne Bild da. */
+    const fuerPdf = await Promise.all(plaene.map(async p => ({
+      id: p.id, titel: p.titel, bild: await alsDatenUrl('abnahme', p.bild_pfad)
+    })));
     const fotos = {};
     await Promise.all(maengel.filter(m => m.foto_pfad).map(async m => {
       fotos[m.id] = await alsDatenUrl('abnahme', m.foto_pfad);
@@ -661,8 +868,10 @@
 
     const blob = await abnahmeProtokoll({
       projekt, abnahme,
-      maengel: maengel.map(m => ({ ...m, firma_name: firmaVon(m.firma_id) })),
-      planBild, fotos,
+      maengel: maengel.map(m => ({
+        ...m, firma_name: firmaVon(m.firma_id), plan_titel: planVon(m.plan_id)?.titel || ''
+      })),
+      plaene: fuerPdf, fotos,
       anwesend: nameVon(ich),
       gastName,
       unterschriftTriga: triga.bild,
@@ -714,7 +923,10 @@
     zeichneKopf();
     if (!abnahme) return zeichneEinrichten();
     if (ansicht === 'abschluss') return zeichneAbschluss();
-    if (!abnahme.plan_bild_pfad) return zeichneEinrichten();
+    /* Eine Abnahme ohne einen einzigen Plan kann es eigentlich nicht
+       geben — der erste entsteht beim Anlegen. Bleibt trotzdem einer
+       übrig, führt der Weg zurück ans Einrichten. */
+    if (!plaene.length) return zeichneEinrichten();
     return zeichnePlan();
   }
 

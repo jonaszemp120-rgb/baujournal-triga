@@ -46,7 +46,7 @@
 
   let ich = null;              // auth.users.id
   let leute = [];              // alle Mitarbeitenden mit Konto
-  let chats = [];              // { id, art, name, erstellt_von, mitglieder[], letzte, ungelesen, zuletzt_gelesen }
+  let chats = [];              // { id, art, name, erstellt_von, mitglieder[], admins[], letzte, ungelesen, zuletzt_gelesen }
   let offen = null;            // der gerade gezeigte Chat
   let nachrichten = [];
   let kanal = null;            // Echtzeit für das offene Gespräch
@@ -83,7 +83,7 @@
 
     const [{ data: koepfe }, { data: alleMitglieder }, { data: letzte }] = await Promise.all([
       sb.from('chats').select('id, art, name, erstellt_von, erstellt_am').in('id', ids),
-      sb.from('chat_mitglieder').select('chat_id, user_id').in('chat_id', ids),
+      sb.from('chat_mitglieder').select('chat_id, user_id, admin').in('chat_id', ids),
       sb.from('nachrichten')
         .select('id, chat_id, absender, text, bild_pfad, bild_ablauf, erstellt_am, geloescht_am')
         .in('chat_id', ids).order('erstellt_am', { ascending: false }).limit(500)
@@ -92,11 +92,13 @@
     const gelesen = Object.fromEntries((meine || []).map(m => [m.chat_id, m.zuletzt_gelesen]));
 
     return (koepfe || []).map(c => {
-      const mit = (alleMitglieder || []).filter(m => m.chat_id === c.id).map(m => m.user_id);
+      const zeilen = (alleMitglieder || []).filter(m => m.chat_id === c.id);
+      const mit = zeilen.map(m => m.user_id);
       const eigene = (letzte || []).filter(n => n.chat_id === c.id);
       return {
         ...c,
         mitglieder: mit,
+        admins: zeilen.filter(m => m.admin).map(m => m.user_id),
         zuletzt_gelesen: gelesen[c.id],
         letzte: eigene[0] || null,
         ungelesen: eigene.filter(n =>
@@ -428,6 +430,21 @@
         async nutzlast => {
           const m = nutzlast.new;
           if (!m?.user_id) return;
+
+          /* Dieselbe Zeile traegt den Lesestand und das Admin-Haekchen.
+             Ernennt jemand einen Admin, kommt es hier herein — sonst
+             stuende im offenen Fenster der alte Stand. */
+          const c = chats.find(x => x.id === m.chat_id);
+          if (c) {
+            const hatte = (c.admins || []).includes(m.user_id);
+            if (hatte !== !!m.admin) {
+              c.admins = m.admin
+                ? [...(c.admins || []), m.user_id]
+                : (c.admins || []).filter(u => u !== m.user_id);
+              if (offen?.id === c.id) zeichneKopf();
+            }
+          }
+
           if (lesestand[m.user_id] === m.zuletzt_gelesen) return;
           lesestand[m.user_id] = m.zuletzt_gelesen;
           if (m.user_id !== ich) await zeichneVerlauf();
@@ -476,6 +493,7 @@
     if (alt.user_id && alt.user_id !== ich) {
       // Nur eine Person hat die Gruppe verlassen oder wurde entfernt.
       c.mitglieder = c.mitglieder.filter(u => u !== alt.user_id);
+      c.admins = (c.admins || []).filter(u => u !== alt.user_id);
       if (offen?.id === c.id) { zeichneKopf(); zeichneVerlauf(); }
       return;
     }
@@ -678,59 +696,91 @@
     el.hidden = false;
   }
 
-  /* Mitglieder pflegen darf, wer die Gruppe angelegt hat. Alle anderen
-     sehen dieselbe Liste, aber nur zum Lesen — so steht es auch in der
-     Policy, hier wird es nur sichtbar gemacht.
+  /* In einer Gruppe hängt alles am Admin: Mitglieder pflegen, weitere
+     Admins ernennen, die Gruppe für alle löschen. Wer die Gruppe anlegt,
+     ist es; die Rolle lässt sich weitergeben.
 
-     Löschen darf dagegen jedes Mitglied, in der Gruppe wie im Einzelchat.
-     Wer mitredet, darf auch beenden; eine Rangordnung dafür hiesse, dass
-     ein Gespräch am einen Ende verschwindet und am anderen stehen bleibt. */
+     Der Grund dafür ist der Unterschied zwischen zwei und acht Leuten. Im
+     Einzelchat darf weiterhin jedes der beiden Mitglieder beenden — wer
+     mitredet, darf auch Schluss machen. In einer Gruppe löschte sonst eine
+     Person den Verlauf von sieben anderen mit.
+
+     Alle anderen können gehen, ohne die Gruppe mitzunehmen. Was hier
+     angeboten wird, steht genauso in den Policies; sichtbar gemacht wird
+     es nur, damit niemand auf einen Knopf drückt, der ohnehin nichts
+     bewirkt. */
   function gespraechMenue() {
     if (!offen) return;
     const gruppe = offen.art === 'gruppe';
-    const meine = offen.erstellt_von === ich;
+    const admins = new Set(offen.admins || []);
+    const binAdmin = gruppe && admins.has(ich);
     const drin = new Set(offen.mitglieder);
     const andere = leute.filter(l => l.user_id !== ich);
 
     const erklaerung = !gruppe
       ? `Einzelgespräch mit ${esc(chatName(offen))}.`
-      : (meine ? 'Sie haben diese Gruppe erstellt und können Mitglieder hinzufügen oder entfernen.'
-               : `Angelegt von ${esc(nameVon(offen.erstellt_von))}. Mitglieder pflegt, wer die Gruppe erstellt hat.`);
+      : (binAdmin
+          ? 'Sie sind Admin dieser Gruppe: Mitglieder pflegen, weitere Admins ernennen und die Gruppe für alle löschen.'
+          : `Admin ${admins.size === 1 ? 'ist' : 'sind'} ${esc([...admins].map(u => nameVon(u)).join(', ') || nameVon(offen.erstellt_von))}. Sie können die Gruppe verlassen; gelöscht wird sie nur von einem Admin.`);
+
+    const zeile = l => {
+      const mit = drin.has(l.user_id);
+      const istAdmin = admins.has(l.user_id);
+      return `
+        <div class="ch-mitzeile">
+          <button type="button" class="zeile pressable" data-mit="${esc(l.user_id)}"
+                  role="checkbox" aria-checked="${mit}" ${binAdmin ? '' : 'disabled'}>
+            <span class="kasten">${svg(IKON.haken, 14)}</span>
+            <span class="kreis">${esc(initialen(l.name))}</span>
+            <span class="wer">${esc(l.name)}</span>
+          </button>
+          ${mit && istAdmin && !binAdmin ? '<span class="ch-admin">Admin</span>' : ''}
+          ${mit && binAdmin
+            ? `<button type="button" class="ch-admin pressable${istAdmin ? ' an' : ''}" data-admin="${esc(l.user_id)}"
+                       aria-pressed="${istAdmin}" title="${istAdmin ? 'Admin-Recht wegnehmen' : 'Zum Admin machen'}">Admin</button>`
+            : ''}
+        </div>`;
+    };
 
     const s = sheet(`
       <div style="font-size:16px; font-weight:800; color:var(--navy); margin-bottom:4px;">${esc(chatName(offen))}</div>
       <div style="font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:16px;">${erklaerung}</div>
       ${gruppe ? `
-      <div class="ch-wahl" style="max-height:46dvh; overflow-y:auto;">
-        <div class="zeile" aria-checked="true" style="cursor:default;">
-          <span class="kasten">${svg(IKON.haken, 14)}</span>
-          <span class="kreis">${esc(initialen(nameVon(ich)))}</span>
-          <span style="flex:1;">${esc(nameVon(ich))} (Sie)</span>
-        </div>
-        ${andere.map(l => `
-          <button type="button" class="zeile pressable" data-mit="${esc(l.user_id)}"
-                  role="checkbox" aria-checked="${drin.has(l.user_id)}" ${meine ? '' : 'disabled'}>
+      <div class="ch-wahl" style="max-height:44dvh; overflow-y:auto;">
+        <div class="ch-mitzeile">
+          <div class="zeile" aria-checked="true" style="cursor:default;">
             <span class="kasten">${svg(IKON.haken, 14)}</span>
-            <span class="kreis">${esc(initialen(l.name))}</span>
-            <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(l.name)}</span>
-          </button>`).join('')}
-      </div>` : ''}
-      <button type="button" id="g-weg" class="pressable" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:50px; border-radius:13px; background:var(--card); border:1.5px solid var(--red); color:var(--red); font-weight:700; font-size:14.5px; margin-top:16px;">
+            <span class="kreis">${esc(initialen(nameVon(ich)))}</span>
+            <span class="wer">${esc(nameVon(ich))} (Sie)</span>
+          </div>
+          ${binAdmin ? '<span class="ch-admin an">Admin</span>' : ''}
+        </div>
+        ${andere.map(zeile).join('')}
+      </div>
+      <button type="button" id="g-raus" class="pressable" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:48px; border-radius:13px; background:var(--card); border:1.5px solid var(--border); color:var(--navy); font-weight:700; font-size:14.5px; margin-top:16px;">
+        Gruppe verlassen
+      </button>` : ''}
+      ${(!gruppe || binAdmin) ? `
+      <button type="button" id="g-weg" class="pressable" style="display:flex; align-items:center; justify-content:center; gap:9px; width:100%; height:50px; border-radius:13px; background:var(--card); border:1.5px solid var(--red); color:var(--red); font-weight:700; font-size:14.5px; margin-top:12px;">
         ${svg(IKON.eimer, 16)} Gespräch löschen
       </button>
       <div style="font-size:12px; color:var(--text-dim); line-height:1.5; margin-top:8px;">
         Löscht das Gespräch mit allen Nachrichten und Bildern — auch bei den anderen Beteiligten.
-      </div>
+      </div>` : ''}
     `);
     s.el.style.maxHeight = '86dvh';
     s.el.style.overflowY = 'auto';
 
-    $('#g-weg', s.el).addEventListener('click', async () => {
+    $('#g-weg', s.el)?.addEventListener('click', async () => {
       s.schliessen();
       await gespraechLoeschen();
     });
+    $('#g-raus', s.el)?.addEventListener('click', async () => {
+      s.schliessen();
+      await gruppeVerlassen();
+    });
 
-    if (!gruppe || !meine) return;
+    if (!binAdmin) return;
 
     $$('[data-mit]', s.el).forEach(el => el.addEventListener('click', async () => {
       const u = el.dataset.mit;
@@ -742,6 +792,7 @@
             .delete().eq('chat_id', offen.id).eq('user_id', u);
           if (error) throw error;
           offen.mitglieder = offen.mitglieder.filter(x => x !== u);
+          offen.admins = (offen.admins || []).filter(x => x !== u);
           toast(`${nameVon(u).split(' ')[0]} entfernt`);
         } else {
           const { error } = await sb.from('chat_mitglieder')
@@ -750,13 +801,58 @@
           offen.mitglieder.push(u);
           toast(`${nameVon(u).split(' ')[0]} hinzugefügt`);
         }
+        s.schliessen();
         zeichneKopf();
         zeichneListe();
+        gespraechMenue();
       } catch (e) {
         el.setAttribute('aria-checked', String(war));
         toast(e.message, true);
       }
     }));
+
+    /* Das Admin-Recht setzt und nimmt die Datenbank, nicht diese Zeile:
+       der Trigger chat_mitglied_schutz() lässt es nur von einem Admin und
+       nur an einer fremden Zeile zu, und chat_admin_bleibt() verhindert,
+       dass die Gruppe ohne Admin dasteht. */
+    $$('[data-admin]', s.el).forEach(el => el.addEventListener('click', async () => {
+      const u = el.dataset.admin;
+      const war = el.getAttribute('aria-pressed') === 'true';
+      const { error } = await sb.from('chat_mitglieder')
+        .update({ admin: !war }).eq('chat_id', offen.id).eq('user_id', u);
+      if (error) return toast(error.message, true);
+
+      offen.admins = war
+        ? (offen.admins || []).filter(x => x !== u)
+        : [...(offen.admins || []), u];
+      s.schliessen();
+      gespraechMenue();
+      toast(war ? `${nameVon(u).split(' ')[0]} ist nicht mehr Admin` : `${nameVon(u).split(' ')[0]} ist jetzt Admin`);
+    }));
+  }
+
+  /* Austreten ist nicht Löschen: die Gruppe läuft für die übrigen weiter,
+     nur die eigene Mitgliedszeile geht weg. Der letzte Admin kommt hier
+     nicht durch — die Datenbank lässt ihn erst gehen, wenn jemand anderes
+     die Gruppe führt. */
+  async function gruppeVerlassen() {
+    if (!offen || offen.art !== 'gruppe') return;
+    const c = offen;
+    const ja = await frage({
+      titel: 'Gruppe verlassen?',
+      text: `„${chatName(c)}“ läuft ohne Sie weiter. Sie sehen den Verlauf danach nicht mehr und bekommen keine neuen Nachrichten. Wieder hinein kommen Sie nur, wenn ein Admin Sie hinzufügt.`,
+      knopf: 'Verlassen'
+    });
+    if (!ja) return;
+    if (!istOnline()) return toast('Dafür braucht es eine Verbindung', true);
+
+    const { error } = await sb.from('chat_mitglieder')
+      .delete().eq('chat_id', c.id).eq('user_id', ich);
+    if (error) return toast(error.message, true);
+
+    chats = chats.filter(x => x.id !== c.id);
+    zeigeListe();
+    toast('Gruppe verlassen');
   }
 
   /* --- Löschen -------------------------------------------------------------------- */

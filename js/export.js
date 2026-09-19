@@ -299,8 +299,12 @@ async function exportWord(eintraege, projekt) {
    Der Plan bekommt die Nadeln nicht als Bild mitgeliefert, sondern sie
    werden hier auf eine Leinwand darübergezeichnet. So steht im Protokoll
    dasselbe Bild wie am Schirm, samt Nummern — und ohne dass irgendwo eine
-   zweite Fassung des Plans abgelegt werden müsste. */
-async function abnahmeProtokoll({ projekt, abnahme, maengel, planBild, fotos,
+   zweite Fassung des Plans abgelegt werden müsste.
+
+   plaene ist eine Liste: [{ id, titel, bild }]. Eine Abnahme kann fünf
+   Häuser mit je drei Geschossen umfassen, und dann steht jeder Grundriss
+   mit seinen eigenen Nadeln im Protokoll. */
+async function abnahmeProtokoll({ projekt, abnahme, maengel, plaene = [], fotos,
                                   anwesend, gastName, unterschriftTriga,
                                   unterschriftGast, wann }) {
   await ladeSkript('vendor/jspdf-2.5.2.umd.min.js');
@@ -377,15 +381,17 @@ async function abnahmeProtokoll({ projekt, abnahme, maengel, planBild, fotos,
   absatz(`${maengel.length} ${maengel.length === 1 ? 'Mangel' : 'Maengel'} erfasst, davon ${maengel.filter(m => m.erledigt_am).length} bereits erledigt.`);
   y += 3;
 
-  /* Der Plan mit den Nadeln. Passt er nicht mehr auf die Seite, kommt er
-     auf die naechste — lieber eine halbleere Seite als ein Plan, der auf
-     Briefmarkengroesse geschrumpft ist. */
-  if (planBild) {
-    const mitNadeln = await planMitNadeln(planBild, maengel);
+  /* Die Plaene mit ihren Nadeln, einer nach dem anderen. Passt einer
+     nicht mehr auf die Seite, kommt er auf die naechste — lieber eine
+     halbleere Seite als ein Plan auf Briefmarkengroesse. */
+  const mitBild = plaene.filter(p => p.bild);
+  for (const p of mitBild) {
+    const darauf = maengel.filter(m => m.plan_id === p.id);
+    const mitNadeln = await planMitNadeln(p.bild, darauf);
     const masse = doc.getImageProperties(mitNadeln);
     const h = Math.min(150, BREITE * masse.height / masse.width);
     const b = h * masse.width / masse.height;
-    titel('Grundriss');
+    titel(mitBild.length > 1 ? `Grundriss — ${p.titel}` : 'Grundriss');
     platz(h + 6);
     doc.addImage(mitNadeln, 'PNG', L, y, b, h);
     y += h + 8;
@@ -414,7 +420,8 @@ async function abnahmeProtokoll({ projekt, abnahme, maengel, planBild, fotos,
     }
     doc.setFont('helvetica', 'normal').setFontSize(9);
     doc.setTextColor(92, 106, 112);
-    const unter = [m.firma_name, m.frist ? `Frist ${fmtDatum(m.frist)}` : '',
+    const unter = [plaene.length > 1 ? m.plan_titel : '', m.firma_name,
+                   m.frist ? `Frist ${fmtDatum(m.frist)}` : '',
                    m.erledigt_am ? 'erledigt' : 'offen'].filter(Boolean).join(' · ');
     if (unter) { doc.text(pdfText(unter), einzug, y); y += 5; }
 

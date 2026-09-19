@@ -213,6 +213,27 @@
   font-weight:700; font-size:12px; flex-shrink:0;
 }
 
+/* Eine Mitgliedszeile trägt rechts das Admin-Zeichen. Als eigene Zeile um
+   die Auswahl herum, weil ein Knopf im Knopf nicht geht: das Häkchen für
+   die Mitgliedschaft und das Admin-Recht sind zwei verschiedene Dinge. */
+.ch-mitzeile{
+  display:flex; align-items:center; gap:8px;
+  background:var(--card); border-bottom:1px solid var(--border); padding-right:10px;
+}
+.ch-mitzeile:last-child{ border-bottom:none; }
+.ch-mitzeile .zeile{ border-bottom:none; flex:1; min-width:0; }
+.ch-mitzeile .wer{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.ch-admin{
+  flex-shrink:0; border:1.5px solid var(--border); border-radius:8px;
+  padding:4px 9px; font-size:11px; font-weight:700; letter-spacing:.02em;
+  background:transparent; color:var(--text-dim);
+}
+.ch-admin.an, .ch-admin[aria-pressed="true"]{
+  background:#e4eaf0; border-color:#e4eaf0; color:var(--navy);
+}
+button.ch-admin:hover{ border-color:var(--navy); color:var(--navy); }
+
 /* --- Breiten ----------------------------------------------------------------- */
 
 @media (min-width:1024px){
