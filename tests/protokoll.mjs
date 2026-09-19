@@ -390,6 +390,120 @@ async function lauf(name, breite, { ordnerDa, kannTeilen }) {
      && text.includes('1 neue Pendenz') && text.includes('Abgeschlossen'), text);
   await p.screenshot({ path: `${OUT}/${name}-5-uebersicht.png`, fullPage: true });
 
+  /* --- 11b. Die Suche über alle Protokolle -------------------------------
+     Gesucht wird in zwei Töpfen: im Text der Traktanden und in den
+     Firmennamen auf der Teilnehmerliste. Damit es etwas zu unterscheiden
+     gibt, kommen zwei weitere Protokolle dazu — sonst prüfte die Suite
+     eine Suche über genau ein Protokoll, und das ist keine. */
+
+  await p.evaluate(() => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.protokolle.push(
+      { id: 'pr7', projekt_id: 'p1', nummer: 7, bezeichnung: 'Baubesprechung',
+        datum: '2026-05-14', ort: 'Sarnen', status: 'abgeschlossen',
+        abgeschlossen_am: '2026-05-14T16:00:00.000Z', erstellt_von: 'u1' },
+      { id: 'pr8', projekt_id: 'p1', nummer: 8, bezeichnung: 'Bauherrensitzung',
+        datum: '2026-06-02', ort: 'Alpnach', status: 'entwurf', erstellt_von: 'u1' },
+      /* Ein Protokoll eines anderen Projekts. Es darf in keinem Treffer
+         auftauchen, auch wenn dasselbe Wort darin steht. */
+      { id: 'pr9', projekt_id: 'p2', nummer: 1, bezeichnung: 'Baubesprechung',
+        datum: '2026-06-09', ort: 'Kerns', status: 'entwurf', erstellt_von: 'u1' });
+    d.projekte.push({ id: 'p2', name: 'Anderes Projekt', status: 'laufend', archiviert: false });
+
+    d.protokoll_traktanden.push(
+      { id: 't7', protokoll_id: 'pr7', reihenfolge: 1, titel: 'Werkleitungen',
+        text: 'Die Rohre der Zirkonium AG kommen erst im Mai, der Graben bleibt offen.',
+        erstellt_von: 'u1', erstellt_am: '2026-05-14T08:00:00.000Z' },
+      { id: 't8', protokoll_id: 'pr8', reihenfolge: 1, titel: 'Zirkonium AG: Nachtrag',
+        text: 'Wird an der naechsten Sitzung behandelt.',
+        erstellt_von: 'u1', erstellt_am: '2026-06-02T08:00:00.000Z' },
+      { id: 't9', protokoll_id: 'pr9', reihenfolge: 1, titel: 'Zirkonium im fremden Projekt',
+        text: 'Gehoert nicht hierher.',
+        erstellt_von: 'u1', erstellt_am: '2026-06-09T08:00:00.000Z' });
+
+    /* Derselbe Firmenname bei drei Personen im selben Protokoll: im
+       Ergebnis soll er einmal stehen und nicht dreimal. */
+    d.protokoll_teilnehmer.push(
+      { id: 'tn1', protokoll_id: 'pr8', name: 'Res Steiger', firma: 'Fankhauser Holzbau AG', status: 'anwesend' },
+      { id: 'tn2', protokoll_id: 'pr8', name: 'Anna Muster', firma: 'Fankhauser Holzbau AG', status: 'anwesend' },
+      { id: 'tn3', protokoll_id: 'pr8', name: 'Urs Meier', firma: 'Fankhauser Holzbau AG', status: 'verteiler' });
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  });
+
+  await p.goto(`${B}/protokolle.html?projekt=p1`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1100);
+  ok('Das Suchfeld steht über der Liste', await p.locator('#p-suche').isVisible());
+  ok('Drei Protokolle in der Übersicht', (await p.locator('#inhalt .pk-karte').count()) === 3);
+
+  // Ein Buchstabe ist noch keine Suche.
+  await p.fill('#p-suche', 'Z'); await p.waitForTimeout(600);
+  ok('Ein einzelner Buchstabe lässt die Liste stehen',
+     (await p.locator('#inhalt .pk-karte').count()) === 3
+       && (await p.locator('#inhalt .pk-fund').count()) === 0);
+
+  await p.fill('#p-suche', 'Zirkonium'); await p.waitForTimeout(800);
+  const gefunden = (await p.textContent('#inhalt')).replace(/\s+/g, ' ');
+  ok('Der Traktandentext wird durchsucht', gefunden.includes('Werkleitungen'));
+  ok('Der Traktandentitel auch', gefunden.includes('Zirkonium AG: Nachtrag'));
+  ok('Zwei Protokolle als Treffer',
+     (await p.locator('#inhalt .pk-karte').count()) === 2,
+     String(await p.locator('#inhalt .pk-karte').count()));
+  ok('Die Zahl der Fundstellen steht dabei',
+     /2 Fundstellen in 2 Protokollen/.test(gefunden), gefunden.slice(0, 120));
+  ok('Jeder Treffer nennt die Protokollnummer',
+     gefunden.includes('Baubesprechung Nr. 7') && gefunden.includes('Bauherrensitzung Nr. 8'));
+  ok('Und das Datum', gefunden.includes('14.05.2026') && gefunden.includes('02.06.2026'));
+  ok('Ein fremdes Projekt bleibt draussen', !gefunden.includes('fremden Projekt'));
+  ok('Das Neueste zuerst',
+     (await p.locator('#inhalt .pk-karte .titel').first().textContent()) === 'Bauherrensitzung Nr. 8');
+  await p.screenshot({ path: `${OUT}/${name}-5b-suche.png`, fullPage: true });
+
+  /* Steht das Wort im Titel, braucht es den Ausschnitt nicht; steht es
+     nur im Text, schon. */
+  ok('Ausschnitt nur, wo der Titel nichts hergibt',
+     gefunden.includes('… der Zirkonium AG kommen erst im Mai')
+       || gefunden.includes('Die Rohre der Zirkonium AG'), gefunden);
+
+  await p.fill('#p-suche', 'Fankhauser'); await p.waitForTimeout(800);
+  const firmenTreffer = (await p.textContent('#inhalt')).replace(/\s+/g, ' ');
+  ok('Ein Firmenname von der Teilnehmerliste wird gefunden',
+     firmenTreffer.includes('Fankhauser Holzbau AG'));
+  ok('Die Firma steht einmal da und nicht dreimal',
+     (firmenTreffer.match(/Fankhauser Holzbau AG/g) || []).length === 1, firmenTreffer);
+  ok('Mit der Kennzeichnung "Beteiligt"', firmenTreffer.includes('Beteiligt'));
+  ok('Nur im Protokoll, auf dessen Liste sie steht',
+     firmenTreffer.includes('Bauherrensitzung Nr. 8') && !firmenTreffer.includes('Nr. 7'));
+
+  await p.fill('#p-suche', 'Bagatellschaden'); await p.waitForTimeout(800);
+  ok('Ohne Treffer ein Satz statt einer leeren Fläche',
+     (await p.textContent('#inhalt')).includes('steht nichts zu «Bagatellschaden»'));
+
+  await p.fill('#p-suche', ''); await p.waitForTimeout(600);
+  ok('Leeres Feld: die gewohnte Liste ist zurück',
+     (await p.locator('#inhalt .pk-karte').count()) === 3
+       && (await p.locator('#inhalt .pk-fund').count()) === 0);
+  ok('Und zwar mit den Zahlen darunter',
+     (await p.textContent('#inhalt')).includes('Traktanden'));
+
+  /* Eine Eingabe mit Komma und Prozent baut in PostgREST sonst eine
+     kaputte Abfrage. Hier darf sie höchstens nichts finden. */
+  await p.fill('#p-suche', 'Bau, Holz (50%)'); await p.waitForTimeout(800);
+  ok('Sonderzeichen bauen keine kaputte Abfrage',
+     (await p.textContent('#inhalt')).length > 0
+       && !fehler.some(f => /ilike|PGRST/.test(f)));
+  await p.fill('#p-suche', ''); await p.waitForTimeout(600);
+
+  // Aufräumen: die Probeprotokolle wieder weg.
+  await p.evaluate(() => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    const weg = new Set(['pr7', 'pr8', 'pr9']);
+    d.protokolle = d.protokolle.filter(x => !weg.has(x.id));
+    d.protokoll_traktanden = d.protokoll_traktanden.filter(x => !weg.has(x.protokoll_id));
+    d.protokoll_teilnehmer = d.protokoll_teilnehmer.filter(x => !weg.has(x.protokoll_id));
+    d.projekte = d.projekte.filter(x => x.id !== 'p2');
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  });
+
   /* --- 12. Zurück auf der Projektseite ----------------------------------- */
 
   await p.goto(`${B}/projekt-detail.html?projekt=p1`, { waitUntil: 'networkidle' });

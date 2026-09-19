@@ -615,6 +615,8 @@ api/search-ch.js     Serverless-Function als Proxy zur Tel-API von
                      search.ch, hält den Schlüssel serverseitig
 api/wetter.js        sucht die nächste Messstation von MeteoSchweiz und
                      macht aus ihrem CSV-Satz fertige Zahlen
+api/fristen.js       täglicher Cron: erinnert drei Tage vorher an eine
+                     ablaufende Frist im Firmenpool
 vendor/              supabase-js, jsPDF, docx, SheetJS, lokal statt
                      vom CDN
 assets/              Logo, PWA-Icons, Archivo als woff2
@@ -1435,6 +1437,230 @@ und niemand merkt es, bis jemand heiratet.
 Wer selbst gemeint ist, sieht es an der Blase und nicht erst im Text: ein roter
 Rand links. In einer Gruppe mit vierzig Nachrichten scrollt sonst niemand bis
 dorthin.
+
+### Wer gelesen hat, im Detail
+
+Langes Antippen einer **eigenen** Nachricht in einer **Gruppe** zeigt unter der
+Reaktionsauswahl, wer sie schon gelesen hat und wer noch nicht. Die Haken an der
+Blase bleiben, wie sie waren: einer heisst angekommen, zwei heissen von allen
+anderen gelesen.
+
+**Dafür war keine Änderung am Datenmodell nötig, und das war vorher zu prüfen.**
+`chat_mitglieder.zuletzt_gelesen` steht seit dem Ungelesen-Zähler in der
+Tabelle, wird beim Öffnen eines Gesprächs gesetzt und kommt über Realtime
+herein — daraus rechnet die App schon den zweiten Haken. Die Liste macht
+dieselbe Rechnung, nur einzeln statt für alle zusammen: eine Nachricht gilt bei
+einer Person als gelesen, sobald deren Lesestand nicht vor dem Sendezeitpunkt
+liegt. Keine zweite Tabelle, keine Spalte pro Nachricht und Person, kein
+zweiter Ort, der abweichen kann.
+
+Was damit nicht geht, und zwar grundsätzlich: **der genaue Moment, in dem jemand
+diese eine Nachricht gelesen hat.** Gespeichert ist nur, wann die Person das
+Gespräch zuletzt geöffnet hat. Deshalb steht bei «Gelesen» dieser Zeitpunkt und
+nichts, was so tut, als wäre es der Moment für genau diese Zeile. Eine Spalte je
+Nachricht und Person wäre der Preis dafür — bei sieben Leuten und tausend
+Nachrichten siebentausend Zeilen, die niemand je ansieht.
+
+In einem Einzelgespräch steht nichts davon: dort sagt der doppelte Haken schon
+alles, und eine Liste mit genau einem Namen wäre dasselbe zweimal. An einer
+fremden Nachricht ebenso wenig — wer gelesen hat, geht die schreibende Person an.
+
+## Abwesend, Fristen und der Text in den PDF
+
+Vier kleinere Erweiterungen, die nebeneinander stehen und einander nicht
+berühren.
+
+**In Kontakte speichern, auch bei den Mitarbeitenden.** Derselbe Knopf wie im
+Firmenpool, nur mit einer Karte statt einer Firma samt Ansprechpersonen. Das
+Werkzeug dahinter steht in `js/app.js` (`vcardWert`, `vcardKarte`,
+`vcardDatei`) und nicht zweimal nebeneinander: zwei Fassungen liefen genau dort
+auseinander, wo man es am spätesten merkt — bei der Maskierung nach RFC 6350.
+
+Der Dateiname kommt ohne Umlaute aus, und das ist kein Schönheitsfehler:
+Chromium verwirft das `download`-Attribut, sobald ein Zeichen ausserhalb von
+ASCII darin steht, und legt die Datei als «download» ohne Endung ab. Aus
+«Thomas Zürcher.vcf» wurde so nichts Lesbares. Also wird umgeschrieben statt
+weggeworfen — «Thomas Zuercher.vcf» —, im Inhalt der Karte steht der Umlaut
+unverändert. Aufgefallen ist das beim ersten Test dieses Knopfes.
+
+**Abwesend bis.** Wer einen genehmigten Ferienantrag hat, der den heutigen Tag
+einschliesst, trägt in Liste und Detailansicht einen gelben Hinweis «Abwesend
+bis 24.12.». Gelb und nicht rot: Ferien sind kein Fehler.
+
+Die Frage an dieser Stelle war nicht der Hinweis, sondern wer ihn sehen darf.
+Ein Ferienantrag gehört der antragstellenden Person und der Geschäftsleitung,
+`antraege_select` sagt genau das. Wer im Adressbuch blättert, soll aber sehen,
+dass jemand bis Freitag weg ist, ohne damit die Anträge des Teams lesen zu
+können. Deshalb eine Funktion und keine weichere Policy: `abwesend_heute()`
+läuft als `security definer` und gibt genau zwei Angaben heraus — wer und bis
+wann. Nicht der Betrag, nicht die Bemerkung, nicht wer entschieden hat, und auch
+nicht, dass es überhaupt einen Antrag gibt, sobald er vorbei ist. Ein
+abgelehnter oder noch offener Antrag steht nie darin.
+
+Ohne Verbindung steht kein Hinweis da statt eines veralteten: «bis Freitag weg»
+aus der letzten Woche wäre schlechter als gar nichts.
+
+**Frist an einer roten Notiz.** Im Firmenpool kann an einer roten Notiz ein
+Datum stehen: bis wann der Versicherungsnachweis da sein muss, bis wann die
+Mängel behoben sind. Das Feld erscheint mit dem roten Punkt und verschwindet mit
+ihm; eine Frist ohne Rot wäre eine Mahnung ohne Anlass, und die Datenbank weist
+sie ab (`notizen_frist_nur_bei_rot`).
+
+Drei Tage vorher bekommt die Person, die die Notiz geschrieben hat, eine Meldung
+aufs Telefon. Drei Tage, weil es am Tag selbst für einen Anruf oft zu spät ist
+und weil man die Meldung sonst wieder vergisst. Nur an die verfassende Person,
+weil sie die Frist gesetzt hat und weiss, worum es geht — eine Meldung an alle
+wäre für sieben Leute Lärm und für einen davon nützlich.
+
+Gemeldet wird jede Frist genau einmal. Dafür steht `frist_gemeldet_am` an der
+Zeile; ohne das käme dieselbe Erinnerung jeden Tag neu. Wer die Frist
+verschiebt, setzt den Vermerk zurück — das macht die App beim Speichern —, und
+dann meldet sich auch die neue Frist wieder. Gesetzt wird er allein vom
+täglichen Lauf in `api/fristen.js`, der mit dem Dienstschlüssel kommt und
+deshalb kein `auth.uid()` hat; der Trigger `notiz_frist_vermerk()` hält die
+Spalte für die App geschlossen. Das war zuerst nur ein Kommentar und keine
+Regel — beim Nachlesen der Policies fiel auf, dass `notizen_update` jedem im
+Team jede Änderung erlaubt, also auch diese. Nachgereicht statt umgeschrieben:
+ein Kommentar, der etwas verspricht, was die Datenbank nicht hält, ist schlimmer
+als gar keiner.
+
+Auch ohne Gerät gilt eine Frist als gemeldet. Sonst sammelte sich für jemanden
+ohne Benachrichtigungen jeden Tag derselbe Versuch an, und beim ersten
+angemeldeten Gerät käme ein Schwall alter Erinnerungen.
+
+**Der Text in den PDF.** Eine Suche, die nur Dateinamen kennt, findet
+«Offerte_2026_final.pdf» und nicht die Firma, um die es darin geht. Also wird
+der Text einmal herausgezogen und steht danach in `dateien.volltext`; die
+globale Suche durchsucht ihn mit und zeigt am Treffer die Stelle im Text — aber
+nur dann, wenn der Dateiname selbst nichts hergibt, sonst stünde die Zeile
+doppelt.
+
+Herausgezogen wird er **im Browser** mit pdf.js, das ohnehin unter `vendor/`
+liegt: beim Hochladen, und bei älteren Dateien beim ersten Herunterladen. So
+füllt sich der Bestand von selbst, ohne dass jemand einen Knopf «alles
+indexieren» drücken muss. Serverseitig ginge es auch, bräuchte aber eine
+Bibliothek in einer `package.json` — und damit den Build-Schritt, den dieses
+Projekt bewusst nicht hat. Zwanzig Seiten und 200'000 Zeichen sind die Grenze:
+ein Bauplan mit achtzig Seiten voller Masszahlen macht die Suche langsamer statt
+besser.
+
+`volltext_am` sagt, wann das geschah. Damit lässt sich unterscheiden, was noch
+nie durchsucht wurde von dem, worin wirklich kein Text steht — ein
+eingescanntes Blatt Papier zum Beispiel. Der Index ist GIN mit Trigram und keine
+Volltextsuche mit Wortstamm: die Leute suchen nach Wortteilen («Fankhaus»), und
+das fände `tsvector` nicht.
+
+**Zuletzt angesehen.** Oben in der Dokumente-Übersicht stehen die letzten fünf
+geöffneten Dateien, projektübergreifend. Die Spur liegt in der Datenbank und
+nicht im Browser: wer am Handy eine Offerte angesehen hat, findet sie am
+Nachmittag am Schreibtisch wieder. Eine Zeile je Person und Datei, damit
+dieselbe Datei beim zweiten Öffnen ein Eintrag bleibt und nicht zwei.
+
+Jede Person sieht und pflegt nur ihre eigene Spur, auch die Geschäftsleitung
+nicht: wer wann welche Datei geöffnet hat, ist eine Frage der Bequemlichkeit und
+keine Aufsicht. Eine Datei im Papierkorb verschwindet aus der Liste, ihre Zeile
+bleibt aber liegen — wird sie wiederhergestellt, ist sie wieder da.
+
+## Suchen in den Sitzungsprotokollen
+
+Über der Liste der Protokolle eines Projekts steht ein Feld, das alle Protokolle
+dieses Projekts durchsucht: den Text der Traktanden und die Firmennamen auf den
+Teilnehmerlisten. Jeder Treffer nennt Protokollnummer und Datum, darunter die
+Stellen, an denen das Wort steht.
+
+Der Firmenname kommt aus `protokoll_teilnehmer.firma` — jenem Schnappschuss vom
+Tag der Sitzung, der auch dann noch stimmt, wenn die Firma später umbenannt
+wurde. Gesucht wird also in dem, was damals galt, und nicht in der heutigen
+Unternehmerliste; genau so soll ein Protokoll gelesen werden. Dieselbe Firma bei
+drei Personen auf einer Liste steht im Ergebnis einmal: gesucht wurde die Firma,
+nicht die Person.
+
+Gesucht wird in der Datenbank und nicht im Browser. Zwölf Protokolle mit je
+zwanzig Traktanden herunterzuladen, nur um darin zu suchen, wäre auf dem Bau
+eine Wartezeit für nichts. Maskierung und `or`-Gruppe stehen in `js/app.js`
+(`suchSauber`, `suchOder`, `textStelle`) und nicht zweimal: die globale Suche
+und diese hier müssen dieselbe Eingabe gleich behandeln, und «Bau, Holz (50%)»
+darf in keiner von beiden eine kaputte Abfrage bauen.
+
+## Was beim Durchsehen auffiel
+
+Eine Runde durch den ganzen Bestand, mit der Vorgabe, am sichtbaren Verhalten
+nichts zu ändern. Was gefunden und behoben wurde, und was bewusst so bleibt.
+
+### Behoben
+
+**Zurück im Netz ohne ganzes Neuladen.** Fünf Bereiche — Feed, Formulare,
+Bauabnahme, Protokoll und Protokollübersicht — luden die Seite komplett neu,
+sobald die Verbindung wiederkam. Das funktioniert, ist aber das gröbste
+verfügbare Mittel für die einfachste Aufgabe: der Browser holt HTML, CSS und
+alle Skripte ein zweites Mal, die Seite blitzt weiss auf, und wer in einem
+Formular etwas stehen hatte, hat es verloren. Gebraucht wird nur, was jede Seite
+ohnehin kann — ihre Daten laden und zeichnen. Dafür gibt es jetzt
+`beiRueckkehr()` in `js/app.js`, und jeder Bereich hängt seine eigene
+Ladefunktion daran.
+
+**Die Bildadressen im Chat werden gemerkt.** Der Verlauf wird bei jeder
+eintreffenden Nachricht, jeder Reaktion und jedem fremden Lesestand neu
+gezeichnet, und danach holte er für **jedes** Bild im Gespräch eine neue
+signierte Adresse. In einer Gruppe, in der sieben Leute mitlesen, sind das bei
+zwanzig Bildern hundertvierzig Anfragen für dieselben zwanzig Adressen — genau
+der Fall «mehrere Personen gleichzeitig», nach dem gefragt war. Die Adressen
+gelten eine Stunde und werden fünfzig Minuten gemerkt; der Abstand ist Absicht,
+damit eine kurz vor dem Ablauf herausgegebene Adresse nicht auf halbem Weg
+ungültig wird.
+
+**Zwei Zwischenspeicher merkten sich das Ergebnis statt des Versprechens.**
+`namen()` in `js/store.js` und `meineStufe()` in `js/app.js` prüften, ob der
+Wert schon dasteht — und fragten zweimal, wenn zwei Ladevorgänge nebeneinander
+liefen. Genau das passiert in den Dokumenten, seit die Dateiliste und «Zuletzt
+angesehen» gleichzeitig starten. Gemerkt wird jetzt das laufende Versprechen,
+und der zweite Aufrufer hängt sich daran.
+
+**Der eigene Name wurde bei jedem Seitenwechsel einzeln erfragt.**
+`ladeProfil()` holte eine Zeile aus `profile`, obwohl `namen()` kurz darauf die
+ganze Tabelle holt — zwei Rundreisen für dieselbe Auskunft, auf 22 Seiten. Jetzt
+nimmt `ladeProfil()` den Namen aus der Namensliste, wo es sie gibt. Die
+Anmeldeseite lädt `js/store.js` nicht, dort bleibt es beim eigenen Abruf.
+
+**Die Dokumente holten alle Dateien, um fünf zu zeigen.** Ohne geöffneten Ordner
+ist die Frage «was kam zuletzt dazu» und nicht «was gibt es alles». Die Grenze
+sitzt jetzt in der Abfrage. Dazu holt die Liste nicht mehr `select('*')`,
+sondern die Spalten, die sie zeichnet — den Volltext jedes PDF über die Leitung
+zu schicken, um einen Dateinamen anzuzeigen, war seit der Volltextsuche eine
+schlechte Idee.
+
+### Bewusst so belassen
+
+**Die App bleibt 23 einzelne Seiten.** Der Wunsch war, Navigation ohne Neuladen
+auf reines Umschalten im Browser umzustellen. Innerhalb einer Seite ist sie das
+längst: Liste und Detail, die Reiter im Protokoll, die drei Blicke im Chat und
+die globale Suche wechseln client-seitig und schreiben die Adresse mit
+`history.replaceState` nach. Der Wechsel **zwischen** den Bereichen ist dagegen
+ein echter Seitenwechsel, und das umzustellen hiesse, die App in eine
+Single-Page-Anwendung umzubauen: ein Router, ein gemeinsamer Zustand, das Laden
+und Entladen jedes Bereichsmoduls von Hand, und für jede Seite die Frage, was
+beim Verlassen aufzuräumen ist. Das ist kein Feinschliff, sondern ein Umbau der
+Grundlage — mit der Vorgabe «ohne sichtbares Verhalten oder Aussehen zu
+verändern» ist er nicht zu vereinbaren, und ohne Build-Schritt wäre das Ergebnis
+schlechter als der jetzige Zustand. Der Service Worker hält HTML, CSS und
+Skripte ohnehin lokal; ein Bereichswechsel kostet damit kaum mehr als ein
+Umschalten. Wenn das gewünscht ist, gehört es als eigener Schritt geplant.
+
+**Die Berechtigungsstufe wird weiterhin bei jedem Seitenaufruf geholt.** Sie
+liesse sich für die Dauer einer Sitzung merken, und das wäre eine Anfrage
+weniger pro Seite. Nur dauert eine Sitzung in einer App, die auf dem
+Startbildschirm liegt, schnell mehrere Tage — wer jemandem erweiterte Rechte
+gibt, will nicht erklären müssen, dass der Tab zuerst zu schliessen ist. Eine
+kleine Abfrage gegen eine Tabelle mit zehn Zeilen ist der bessere Handel.
+
+**Ein BKP-Code umzubenennen schreibt weiterhin Zeile für Zeile.** Jede Firma
+bekommt eine andere Liste von Codes, ein einziges UPDATE kann das nicht. Der
+Fall kommt selten vor und betrifft eine überschaubare Zahl von Zeilen.
+
+**Die Fotos eines Feed-Beitrags werden nacheinander hochgeladen.** Parallel wäre
+schneller, aber beim Abbruch mitten im Vorgang ist das Aufräumen klar
+nachvollziehbar: was schon oben ist, steht in einer Liste und wird entfernt. Bei
+drei bis vier Fotos ist der Unterschied die Mühe nicht wert.
 
 ## Logo
 

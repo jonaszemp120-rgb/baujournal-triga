@@ -53,6 +53,7 @@
     runter: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
     rauf: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
     kontakt: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>',
+    uhr: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     lupe: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     mehr: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>'
   };
@@ -576,6 +577,8 @@
           ${['rot', 'gelb', 'gruen'].map(k => `
             <button type="button" class="fp-farbe pressable" data-farbe="${k}" aria-pressed="${k === 'gruen'}" aria-label="${esc(AMPELN[k].text)}" title="${esc(AMPELN[k].text)}"><span class="punkt ${k}"></span></button>`).join('')}
         </div>
+        <input id="notiz-frist" type="date" aria-label="Frist für diese Notiz" hidden
+               style="height:46px; border-radius:10px; border:1px solid var(--border); background:var(--card); color:var(--text); font-size:13px; padding:0 10px; flex:0 1 auto;">
         <button type="button" id="notiz-speichern" class="fp-notizspeichern pressable">Speichern</button>
       </div>
       <div class="fp-ueberschrift" style="font-size:14.5px;">Notizen-Verlauf</div>
@@ -596,9 +599,15 @@
     $$('#firma-rechts .fp-farbe').forEach(el => el.addEventListener('click', () => {
       farbe = el.dataset.farbe;
       $$('#firma-rechts .fp-farbe').forEach(x => x.setAttribute('aria-pressed', String(x === el)));
+      /* Das Frist-Feld erscheint mit dem roten Punkt und verschwindet mit
+         ihm. Eine Frist an einer grünen Notiz weist die Datenbank ohnehin
+         ab; hier steht sie gar nicht erst zur Wahl. */
+      const f = $('#notiz-frist');
+      if (f) { f.hidden = farbe !== 'rot'; if (f.hidden) f.value = ''; }
     }));
 
-    const speichern = () => notizAnlegen(f, $('#notiz-text').value.trim(), farbe, $('#notiz-projekt').value || null);
+    const speichern = () => notizAnlegen(f, $('#notiz-text').value.trim(), farbe,
+      $('#notiz-projekt').value || null, $('#notiz-frist')?.value || null);
     $('#notiz-speichern').addEventListener('click', speichern);
     $('#notiz-text').addEventListener('keydown', e => { if (e.key === 'Enter') speichern(); });
 
@@ -650,6 +659,23 @@
       </a>`;
   }
 
+  /* Eine abgelaufene Frist sieht anders aus als eine kommende. Ohne das
+     steht "Frist 12.09." freundlich da, obwohl der Termin seit einer
+     Woche verstrichen ist. */
+  const fristTage = d => Math.round(
+    (new Date(String(d).slice(0, 10) + 'T00:00:00') - new Date(heute() + 'T00:00:00')) / 86400000);
+
+  const fristKlasse = d => fristTage(d) < 0 ? 'vorbei' : (fristTage(d) <= 3 ? 'bald' : '');
+
+  const fristZusatz = d => {
+    const t = fristTage(d);
+    if (t < 0) return ` · seit ${-t} ${-t === 1 ? 'Tag' : 'Tagen'} überfällig`;
+    if (t === 0) return ' · heute';
+    if (t === 1) return ' · morgen';
+    if (t <= 3) return ` · in ${t} Tagen`;
+    return '';
+  };
+
   function notizZeile(n) {
     return `
       <div class="fp-notiz">
@@ -663,6 +689,7 @@
               : ''}
           </div>
           <div class="text">${esc(n.text)}</div>
+          ${n.frist ? `<div class="fp-frist ${fristKlasse(n.frist)}">${svg(IKON.uhr, 12)}<span>Frist ${esc(fmtDatum(n.frist))}${fristZusatz(n.frist)}</span></div>` : ''}
         </div>
         <div class="tasten">
           <button type="button" class="fp-mini" data-notiz-bearbeiten="${esc(n.id)}" aria-label="Notiz bearbeiten">${svg(IKON.stift, 14)}</button>
@@ -740,13 +767,14 @@
 
   /* --- Notizen ------------------------------------------------------------ */
 
-  async function notizAnlegen(f, text, farbe, projektId) {
+  async function notizAnlegen(f, text, farbe, projektId, frist) {
     if (!text) return toast('Ohne Text keine Notiz.', true);
     try {
       if (!istOnline()) throw new Error('Notizen lassen sich nur online erfassen');
       const s = await session();
       const { error } = await sb.from('notizen')
-        .insert({ firma_id: f.id, text, farbe, autor_id: s.user.id, projekt_id: projektId || null });
+        .insert({ firma_id: f.id, text, farbe, autor_id: s.user.id, projekt_id: projektId || null,
+                  frist: farbe === 'rot' ? (frist || null) : null });
       if (error) throw error;
       await neuLaden(f);
       toast('Notiz gespeichert');
@@ -762,13 +790,19 @@
       felder: [{ id: 'text', label: 'Notiz', wert: n.text, mehrzeilig: true }],
       pflicht: ['text'],
       farbe: n.farbe,
-      projekt: n.projekt_id || null
+      projekt: n.projekt_id || null,
+      frist: n.frist ? String(n.frist).slice(0, 10) : ''
     });
     if (!werte) return;
     try {
       if (!istOnline()) throw new Error('Notizen lassen sich nur online bearbeiten');
-      const { error } = await sb.from('notizen')
-        .update({ text: werte.text, farbe: werte.farbe, projekt_id: werte.projekt_id }).eq('id', n.id);
+      /* Eine geänderte Frist ist eine neue Frist: die Erinnerung zu ihr
+         ging noch nicht hinaus, also wird der Vermerk zurückgesetzt.
+         Sonst bliebe eine verschobene Frist für immer stumm. */
+      const satz = { text: werte.text, farbe: werte.farbe, projekt_id: werte.projekt_id,
+                     frist: werte.frist };
+      if (String(werte.frist || '') !== String(n.frist || '')) satz.frist_gemeldet_am = null;
+      const { error } = await sb.from('notizen').update(satz).eq('id', n.id);
       if (error) throw error;
       await neuLaden(f);
       toast('Notiz gespeichert');
@@ -950,9 +984,10 @@
 
   /* --- vCard -------------------------------------------------------------- */
 
-  /* Nach RFC 6350 sind Komma, Semikolon, Backslash und Zeilenumbruch in
-     einem Wert zu maskieren, sonst zerfällt der Kontakt beim Import. */
-  const vc = s => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\;');
+  /* Maskierung und Dateiaufbau stehen in js/app.js: der Bereich
+     Mitarbeiter exportiert Kontakte auf dieselbe Weise, und zwei
+     Fassungen liefen genau an der Maskierung auseinander. */
+  const vc = vcardWert;
 
   function vcardHerunterladen(f, personen) {
     const ort = ortschaft(f.plz_ort);
@@ -960,32 +995,26 @@
     const bkpText = codesVon(f).map(katText).join(' · ');
 
     const karten = [];
-    karten.push([
-      'BEGIN:VCARD', 'VERSION:3.0',
+    karten.push(vcardKarte([
       `N:;${vc(f.name)};;;`,
       `FN:${vc(f.name)}`,
       `ORG:${vc(f.name)}`,
       f.telefon ? `TEL;TYPE=WORK,VOICE:${vc(f.telefon)}` : null,
       f.email ? `EMAIL;TYPE=INTERNET,WORK:${vc(f.email)}` : null,
       (f.adresse || f.plz_ort) ? `ADR;TYPE=WORK:;;${vc(f.adresse)};${vc(ort)};;${vc(plz)};` : null,
-      bkpText ? `NOTE:BKP ${vc(bkpText)}` : null,
-      'END:VCARD'
-    ].filter(Boolean).join('\r\n'));
+      bkpText ? `NOTE:BKP ${vc(bkpText)}` : null
+    ]));
 
-    personen.forEach(p => karten.push([
-      'BEGIN:VCARD', 'VERSION:3.0',
+    personen.forEach(p => karten.push(vcardKarte([
       `N:;${vc(p.name)};;;`,
       `FN:${vc(p.name)}`,
       `ORG:${vc(f.name)}`,
       p.funktion ? `TITLE:${vc(p.funktion)}` : null,
       p.telefon ? `TEL;TYPE=WORK,VOICE:${vc(p.telefon)}` : null,
-      p.email ? `EMAIL;TYPE=INTERNET,WORK:${vc(p.email)}` : null,
-      'END:VCARD'
-    ].filter(Boolean).join('\r\n')));
+      p.email ? `EMAIL;TYPE=INTERNET,WORK:${vc(p.email)}` : null
+    ])));
 
-    const datei = karten.join('\r\n') + '\r\n';
-    herunterladen(new Blob([datei], { type: 'text/vcard;charset=utf-8' }),
-      `${f.name.replace(/[^\w\dÄÖÜäöü .-]/g, '_')}.vcf`);
+    vcardDatei(karten, f.name);
     toast(personen.length ? `Kontakt und ${personen.length} Ansprechperson${personen.length === 1 ? '' : 'en'} exportiert` : 'Kontakt exportiert');
   }
 
@@ -1221,7 +1250,13 @@
 
   /* --- Ein Formular als Sheet, für die kleinen Dialoge -------------------- */
 
-  function formularSheet({ titel, felder, knopf = 'Speichern', pflicht = [], farbe = null, projekt }) {
+  /* frist: wenn gesetzt (auch als leerer String), erscheint ein
+     Datumsfeld — aber nur, solange die Einstufung rot ist. Eine Frist an
+     einer grünen Notiz wäre eine Mahnung ohne Anlass, und die Datenbank
+     weist sie ohnehin ab. Das Feld folgt deshalb dem Punkt: wer auf Gelb
+     umstellt, sieht es verschwinden. */
+  function formularSheet({ titel, felder, knopf = 'Speichern', pflicht = [], farbe = null,
+                           projekt, frist }) {
     return new Promise(ok => {
       const eingabe = f => f.mehrzeilig
         ? `<textarea id="fs-${f.id}" rows="4" placeholder="${esc(f.platzhalter || '')}" style="border-radius:10px; border:1.5px solid var(--border); padding:11px 13px; font-size:14px; color:var(--text); box-sizing:border-box; resize:vertical;">${esc(f.wert || '')}</textarea>`
@@ -1247,6 +1282,13 @@
                 ${['rot', 'gelb', 'gruen'].map(k => `<button type="button" class="fp-farbe pressable" data-farbe="${k}" aria-pressed="${k === farbe}" aria-label="${esc(AMPELN[k].text)}"><span class="punkt ${k}"></span></button>`).join('')}
               </div>
             </div>` : ''}
+          ${frist !== undefined ? `
+            <div id="fs-fristfeld" style="display:flex; flex-direction:column; gap:6px;" ${farbe === 'rot' ? '' : 'hidden'}>
+              <label for="fs-frist" style="font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim);">Frist (optional)</label>
+              <input id="fs-frist" type="date" value="${esc(frist || '')}"
+                     style="height:44px; border-radius:10px; border:1.5px solid var(--border); padding:0 13px; font-size:14px; color:var(--text); background:var(--card); box-sizing:border-box;">
+              <span style="font-size:12px; color:var(--text-dim); line-height:1.45;">Drei Tage vorher bekommen Sie eine Meldung. Nur Sie — es ist Ihre Notiz.</span>
+            </div>` : ''}
           <div id="fs-fehler" hidden style="font-size:12.5px; color:var(--red); font-weight:600;"></div>
           <div style="display:flex; gap:10px; margin-top:4px;">
             <button type="button" id="fs-ja" class="btn-primary pressable" style="flex:1; height:48px; border:none; border-radius:12px; background:var(--red); color:#fff; font-weight:700; font-size:15px;">${esc(knopf)}</button>
@@ -1261,6 +1303,8 @@
       $$('.fp-farbe', s.el).forEach(el => el.addEventListener('click', () => {
         gewaehlteFarbe = el.dataset.farbe;
         $$('.fp-farbe', s.el).forEach(x => x.setAttribute('aria-pressed', String(x === el)));
+        const feld = $('#fs-fristfeld', s.el);
+        if (feld) feld.hidden = gewaehlteFarbe !== 'rot';
       }));
 
       $('#fs-nein', s.el).addEventListener('click', () => { s.schliessen(); ok(null); });
@@ -1277,6 +1321,12 @@
         }
         if (farbe) werte.farbe = gewaehlteFarbe;
         if (projekt !== undefined) werte.projekt_id = $('#fs-projekt', s.el).value || null;
+        /* Wer von Rot weg stellt, verliert die Frist. Das ist gewollt:
+           die Farbe sagt, dass etwas im Argen liegt, und ohne sie gibt
+           es nichts mehr zu befristen. */
+        if (frist !== undefined) {
+          werte.frist = gewaehlteFarbe === 'rot' ? ($('#fs-frist', s.el).value || null) : null;
+        }
         s.schliessen();
         ok(werte);
       });

@@ -8,6 +8,10 @@
     {
       "path": "/api/feed-aufraeumen",
       "schedule": "47 3 * * *"
+    },
+    {
+      "path": "/api/fristen",
+      "schedule": "5 6 * * *"
     }
   ],
   "headers": [

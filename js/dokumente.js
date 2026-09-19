@@ -21,6 +21,12 @@
   let offenerOrdner = null;      // der geöffnete Ordner
   let letzteHochgeladen = [];
 
+  /* Die letzten fünf Dateien, die diese Person geöffnet hat — über alle
+     Ordner und Projekte hinweg. Das ist der Unterschied zu "Zuletzt
+     hochgeladen" darunter: dort steht, was neu ist, hier, woran man
+     gerade arbeitet. */
+  let zuletztAngesehen = [];
+
   const breit = () => matchMedia('(min-width:1024px)').matches;
 
   const IK = {
@@ -50,13 +56,105 @@
     return data || [];
   }
 
+  /* Ohne Ordner ist die Frage "was kam zuletzt dazu" und nicht "was gibt
+     es alles". Die Grenze gehört deshalb in die Abfrage: sonst kämen
+     alle Zeilen über die Leitung, samt dem Volltext jedes einzelnen PDF,
+     nur um davon fünf zu zeigen.
+
+     Und darum auch nicht select('*'): im geöffneten Ordner braucht die
+     Liste den Dateinamen, nicht den ganzen Text darin. Gelesen wird der
+     nur von der Suche. */
+  const SPALTEN = 'id, name, pfad, ordner_id, groesse, hochgeladen_am, hochgeladen_von, volltext_am, geloescht_am';
+
+  /* Fünf, und keine sechs: die Liste steht über allem anderen und soll
+     den Blick auf die Ordner nicht verstellen. Die Begrenzung sitzt in
+     der Abfrage und nicht erst beim Zeichnen — wer zweihundert Dateien
+     geöffnet hat, soll sie nicht alle über die Leitung holen. */
+  const ZULETZT_MAX = 5;
+
   async function ladeDateien(ordnerId) {
-    let frage = sb.from('dateien').select('*').is('geloescht_am', null);
-    frage = ordnerId ? frage.eq('ordner_id', ordnerId) : frage;
+    let frage = sb.from('dateien').select(SPALTEN).is('geloescht_am', null);
+    frage = ordnerId ? frage.eq('ordner_id', ordnerId) : frage.limit(ZULETZT_MAX);
     const { data, error } = await frage.order('hochgeladen_am', { ascending: false });
     if (meckern('Dateien laden', error)) return [];
     const wer = await namen();
     return (data || []).map(d => ({ ...d, wer: wer[d.hochgeladen_von] || 'Unbekannt' }));
+  }
+
+  async function ladeZuletzt() {
+    const { data, error } = await sb.from('datei_zugriffe')
+      .select('zuletzt_am, dateien(id, name, ordner_id, hochgeladen_am, groesse, hochgeladen_von, volltext_am, geloescht_am)')
+      .order('zuletzt_am', { ascending: false })
+      .limit(ZULETZT_MAX * 3);
+    if (meckern('Zuletzt angesehen laden', error)) return [];
+
+    const wer = await namen();
+    /* Eine Datei im Papierkorb steht nicht mehr in der Liste. Ihre Zeile
+       bleibt aber liegen: wird sie wiederhergestellt, ist sie wieder da,
+       und das ist richtiger, als die Spur zu löschen. Deshalb wird hier
+       gefiltert und erst danach auf fünf gekürzt. */
+    return (data || [])
+      .map(z => z.dateien)
+      .filter(d => d && !d.geloescht_am)
+      .map(d => ({ ...d, wer: wer[d.hochgeladen_von] || 'Unbekannt' }))
+      .slice(0, ZULETZT_MAX);
+  }
+
+  /* --- Der Text im PDF ------------------------------------------------------ */
+
+  /* Eine Suche, die nur Dateinamen kennt, findet "Offerte_2026_final.pdf"
+     und nicht die Firma, um die es darin geht. Also wird der Text einmal
+     herausgezogen und steht danach in dateien.volltext.
+
+     Im Browser mit pdf.js, das ohnehin unter vendor/ liegt und von der
+     Bauabnahme her schon geladen wird. Serverseitig bräuchte es eine
+     Bibliothek in einer package.json und damit den Build-Schritt, den
+     dieses Projekt bewusst nicht hat.
+
+     Zwei Gelegenheiten: beim Hochladen, und bei älteren Dateien beim
+     ersten Herunterladen. So füllt sich der Bestand von selbst, ohne
+     dass jemand einen Knopf "alles indexieren" drücken muss.
+
+     Zwanzig Seiten und 200'000 Zeichen sind die Grenze. Ein Bauplan mit
+     achtzig Seiten voller Masszahlen macht die Suche langsamer statt
+     besser, und irgendwo muss eine Grenze stehen. */
+  const SEITEN_MAX = 20;
+  const ZEICHEN_MAX = 200000;
+
+  async function textAusPdf(blob) {
+    await ladeSkript('vendor/pdfjs-3.11.174.min.js');
+    const lib = window.pdfjsLib;
+    if (!lib) throw new Error('Der PDF-Leser liess sich nicht laden.');
+    lib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs-worker-3.11.174.min.js';
+
+    const doc = await lib.getDocument({ data: await blob.arrayBuffer() }).promise;
+    const teile = [];
+    for (let i = 1; i <= Math.min(doc.numPages, SEITEN_MAX); i++) {
+      const seite = await doc.getPage(i);
+      const inhalt = await seite.getTextContent();
+      teile.push(inhalt.items.map(x => x.str).join(' '));
+      if (teile.join(' ').length > ZEICHEN_MAX) break;
+    }
+    /* Mehrfache Leerzeichen und Zeilenumbrüche weg: pdf.js liefert den
+       Text stückweise, und "Fank  hauser" fände die Suche nicht. */
+    return teile.join('\n').replace(/\s+/g, ' ').trim().slice(0, ZEICHEN_MAX);
+  }
+
+  /* Den Text herausziehen und ablegen. Scheitert das, bleibt die Datei
+     unangetastet — ein PDF, das pdf.js nicht mag, darf weder das
+     Hochladen noch das Herunterladen aufhalten. */
+  async function volltextMerken(datei, blob) {
+    try {
+      const text = await textAusPdf(blob);
+      const { error } = await sb.from('dateien')
+        .update({ volltext: text, volltext_am: new Date().toISOString() })
+        .eq('id', datei.id);
+      if (error) throw error;
+      datei.volltext = text;
+      datei.volltext_am = new Date().toISOString();
+    } catch (e) {
+      console.warn('[TRIGA] Der Text aus', datei.name, 'liess sich nicht lesen:', e?.message || e);
+    }
   }
 
   /* --- Ordner ------------------------------------------------------------- */
@@ -181,14 +279,19 @@
       .upload(pfad, file, { contentType: 'application/pdf' });
     if (hochError) return toast(hochError.message, true);
 
-    const { error } = await sb.from('dateien').insert({
+    const { data: neueZeile, error } = await sb.from('dateien').insert({
       ordner_id: offenerOrdner.id, name: file.name, pfad,
       groesse: file.size, typ: 'application/pdf', hochgeladen_von: s.user.id
-    });
+    }).select().single();
     if (error) return toast(error.message, true);
 
     await allesLaden();
     toast('Hochgeladen');
+
+    /* Der Text erst danach: die Datei ist oben, die Liste steht, und ob
+       pdf.js noch eine Sekunde braucht, geht niemanden etwas an. Dass
+       er durchsuchbar wird, merkt man erst beim nächsten Suchen. */
+    if (neueZeile) volltextMerken(neueZeile, file);
   }
 
   /* Der Bucket ist nicht öffentlich. Heruntergeladen wird über eine
@@ -206,6 +309,47 @@
     document.body.appendChild(a);
     a.click();
     a.remove();
+
+    /* Zwei Dinge nebenbei, beide ohne die Person warten zu lassen.
+       Erstens die Spur für "Zuletzt angesehen". Zweitens der Text, falls
+       die Datei von vor dieser Erweiterung stammt — so füllt sich der
+       Bestand von selbst, ohne dass jemand einen Knopf drücken muss. */
+    spurMerken(d.id);
+    if (!d.volltext_am) nachtragen(d);
+  }
+
+  /* Eine Zeile je Person und Datei, beim zweiten Öffnen aktualisiert
+     statt verdoppelt. Scheitert es, bleibt es still: eine Liste der
+     zuletzt angesehenen Dateien ist Bequemlichkeit, kein Nachweis. */
+  async function spurMerken(dateiId) {
+    try {
+      const s = await session();
+      if (!s) return;
+      await sb.from('datei_zugriffe')
+        .upsert({ user_id: s.user.id, datei_id: dateiId, zuletzt_am: new Date().toISOString() },
+                { onConflict: 'user_id,datei_id' });
+      zuletztAngesehen = await ladeZuletzt();
+      zeichneZuletzt();
+      /* Am Schreibtisch steht dieselbe Liste in der rechten Fläche. Sie
+         wird nur dann neu gezeichnet, wenn dort nichts anderes steht —
+         im geöffneten Ordner gehört die Fläche seinen Dateien. */
+      if (!offenerOrdner) zeichneDetail();
+    } catch (e) {
+      console.warn('[TRIGA] Die Spur liess sich nicht merken:', e?.message || e);
+    }
+  }
+
+  /* Den Text einer älteren Datei nachholen. Sie liegt ohnehin gleich im
+     Browser, weil sie gerade heruntergeladen wird — ein zweiter Abruf
+     wäre derselbe Inhalt ein zweites Mal durch die Leitung. */
+  async function nachtragen(d) {
+    try {
+      const { data, error } = await sb.storage.from(BUCKET).download(d.pfad);
+      if (error || !data) return;
+      await volltextMerken(d, data);
+    } catch (e) {
+      console.warn('[TRIGA] Der Text liess sich nicht nachtragen:', e?.message || e);
+    }
   }
 
   async function dateiInPapierkorb(d) {
@@ -309,8 +453,15 @@
     $('#m-titel').textContent = offenerOrdner ? offenerOrdner.name : 'Dokumente';
     $('#m-zurueck').href = offenerOrdner ? '#' : 'start.html';
 
+    /* Am Schreibtisch steht die Liste hier und nicht in der linken Spalte:
+       dort ist nur Platz für die Ordnernamen, und breit genug für Datum,
+       Ordner und Grösse ist allein die rechte Fläche. Am Handy ist es
+       umgekehrt — dort gibt es diese Fläche nicht, und die Liste steht
+       oben über den Ordnern. */
     if (!offenerOrdner) {
-      $('#detail').innerHTML = `<div class="br-leer">Links einen Ordner wählen, oder einen neuen anlegen.</div>`;
+      $('#detail').innerHTML = blockZuletzt()
+        + `<div class="br-leer" style="margin-top:${zuletztAngesehen.length ? '20px' : '0'};">Links einen Ordner wählen, oder einen neuen anlegen.</div>`;
+      knoepfeBinden($('#detail'), zuletztAngesehen);
       return;
     }
 
@@ -334,6 +485,28 @@
 
     $('#d-hoch').addEventListener('click', () => $('#datei-wahl').click());
     knoepfeBinden($('#detail'), dateien);
+  }
+
+  /* Ganz oben, über den Ordnern: es ist der kürzeste Weg zu dem, woran
+     man gerade sitzt. Erst wenn dort nichts steht, fängt das Blättern
+     durch die Ordner an. Im geöffneten Ordner verschwindet die Liste —
+     dort sucht niemand nach etwas anderem. */
+  function blockZuletzt() {
+    if (offenerOrdner || !zuletztAngesehen.length) return '';
+    return `
+      <div style="font-size:12px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--red); margin:4px 0 10px;">Zuletzt angesehen</div>
+      <div class="dk-tabelle">${zuletztAngesehen.map(d => dateiZeile(d, true)).join('')}</div>`;
+  }
+
+  function zeichneZuletzt() {
+    const el = $('#zuletzt');
+    if (!el) return;
+    const html = blockZuletzt();
+    el.innerHTML = html;
+    /* Ohne das bliebe der Innenabstand des leeren Kastens stehen und
+       drückte "Zuletzt hochgeladen" grundlos nach unten. */
+    el.hidden = !html;
+    knoepfeBinden(el, zuletztAngesehen);
   }
 
   function zeichneLetzte() {
@@ -364,11 +537,23 @@
 
     [ordner, projekte] = await Promise.all([ladeOrdner(), PJ.projekte()]);
     if (offenerOrdner) offenerOrdner = ordner.find(o => o.id === offenerOrdner.id) || null;
-    dateien = offenerOrdner ? await ladeDateien(offenerOrdner.id) : [];
-    letzteHochgeladen = offenerOrdner ? [] : (await ladeDateien(null)).slice(0, 5);
+
+    /* Beides auf einmal statt nacheinander: die Dateien des Ordners und
+       die zuletzt angesehenen hängen nicht voneinander ab, und zwei
+       Rundreisen hintereinander sind auf dem Bau eine zu viel. */
+    if (offenerOrdner) {
+      [dateien, zuletztAngesehen] = [await ladeDateien(offenerOrdner.id), []];
+      letzteHochgeladen = [];
+    } else {
+      dateien = [];
+      const [alleDateien, gesehen] = await Promise.all([ladeDateien(null), ladeZuletzt()]);
+      letzteHochgeladen = alleDateien.slice(0, 5);
+      zuletztAngesehen = gesehen;
+    }
 
     zeichneOrdner();
     zeichneDetail();
+    zeichneZuletzt();
     zeichneLetzte();
   }
 

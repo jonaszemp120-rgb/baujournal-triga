@@ -233,6 +233,15 @@
       r.mitarbeiter = db().mitarbeiter?.find(m => m.id === r.mitarbeiter_id) || null;
       r.projekte = db().projekte.find(p => p.id === r.projekt_id) || null;
     }
+    /* Die Spur zu "Zuletzt angesehen" traegt nur die Kennung der Datei;
+       angezeigt wird die Datei selbst. In der echten Datenbank gibt es
+       dafuer einen Fremdschluessel, das Einbetten laeuft also. */
+    if (tabelle === 'datei_zugriffe') {
+      r.dateien = (db().dateien || []).find(x => x.id === r.datei_id) || null;
+    }
+    if (tabelle === 'notizen') {
+      r.firmen = r.firma_id ? ((db().firmen || []).find(f => f.id === r.firma_id) || null) : null;
+    }
     if (tabelle === 'projekte') r.eintraege = db().eintraege.filter(e => e.projekt_id === r.id).map(e => ({ datum: e.datum, geloescht_am: e.geloescht_am ?? null }));
     return r;
   }
@@ -250,6 +259,14 @@
         zustand.op = 'upsert';
         zustand.daten = Array.isArray(v) ? v : [v];
         zustand.schluessel = (opt && opt.onConflict) || 'id';
+        return b;
+      },
+      /* Ein einzelnes ilike, nicht in einer or-Gruppe: die Suche ueber
+         die Protokolle fragt so nach dem Firmennamen auf der
+         Teilnehmerliste. */
+      ilike(sp, muster) {
+        const wert = String(muster).replace(/%/g, '').toLowerCase();
+        zustand.filter.push(r => String(r[sp] ?? '').toLowerCase().includes(wert));
         return b;
       },
       is(sp, w) { zustand.filter.push(r => (r[sp] ?? null) === w); return b; },
@@ -284,11 +301,33 @@
       }
       let reihen = d[tabelle] || (d[tabelle] = []);
 
+      /* Die Spur zu "Zuletzt angesehen" gehoert der Person, die sie
+         hinterlassen hat. Auch die Geschaeftsleitung sieht sie nicht:
+         wer wann welche Datei geoeffnet hat, ist Bequemlichkeit und
+         keine Aufsicht. Steht vor dem upsert, weil die App genau so
+         schreibt — danach waere die Regel fuer den einzigen Schreibweg
+         wirkungslos. */
+      if (tabelle === 'datei_zugriffe') {
+        if (zustand.op === 'select' || zustand.op === 'update' || zustand.op === 'delete') {
+          zustand.filter.push(r => r.user_id === USER.id);
+        }
+        const neue = (zustand.op === 'insert' || zustand.op === 'upsert') ? zustand.daten : [];
+        if ((neue || []).some(r => r.user_id !== USER.id)) {
+          return { data: null, error: { message: 'new row violates row-level security policy for table "datei_zugriffe"' } };
+        }
+      }
+
       if (zustand.op === 'upsert') {
-        const schluessel = zustand.schluessel;
+        /* onConflict kann mehrere Spalten nennen: datei_zugriffe hat
+           einen Primaerschluessel aus user_id und datei_id. Mit nur der
+           ersten Spalte zu vergleichen hiesse, die Spur einer Person
+           haette genau eine Zeile — und "Zuletzt angesehen" zeigte immer
+           nur eine Datei. */
+        const spalten = String(zustand.schluessel).split(',').map(s => s.trim());
+        const gleich = (r, v) => spalten.every(sp => r[sp] === v[sp]);
         const raus = [];
         for (const v of zustand.daten) {
-          const i = reihen.findIndex(r => r[schluessel] === v[schluessel]);
+          const i = reihen.findIndex(r => gleich(r, v));
           if (i >= 0) { reihen[i] = { ...reihen[i], ...v }; raus.push(reihen[i]); }
           else { const n = { ...v, id: v.id || crypto.randomUUID() }; reihen.push(n); raus.push(n); }
         }
@@ -399,6 +438,33 @@
          Wirklichkeit. */
       if (tabelle === 'eintraege' && zustand.op === 'update') {
         return { data: null, error: { message: 'permission denied for table eintraege', code: '42501' } };
+      }
+
+      /* Die beiden Regeln an einer Notiz, nachgewiesen auf der echten
+         Datenbank:
+         notizen_frist_nur_bei_rot - eine Frist ohne Rot waere eine
+         Mahnung ohne Anlass, und
+         notiz_frist_vermerk() - der Vermerk "Erinnerung ist hinaus"
+         gehoert dem taeglichen Lauf. Zuruecknehmen auf null bleibt
+         erlaubt, das macht die App beim Verschieben der Frist. */
+      if (tabelle === 'notizen' && (zustand.op === 'insert' || zustand.op === 'update')) {
+        const neue = zustand.op === 'insert' ? zustand.daten : [zustand.daten || {}];
+        const alte = zustand.op === 'update'
+          ? reihen.filter(r => zustand.filter.every(f => f(r)))
+          : [];
+
+        for (const v of neue) {
+          if (!('frist' in v) || v.frist == null) continue;
+          const farbe = v.farbe ?? (alte.length ? alte[0].farbe : null);
+          if (farbe !== 'rot') {
+            return { data: null, error: { message: 'new row for relation "notizen" violates check constraint "notizen_frist_nur_bei_rot"' } };
+          }
+        }
+        for (const v of neue) {
+          if (!('frist_gemeldet_am' in v) || v.frist_gemeldet_am == null) continue;
+          if (alte.length && alte.every(r => (r.frist_gemeldet_am ?? null) === v.frist_gemeldet_am)) continue;
+          return { data: null, error: { message: 'Der Vermerk zur Erinnerung wird nicht von Hand gesetzt.' } };
+        }
       }
 
       if (tabelle === 'antraege' && zustand.op === 'select') {
@@ -754,6 +820,24 @@
           if (i >= 0) kanaele.splice(i, 1);
         },
         rpc: async (name, p) => {
+          /* abwesend_heute(): wer heute in genehmigten Ferien ist, und
+             bis wann. Nur diese beiden Angaben — den Antrag selbst gibt
+             die Funktion nie heraus, und ein abgelehnter oder noch
+             offener Antrag steht nie darin. Genau so ist sie in der
+             Migration 20260920160000 gebaut und auf der echten Datenbank
+             nachgewiesen. */
+          if (name === 'abwesend_heute') {
+            const d = db();
+            const heute = new Date().toISOString().slice(0, 10);
+            const bis = new Map();
+            for (const a of d.antraege || []) {
+              if (a.art !== 'ferien' || a.status !== 'genehmigt') continue;
+              if (String(a.von) > heute || String(a.bis) < heute) continue;
+              const alt = bis.get(a.erstellt_von);
+              if (!alt || String(a.bis) > alt) bis.set(a.erstellt_von, String(a.bis));
+            }
+            return { data: [...bis].map(([user_id, b]) => ({ user_id, bis: b })), error: null };
+          }
           /* feed_ergebnisse(): je Umfrage und Option die Anzahl Stimmen,
              sonst nichts. Genau darin liegt die Anonymitaet — wer wie
              gestimmt hat, verlaesst die Datenbank nie. */

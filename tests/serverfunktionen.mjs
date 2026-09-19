@@ -932,6 +932,185 @@ console.log('\n=== api/push: stumm, Erwähnung, Zuständigkeit ===');
      d.a.status === 403, String(d.a.status));
 }
 
+/* ===== Fristen erinnern ==================================================== */
+
+/* Die Erinnerung an eine ablaufende Frist im Firmenpool. Drei Tage
+   vorher, an die Person, die die Notiz geschrieben hat, und genau
+   einmal. Alle drei Punkte hängen an Rechnerei mit Daten, und die geht
+   erfahrungsgemäss über die Sommerzeit oder den Monatswechsel schief —
+   also wird sie hier nachgerechnet und nicht geglaubt. */
+
+console.log('\n=== api/fristen ===');
+{
+  const fristen = require('./fristen.js');
+
+  /* --- Der Zieltag ---------------------------------------------------- */
+
+  ok('Drei Tage und keine zwei', fristen.VORLAUF_TAGE === 3);
+  ok('Ein gewöhnlicher Tag',
+     fristen.zielTag(new Date('2026-09-19T00:00:00Z')) === '2026-09-22',
+     fristen.zielTag(new Date('2026-09-19T00:00:00Z')));
+  ok('Über den Monatswechsel',
+     fristen.zielTag(new Date('2026-09-29T00:00:00Z')) === '2026-10-02');
+  ok('Über den Jahreswechsel',
+     fristen.zielTag(new Date('2026-12-30T00:00:00Z')) === '2027-01-02');
+  /* Ende März stellt die Schweiz auf Sommerzeit um. Mit lokaler Zeit
+     gerechnet läge der Zieltag hier einen Tag daneben, und die
+     Erinnerung käme vier statt drei Tage vorher. */
+  ok('Über die Zeitumstellung',
+     fristen.zielTag(new Date('2027-03-27T23:30:00Z')) === '2027-03-30');
+  ok('Spät am Abend UTC ist es noch derselbe Tag',
+     fristen.zielTag(new Date('2026-09-19T23:59:00Z')) === '2026-09-22');
+
+  const umwelt = { ...process.env };
+  process.env.SUPABASE_SERVICE_KEY = 'dienst';
+
+  /* Echte Schlüssel und kein Platzhalter: sende() unterschreibt damit
+     und verschlüsselt für das Gerät. Mit einer Zeichenkette bräche das
+     ab, bevor die Meldung überhaupt hinausginge — und der Test prüfte
+     dann, dass nichts passiert, statt dass etwas passiert. */
+  const { subtle: krypto } = require(`${WURZEL}/api/_webpush.js`);
+  const paarF = await krypto.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+  const privatF = (await krypto.exportKey('jwk', paarF.privateKey)).d;
+  process.env.VAPID_PRIVAT = privatF;
+  process.env.VAPID_OEFFENTLICH =
+    Buffer.from(await krypto.exportKey('raw', paarF.publicKey)).toString('base64url');
+
+  const geraet = await krypto.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+  const P256DH = Buffer.from(await krypto.exportKey('raw', geraet.publicKey)).toString('base64url');
+  const AUTH = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString('base64url');
+
+  delete process.env.CRON_SECRET;
+
+  /* --- Ohne Schlüssel gar nichts -------------------------------------- */
+  spur = [];
+  delete process.env.VAPID_PRIVAT;
+  let d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  hoerAuf();
+  ok('Ohne VAPID-Schlüssel: klare Absage statt stiller Fehler',
+     d.a.status === 503 && !!d.a.daten.fehler, String(d.a.status));
+  process.env.VAPID_PRIVAT = privatF;
+
+  /* --- Fremder Aufruf --------------------------------------------------- */
+  process.env.CRON_SECRET = 'geheim';
+  spur = [];
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: { authorization: 'Bearer falsch' } }, d.res);
+  hoerAuf();
+  ok('Ein fremder Aufruf wird abgewiesen', d.a.status === 401, String(d.a.status));
+  delete process.env.CRON_SECRET;
+
+  /* --- Nichts fällig ---------------------------------------------------- */
+  spur = [];
+  stubFetch([['rest/v1/notizen', { status: 200, daten: [] }]]);
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  hoerAuf();
+  ok('Nichts fällig: nichts passiert', d.a.status === 200 && d.a.daten.gemeldet === 0);
+  ok('Und kein Schreibaufruf', !spur.some(s => s.methode === 'PATCH'));
+
+  /* --- Die Abfrage selbst ------------------------------------------------ */
+  const heute = new Date();
+  const ziel = fristen.zielTag(heute);
+
+  spur = [];
+  stubFetch([
+    ['rest/v1/notizen?select', { status: 200, daten: [
+      { id: 'n1', text: 'Versicherungsnachweis fehlt noch', autor_id: 'wer-schrieb',
+        frist: ziel, firmen: { name: 'Zirkonium AG' } }] }],
+    ['push_geraete', { status: 200, daten: [
+      { id: 'g1', user_id: 'wer-schrieb', endpunkt: 'https://fcm.googleapis.com/x/1', p256dh: P256DH, auth: AUTH },
+      { id: 'g2', user_id: 'jemand-anders', endpunkt: 'https://fcm.googleapis.com/x/2', p256dh: P256DH, auth: AUTH }] }]
+  ]);
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  const log = hoerAuf();
+
+  const abfrage = spur.find(s => s.url.includes('rest/v1/notizen?select'));
+  ok('Gefragt wird nach genau dem Tag in drei Tagen',
+     !!abfrage && abfrage.url.includes(`frist=eq.${ziel}`), abfrage && abfrage.url);
+  ok('Nur rote Notizen', !!abfrage && abfrage.url.includes('farbe=eq.rot'));
+  ok('Und nur solche, zu denen noch nichts hinausging',
+     !!abfrage && abfrage.url.includes('frist_gemeldet_am=is.null'));
+  ok('Der Firmenname kommt gleich mit, statt einzeln nachgefragt zu werden',
+     !!abfrage && abfrage.url.includes('firmen(name)')
+       && spur.filter(s => s.url.includes('rest/v1/firmen')).length === 0);
+
+  const geraete = spur.filter(s => s.url.includes('push_geraete') && s.methode === 'GET');
+  ok('Die Geräte kommen in einer einzigen Anfrage', geraete.length === 1);
+  ok('Und nur für die betroffene Person',
+     geraete[0].url.includes('user_id=in.(wer-schrieb)'), geraete[0].url);
+
+  const versand = spur.filter(s => s.url.startsWith('https://fcm.googleapis.com'));
+  ok('Eine Meldung, an das eine Gerät', versand.length === 1
+     && versand[0].url === 'https://fcm.googleapis.com/x/1', String(versand.length));
+  ok('Niemand sonst bekommt sie',
+     !versand.some(v => v.url.endsWith('/2')));
+
+  const vermerk = spur.find(s => s.methode === 'PATCH' && s.url.includes('rest/v1/notizen'));
+  ok('Danach steht der Vermerk an der Notiz', !!vermerk && vermerk.url.includes('id=in.(n1)'));
+  ok('Und zwar nur dieser eine Wert',
+     !!vermerk && Object.keys(JSON.parse(vermerk.rumpf)).join() === 'frist_gemeldet_am');
+  ok('Der Bericht nennt Firma und Zahl',
+     log.includes('1 Frist(en)'), log.split('\n').pop());
+
+  /* --- Wer kein Gerät hat, staut nichts auf ---------------------------- */
+  /* Ohne den Vermerk käme für diese Person jeden Tag derselbe Versuch,
+     und beim ersten angemeldeten Gerät ein Schwall alter Erinnerungen. */
+  spur = [];
+  stubFetch([
+    ['rest/v1/notizen?select', { status: 200, daten: [
+      { id: 'n2', text: 'Mängel beheben', autor_id: 'ohne-geraet',
+        frist: ziel, firmen: { name: 'Steiger Baucontrol AG' } }] }],
+    ['push_geraete', { status: 200, daten: [] }]
+  ]);
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  hoerAuf();
+  ok('Ohne Gerät wird nichts verschickt',
+     !spur.some(s => s.url.startsWith('https://fcm.googleapis.com')));
+  ok('Die Frist gilt trotzdem als gemeldet',
+     spur.some(s => s.methode === 'PATCH' && s.url.includes('id=in.(n2)')));
+
+  /* --- Ein abgemeldetes Gerät fliegt raus ------------------------------ */
+  spur = [];
+  stubFetch([
+    ['rest/v1/notizen?select', { status: 200, daten: [
+      { id: 'n3', text: 'Nachweis', autor_id: 'wer-schrieb', frist: ziel, firmen: null }] }],
+    ['push_geraete', { status: 200, daten: [
+      { id: 'g9', user_id: 'wer-schrieb', endpunkt: 'https://fcm.googleapis.com/weg', p256dh: P256DH, auth: AUTH }] }],
+    ['fcm.googleapis.com/weg', { status: 410, daten: '' }]
+  ]);
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  hoerAuf();
+  ok('Ein abgemeldetes Gerät wird weggeräumt',
+     spur.some(s => s.methode === 'DELETE' && s.url.includes('push_geraete') && s.url.includes('g9')));
+  ok('Ohne Firmenname bleibt die Meldung trotzdem verständlich',
+     d.a.status === 200 && d.a.daten.gemeldet === 1);
+
+  /* --- Die Notizen lassen sich nicht laden ----------------------------- */
+  spur = [];
+  stubFetch([['rest/v1/notizen', { status: 500, daten: 'kaputt' }]]);
+  d = antwortDoppel();
+  hoerZu();
+  await fristen({ headers: {} }, d.res);
+  const klage = hoerAuf();
+  ok('Scheitert die Abfrage, bricht es laut ab',
+     d.a.status === 502 && klage.includes('[fristen]'), String(d.a.status));
+  ok('Und kein Vermerk wird gesetzt',
+     !spur.some(s => s.methode === 'PATCH'));
+
+  process.env = umwelt;
+}
+
 globalThis.fetch = echt;
 console.log(`\n=== ${gut} von ${gut + schlecht} Prüfungen bestanden ===`);
 process.exit(schlecht ? 1 : 0);

@@ -557,24 +557,34 @@
     }
     beiStatuswechsel(hinweisZeigen);
 
+    async function alles() {
+      $$('[data-neu]').forEach(b => { b.hidden = false; });
+      await ladeAlles();
+
+      if (!leute.some(l => l.user_id === ich)) {
+        $('#meine').innerHTML = '<div class="br-leer">Ihr Konto ist mit keinem Eintrag im Bereich Mitarbeiter verknüpft. Anträge sind dem TRIGA-Team vorbehalten.</div>';
+        $$('[data-neu]').forEach(b => { b.hidden = true; });
+        return false;
+      }
+
+      zeichne();
+      baueFormular($('#form-fest'));
+      return true;
+    }
+
+    $$('[data-neu]').forEach(b => b.addEventListener('click', neuerAntrag));
+
     if (!istOnline()) {
       $('#meine').innerHTML = '<div class="br-leer">Ohne Verbindung lassen sich keine Anträge laden. Sobald das Gerät wieder online ist, steht hier alles.</div>';
-      $$('[data-neu]').forEach(b => b.hidden = true);
-      beiStatuswechsel(() => { if (istOnline()) location.reload(); });
+      $$('[data-neu]').forEach(b => { b.hidden = true; });
+      /* Früher lud die Seite sich hier selbst neu. Die Anträge zu holen
+         und zu zeichnen reicht — dafür braucht es kein zweites Mal HTML,
+         CSS und alle Skripte. */
+      beiRueckkehr(alles);
       return;
     }
 
-    await ladeAlles();
-
-    if (!leute.some(l => l.user_id === ich)) {
-      $('#meine').innerHTML = '<div class="br-leer">Ihr Konto ist mit keinem Eintrag im Bereich Mitarbeiter verknüpft. Anträge sind dem TRIGA-Team vorbehalten.</div>';
-      $$('[data-neu]').forEach(b => b.hidden = true);
-      return;
-    }
-
-    zeichne();
-    baueFormular($('#form-fest'));
-    $$('[data-neu]').forEach(b => b.addEventListener('click', neuerAntrag));
+    if (!await alles()) return;
 
     pushFragen({
       grund: 'Damit Sie es mitbekommen, wenn ein Antrag entschieden wird, und wenn im Feed oder im Chat etwas Wichtiges kommt. Ohne funktioniert alles genau gleich, es kommt nur keine Meldung auf den Bildschirm.'

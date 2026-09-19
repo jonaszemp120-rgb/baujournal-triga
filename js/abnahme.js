@@ -944,18 +944,24 @@
     }
     beiStatuswechsel(hinweisZeigen);
 
+    async function alles() {
+      $('#inhalt').innerHTML = '<div class="br-leer">Wird geladen…</div>';
+      await ladeAlles();
+      if (!projekt) {
+        $('#inhalt').innerHTML = '<div class="br-leer">Dieses Projekt gibt es nicht mehr.</div>';
+        return;
+      }
+      await zeichne();
+    }
+
     if (!istOnline()) {
       $('#inhalt').innerHTML = '<div class="br-leer">Ohne Verbindung lässt sich die Bauabnahme nicht laden. Der Plan und die Fotos liegen im Netz.</div>';
-      beiStatuswechsel(() => { if (istOnline()) location.reload(); });
+      /* Früher lud die Seite sich hier selbst neu. Laden und zeichnen
+         kann sie ohnehin, und nur das ist nötig. */
+      beiRueckkehr(alles);
       return;
     }
 
-    $('#inhalt').innerHTML = '<div class="br-leer">Wird geladen…</div>';
-    await ladeAlles();
-    if (!projekt) {
-      $('#inhalt').innerHTML = '<div class="br-leer">Dieses Projekt gibt es nicht mehr.</div>';
-      return;
-    }
-    await zeichne();
+    await alles();
   })();
 })();

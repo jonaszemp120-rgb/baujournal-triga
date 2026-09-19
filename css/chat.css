@@ -293,6 +293,26 @@ button.ch-admin:hover{ border-color:var(--navy); color:var(--navy); }
 }
 .ch-reaktionswahl button.meine{ border-color:var(--navy); background:var(--bg); }
 
+/* Unter der Auswahl, bei eigenen Nachrichten in einer Gruppe: wer schon
+   gelesen hat und wer noch nicht. Ein Strich trennt es von den Emoji —
+   das eine ist eine Handlung, das andere eine Auskunft. */
+.ch-lesestand{ margin-top:18px; padding-top:16px; border-top:1px solid var(--border); }
+.ch-lesestand .titel{ font-size:14px; font-weight:800; color:var(--navy); }
+.ch-lesestand .marke{
+  font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--text-dim); margin:14px 0 2px;
+}
+.ch-lesestand .gruppe{ margin-top:6px; }
+.ch-lesezeile{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:9px 0; border-bottom:1px solid var(--border);
+}
+.ch-lesezeile:last-child{ border-bottom:none; }
+.ch-lesezeile .wer{ font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.ch-lesezeile .wann{ font-size:12px; color:var(--text-dim); flex-shrink:0; }
+/* Der gelesene Teil trägt dasselbe Grün wie der doppelte Haken. */
+.ch-lesestand .gelesen .wer{ color:var(--ok); }
+
 /* Wer selbst gemeint ist, soll es sehen, ohne zu lesen. */
 .ch-erwaehnt{ font-weight:700; color:var(--navy); text-decoration:none; }
 .ch-blase.ich .ch-erwaehnt{ color:#9fd8ff; }

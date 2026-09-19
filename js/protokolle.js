@@ -22,6 +22,15 @@
   let projekt = null;
   let liste = [];
 
+  /* null heisst: nicht gesucht, die gewohnte Liste steht da. Sonst
+     { q, treffer, anzahl } — das Ergebnis der letzten Eingabe. */
+  let fund = null;
+  let suchLauf = 0;    // zählt die Anfragen, damit eine langsame keine neue überholt
+
+  /* Genug für jede Sitzungsreihe, die es hier gibt, und eine Grenze für
+     den Fall, dass jemand nach "e" sucht. */
+  const GRENZE = 60;
+
   const STATUS = {
     vorbereitet:   { titel: 'Vorbereitet',   farbe: 'grau' },
     entwurf:       { titel: 'Entwurf',       farbe: 'gelb' },
@@ -64,6 +73,75 @@
     return [...gewesen, ...kommend];
   }
 
+  /* --- Suchen --------------------------------------------------------------- */
+
+  /* Gesucht wird in zwei Töpfen: im Text der Traktanden und in den
+     Firmennamen auf der Teilnehmerliste. Der Firmenname steht dort als
+     eigene Spalte — jener Schnappschuss vom Tag der Sitzung, der auch
+     dann noch stimmt, wenn die Firma später umbenannt wurde.
+     Beides in der Datenbank und nicht im Browser: zwölf Protokolle mit
+     je zwanzig Traktanden herunterzuladen, nur um darin zu suchen, wäre
+     auf dem Bau eine Wartezeit für nichts. */
+  async function suchen(roh) {
+    const q = suchSauber(roh);
+    if (q.length < 2) { fund = null; zeichne(); return; }
+
+    const ids = liste.map(p => p.id);
+    if (!ids.length) { fund = { q, treffer: [], anzahl: 0 }; zeichne(); return; }
+
+    const lauf = ++suchLauf;
+    const [tr, tn] = await Promise.all([
+      sb.from('protokoll_traktanden')
+        .select('protokoll_id, titel, text')
+        .in('protokoll_id', ids).or(suchOder(['titel', 'text'], q)).limit(GRENZE),
+      sb.from('protokoll_teilnehmer')
+        .select('protokoll_id, name, firma')
+        .in('protokoll_id', ids).ilike('firma', `%${q}%`).limit(GRENZE)
+    ]);
+    /* Wer schnell tippt, löst mehrere Anfragen aus. Kommt eine ältere
+       später zurück als eine neuere, überschriebe sie das jüngere
+       Ergebnis — deshalb der Zähler. */
+    if (lauf !== suchLauf) return;
+
+    meckern('Traktanden durchsuchen', tr.error);
+    meckern('Firmen durchsuchen', tn.error);
+    fund = { q, ...gruppiere(q, tr.data || [], tn.data || []) };
+    zeichne();
+  }
+
+  function gruppiere(q, traktanden, teilnehmende) {
+    const je = new Map();
+    const hole = id => { if (!je.has(id)) je.set(id, []); return je.get(id); };
+    const klein = q.toLowerCase();
+
+    for (const t of traktanden) {
+      const imTitel = String(t.titel || '').toLowerCase().includes(klein);
+      hole(t.protokoll_id).push({
+        art: 'Traktandum',
+        wo: t.titel,
+        /* Steht das Wort schon im Titel, wäre der Ausschnitt darunter
+           dasselbe zweimal. */
+        aus: imTitel ? '' : textStelle(t.text, q)
+      });
+    }
+
+    /* Dieselbe Firma steht mit drei Leuten auf der Teilnehmerliste, im
+       Ergebnis aber nur einmal: gesucht wurde die Firma, nicht die
+       Person. */
+    const gesehen = new Set();
+    for (const p of teilnehmende) {
+      const schluessel = `${p.protokoll_id}|${String(p.firma || '').toLowerCase()}`;
+      if (gesehen.has(schluessel)) continue;
+      gesehen.add(schluessel);
+      hole(p.protokoll_id).push({ art: 'Beteiligt', wo: p.firma, aus: p.name });
+    }
+
+    /* Die Reihenfolge kommt aus der Liste und nicht aus den Treffern:
+       das Neueste zuerst, wie überall sonst auch. */
+    const treffer = liste.filter(p => je.has(p.id)).map(p => ({ p, zeilen: je.get(p.id) }));
+    return { treffer, anzahl: treffer.reduce((s, t) => s + t.zeilen.length, 0) };
+  }
+
   /* --- Zeichnen ------------------------------------------------------------- */
 
   function unterzeile(p) {
@@ -76,8 +154,36 @@
     return { wann, zahlen };
   }
 
+  /* Ein Treffer nennt Nummer und Datum des Protokolls und darunter die
+     Stellen, an denen das Wort steht. Karten und keine Tabellenzeilen:
+     die Fundstellen brauchen die ganze Breite, und auf dem Desktop
+     stünde in den Spalten für Traktanden und Pendenzen nichts. */
+  function zeichneFund() {
+    const { q, treffer, anzahl } = fund;
+    if (!treffer.length) {
+      $('#inhalt').innerHTML = `
+        <div class="br-leer">In den Protokollen dieses Projekts steht nichts zu «${esc(q)}».</div>`;
+      return;
+    }
+    $('#inhalt').innerHTML = `
+      <div class="pk-label">${anzahl} ${anzahl === 1 ? 'Fundstelle' : 'Fundstellen'} in
+        ${treffer.length} ${treffer.length === 1 ? 'Protokoll' : 'Protokollen'}</div>
+      ${treffer.map(({ p, zeilen }) => `
+        <a class="pk-karte pressable" href="protokoll.html?protokoll=${esc(p.id)}">
+          <span class="oben"><span class="titel">${esc(titelVon(p))}</span>${chip(p)}</span>
+          <span class="unter">${esc(fmtDatum(p.datum))}${p.ort ? ` · ${esc(p.ort)}` : ''}</span>
+          ${zeilen.map(z => `
+            <span class="pk-fund">
+              <span class="was">${esc(z.art)}</span>
+              <span class="wo">${esc(z.wo || '—')}</span>
+              ${z.aus ? `<span class="aus">${esc(z.aus)}</span>` : ''}
+            </span>`).join('')}
+        </a>`).join('')}`;
+  }
+
   function zeichne() {
     zeichneKopf();
+    if (fund) { zeichneFund(); return; }
     if (!liste.length) {
       $('#inhalt').innerHTML = `
         <div class="br-leer">
@@ -211,19 +317,36 @@
     beiStatuswechsel(hinweisZeigen);
     $('#m-neu').addEventListener('click', anlegen);
 
+    /* Ein kurzer Moment Ruhe, bevor gefragt wird: wer "Fankhauser"
+       tippt, löste sonst zehn Anfragen aus und bräuchte nur die letzte. */
+    let warten = null;
+    $('#p-suche').addEventListener('input', e => {
+      const wert = e.target.value;
+      clearTimeout(warten);
+      warten = setTimeout(() => suchen(wert), 220);
+    });
+
+    async function alles() {
+      $('#inhalt').innerHTML = '<div class="br-leer">Wird geladen…</div>';
+      projekt = await PJ.projekt(projektId);
+      if (!projekt) {
+        $('#inhalt').innerHTML = '<div class="br-leer">Dieses Projekt gibt es nicht mehr.</div>';
+        return;
+      }
+      liste = await laden();
+
+      /* Das Feld erscheint erst, wenn es etwas zu durchsuchen gibt. Beim
+         ersten Protokoll eines Projekts wäre es nur ein leeres Kästchen. */
+      $('#suchleiste').hidden = !liste.length;
+      zeichne();
+    }
+
     if (!istOnline()) {
       $('#inhalt').innerHTML = '<div class="br-leer">Ohne Verbindung lassen sich die Protokolle nicht laden.</div>';
-      beiStatuswechsel(() => { if (istOnline()) location.reload(); });
+      beiRueckkehr(alles);
       return;
     }
 
-    $('#inhalt').innerHTML = '<div class="br-leer">Wird geladen…</div>';
-    projekt = await PJ.projekt(projektId);
-    if (!projekt) {
-      $('#inhalt').innerHTML = '<div class="br-leer">Dieses Projekt gibt es nicht mehr.</div>';
-      return;
-    }
-    liste = await laden();
-    zeichne();
+    await alles();
   })();
 })();

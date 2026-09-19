@@ -25,6 +25,14 @@
   let verwalten = false;
   let eigenesKonto = null;
 
+  /* Wer heute in genehmigten Ferien ist, als user_id -> letzter Ferientag.
+     Die Angabe kommt aus abwesend_heute() und nicht aus den Anträgen
+     selbst: die gehören der antragstellenden Person und der
+     Geschäftsleitung, und wer im Adressbuch blättert, soll nur sehen,
+     dass jemand weg ist — nicht warum, nicht wie lange beantragt, nicht
+     wer entschieden hat. */
+  let abwesend = {};
+
   const breit = () => matchMedia('(min-width:1024px)').matches;
 
   /* --- Daten -------------------------------------------------------------- */
@@ -43,6 +51,30 @@
     schreib(MA_CACHE, data || []);
     return data || [];
   }
+
+  /* Ohne Verbindung steht kein Hinweis da statt eines veralteten: "bis
+     Freitag weg" aus der letzten Woche wäre schlechter als gar nichts.
+     Deshalb wird das hier auch nicht gespiegelt. */
+  async function ladeAbwesende() {
+    if (!navigator.onLine) return {};
+    const { data, error } = await sb.rpc('abwesend_heute');
+    if (meckern('Abwesenheiten laden', error)) return {};
+    return Object.fromEntries((data || []).map(a => [a.user_id, a.bis]));
+  }
+
+  const abwesenheit = m => (m.user_id && abwesend[m.user_id]) || null;
+
+  const abwesenheitMarke = m => {
+    const bis = abwesenheit(m);
+    return bis ? `<span class="ma-abwesend">${svg(IKON.weg, 12)}Abwesend bis ${esc(fmtKurz(bis))}</span>` : '';
+  };
+
+  /* Ohne Jahr: "bis 24.12." liest sich schneller, und wer heute weg ist,
+     ist nicht über den Jahreswechsel hinaus weg. */
+  const fmtKurz = d => {
+    const [, m, t] = String(d).slice(0, 10).split('-');
+    return `${t}.${m}.`;
+  };
 
   async function speichereMitarbeiter(felder, id) {
     if (!navigator.onLine) throw new Error('Mitarbeiter lassen sich nur online bearbeiten');
@@ -74,7 +106,9 @@
     telefon: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
     mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
     stift: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
-    eimer: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+    eimer: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    kontakt: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/>',
+    weg: '<path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/>'
   };
   const svg = (d, g = 18) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
@@ -114,6 +148,7 @@
         <span style="min-width:0; flex:1;">
           <span class="titel" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.name)}</span>
           <span class="unter" style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(m.rolle || '—')}</span>
+          ${abwesenheitMarke(m)}
         </span>
         ${stufeMarke(m)}
         <span class="br-nur-handy" style="display:flex; gap:6px; flex-shrink:0;">
@@ -152,6 +187,7 @@
             <span style="display:flex; align-items:center; flex-wrap:wrap; gap:8px; color:var(--text-dim); font-size:13.5px;">
               <span>${esc(m.rolle || 'Keine Funktion erfasst')}</span>
               ${neu ? '' : stufeMarke(m)}
+              ${neu ? '' : abwesenheitMarke(m)}
             </span>
           </span>
           ${verwalten ? `
@@ -163,6 +199,7 @@
           ${zeile(IKON.mail, m.email, 'mailto:' + (m.email || ''), `${m.name} anschreiben`)}
           ${!m.telefon && !m.email ? '<div style="padding:14px 4px; font-size:13.5px; color:var(--text-dim);">Keine Kontaktangaben erfasst.</div>' : ''}
         </div>
+        ${neu ? '' : `<button type="button" id="ma-vcard" class="ma-kontakt pressable">${svg(IKON.kontakt, 16)}<span>In Kontakte speichern</span></button>`}
         ${verwalten ? '' : `<div style="max-width:480px; margin-top:14px; font-size:12.5px; color:var(--text-dim); line-height:1.55;">${
           m.user_id && m.user_id === eigenesKonto
             ? 'Das sind Sie. Telefon und E-Mail ändern Sie unter <a href="profil.html" style="color:var(--red); font-weight:700;">Mein Profil</a>.'
@@ -231,6 +268,10 @@
 
   function zeigeAnsicht(m) {
     zeige(detailHtml(m), wurzel => {
+      /* Der Kontakt-Export steht vor dem Riegel: eine Nummer ins eigene
+         Telefon zu übernehmen ist keine Verwaltung, und wer sie am
+         Bildschirm sieht, kann sie ohnehin abtippen. */
+      $('#ma-vcard', wurzel)?.addEventListener('click', () => kontaktHerunterladen(m));
       if (!verwalten) return;
       $('#ma-bearbeiten', wurzel).addEventListener('click', () => zeigeFormular(m));
       $('#ma-weg', wurzel).addEventListener('click', async () => {
@@ -303,6 +344,29 @@
     });
   }
 
+  /* --- In Kontakte speichern ------------------------------------------------ */
+
+  /* Dieselbe Maschinerie wie im Firmenpool, aus js/app.js. Eine einzelne
+     Karte: eine Person ist keine Firma mit Ansprechpersonen.
+     ORG steht fest auf der Firma — wer die Nummer ins Telefon holt, soll
+     dort sehen, woher sie kommt, und nicht nur einen Vornamen. */
+  function kontaktHerunterladen(m) {
+    if (!m.telefon && !m.email) return toast('Für diesen Eintrag sind keine Kontaktangaben erfasst', true);
+    const teile = String(m.name || '').trim().split(/\s+/);
+    const nach = teile.length > 1 ? teile.pop() : '';
+    const vor = teile.join(' ');
+
+    vcardDatei([vcardKarte([
+      `N:${vcardWert(nach)};${vcardWert(vor)};;;`,
+      `FN:${vcardWert(m.name)}`,
+      'ORG:TRIGA Baumanagement AG',
+      m.rolle ? `TITLE:${vcardWert(m.rolle)}` : null,
+      m.telefon ? `TEL;TYPE=WORK,VOICE:${vcardWert(m.telefon)}` : null,
+      m.email ? `EMAIL;TYPE=INTERNET,WORK:${vcardWert(m.email)}` : null
+    ])], m.name);
+    toast('Kontakt exportiert');
+  }
+
   function leeresDetail() {
     if (sheetOffen) { sheetOffen.schliessen(); sheetOffen = null; }
     $('#detail').innerHTML = `<div class="br-leer">Links jemanden auswählen${
@@ -334,7 +398,9 @@
     }
     beiStatuswechsel(hinweisZeigen);
 
-    alle = await ladeMitarbeiter();
+    /* Beides auf einmal: die Abwesenheiten hängen nicht am Adressbuch,
+       und nacheinander zu warten kostet eine Rundreise ohne Gegenwert. */
+    [alle, abwesend] = await Promise.all([ladeMitarbeiter(), ladeAbwesende()]);
     zeichneListe();
     leeresDetail();
 

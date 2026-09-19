@@ -1236,6 +1236,129 @@ console.log('\n=== Reaktionen an einer Nachricht ===');
   await ctx.close();
 }
 
+/* --- 1b. Lesebestätigung im Detail ----------------------------------------
+   Langes Antippen einer eigenen Nachricht in der Gruppe zeigt, wer sie
+   gelesen hat und wer nicht. Dafür braucht es nichts Neues in der
+   Datenbank: chat_mitglieder.zuletzt_gelesen steht seit dem
+   Ungelesen-Zähler dort und trägt schon den zweiten Haken. Die Rechnung
+   ist dieselbe, nur einzeln statt für alle zusammen. */
+
+console.log('\n=== Wer hat gelesen ===');
+{
+  /* Eine eigene Nachricht in der Gruppe und eine im Einzelgespräch. Die
+     Lesestände liegen absichtlich davor: gelesen hat sie noch niemand. */
+  const saat = JSON.parse(JSON.stringify(SAAT_PLUS));
+  const T = (h, m) => `${HEUTE}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00.000Z`;
+  saat.nachrichten.push(
+    { id:'lb1', chat_id:'c1', absender:'u1', text:'Bitte alle den Plan anschauen',
+      bild_pfad:null, bild_ablauf:null, erstellt_am:T(10, 0) },
+    /* Früher als lb1: die Gruppe soll in der Liste zuoberst bleiben,
+       sonst öffnet gruppeAuf() das Einzelgespräch. */
+    { id:'lb2', chat_id:'c2', absender:'u1', text:'Die Pläne liegen im Büro',
+      bild_pfad:null, bild_ablauf:null, erstellt_am:T(9, 50) }
+  );
+  for (const m of saat.chat_mitglieder) m.zuletzt_gelesen = T(9, 30);
+
+  const ctx = await baueKontext(390, { saat });
+  const p = await anmelden(ctx);
+  await p.goto(`${SERVER}/chat.html`, { waitUntil:'networkidle' });
+  await p.waitForTimeout(700);
+  await gruppeAuf(p);
+
+  const stand = () => p.locator('.ch-lesestand');
+  const schliessen = async () => {
+    await p.locator('.sheet-bg').last().click({ force:true, position:{ x:5, y:5 } });
+    await p.waitForTimeout(400);
+  };
+
+  ok('Die eigene Nachricht trägt einen Haken',
+     await p.locator('#n-lb1 .haken').count() === 1
+       && await p.locator('#n-lb1 .haken.gelesen').count() === 0);
+
+  await p.locator('#n-lb1').dispatchEvent('contextmenu');
+  await p.waitForTimeout(500);
+  ok('Langes Drücken zeigt den Lesestand', await stand().count() === 1);
+  ok('Die Reaktionen bleiben daneben stehen',
+     await p.locator('.ch-reaktionswahl button').count() === 5);
+  ok('Noch hat niemand gelesen',
+     (await stand().locator('.titel').textContent()).trim() === 'Gelesen von 0 von 2',
+     await stand().locator('.titel').textContent());
+  ok('Beide stehen unter "Noch nicht gelesen"',
+     (await stand().locator('.marke').textContent()).includes('Noch nicht gelesen')
+       && await stand().locator('.ch-lesezeile').count() === 2);
+  ok('Mit Namen und ohne Uhrzeit',
+     (await stand().locator('.ch-lesezeile .wer').allTextContents()).sort().join('|')
+       === 'Adrian Zemp|Silvia Weber'
+       && await stand().locator('.ch-lesezeile .wann').count() === 0,
+     (await stand().locator('.ch-lesezeile .wer').allTextContents()).join('|'));
+  ok('Die eigene Person steht nicht auf der Liste',
+     !(await stand().textContent()).includes('Jonas Zemp'));
+  await p.screenshot({ path:`${OUT}/lesestand-niemand.png`, fullPage:true });
+  await schliessen();
+
+  /* Adrian liest mit. Über Realtime wandert sein Lesestand weiter — und
+     damit ändert sich genau eine Zeile im Blatt. */
+  await p.evaluate(zeit => window.__stubMelde('chat_mitglieder',
+    { chat_id:'c1', user_id:'u9-adrian', zuletzt_gelesen: zeit, admin:false }, 'UPDATE'),
+    T(10, 30));
+  await p.waitForTimeout(800);
+
+  await p.locator('#n-lb1').dispatchEvent('contextmenu');
+  await p.waitForTimeout(500);
+  ok('Einer von zweien hat gelesen',
+     (await stand().locator('.titel').textContent()).trim() === 'Gelesen von 1 von 2',
+     await stand().locator('.titel').textContent());
+  ok('Adrian steht im gelesenen Teil',
+     (await stand().locator('.gelesen .wer').textContent()) === 'Adrian Zemp');
+  ok('Mit dem Zeitpunkt daneben',
+     /^\d{2}:\d{2}$/.test((await stand().locator('.gelesen .wann').textContent()).trim()),
+     await stand().locator('.gelesen .wann').textContent());
+  ok('Silvia steht weiterhin darunter',
+     (await stand().locator('.marke').textContent()).includes('Noch nicht gelesen')
+       && (await stand().textContent()).includes('Silvia Weber'));
+  await p.screenshot({ path:`${OUT}/lesestand-einer.png`, fullPage:true });
+  await schliessen();
+
+  /* Beide gelesen: aus einem Haken werden zwei, und die zweite Gruppe
+     fällt weg. */
+  await p.evaluate(zeit => window.__stubMelde('chat_mitglieder',
+    { chat_id:'c1', user_id:'u9-silvia', zuletzt_gelesen: zeit, admin:false }, 'UPDATE'),
+    T(10, 40));
+  await p.waitForTimeout(800);
+  ok('Jetzt stehen zwei Haken an der Nachricht',
+     await p.locator('#n-lb1 .haken.gelesen').count() === 1);
+
+  await p.locator('#n-lb1').dispatchEvent('contextmenu');
+  await p.waitForTimeout(500);
+  ok('Beide haben gelesen',
+     (await stand().locator('.titel').textContent()).trim() === 'Gelesen von 2 von 2');
+  ok('Und "Noch nicht gelesen" fällt weg', await stand().locator('.marke').count() === 0);
+  ok('Die zuletzt Eingetroffene zuoberst',
+     (await stand().locator('.gelesen .wer').first().textContent()) === 'Silvia Weber');
+  await schliessen();
+
+  /* An einer fremden Nachricht steht nichts davon: wer gelesen hat, geht
+     die schreibende Person an und nicht die lesende. */
+  await p.locator('#n-p1').dispatchEvent('contextmenu');
+  await p.waitForTimeout(500);
+  ok('An einer fremden Nachricht kein Lesestand', await stand().count() === 0);
+  ok('Die Reaktionen gibt es dort trotzdem',
+     await p.locator('.ch-reaktionswahl button').count() === 5);
+  await schliessen();
+
+  /* Im Einzelgespräch sagt der doppelte Haken schon alles. Eine Liste
+     mit genau einem Namen darunter wäre dasselbe zweimal. */
+  await p.click('#g-zurueck'); await p.waitForTimeout(700);
+  await p.locator('#gespraeche .ch-zeile', { hasText:'Adrian' }).first().click();
+  await p.waitForTimeout(900);
+  await p.locator('#n-lb2').dispatchEvent('contextmenu');
+  await p.waitForTimeout(500);
+  ok('Im Einzelgespräch kein Lesestand', await stand().count() === 0);
+  await schliessen();
+
+  await ctx.close();
+}
+
 /* --- 2. Stummschaltung ----------------------------------------------------- */
 
 console.log('\n=== Chat stummschalten ===');

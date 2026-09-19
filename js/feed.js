@@ -1023,27 +1023,37 @@
        offline sieht, wäre womöglich der von vorgestern, und beim
        Wichtigsten wäre das am gefährlichsten. Dann lieber ehrlich sagen,
        dass gerade nichts geht. */
+    async function alles() {
+      $$('[data-neu]').forEach(b => { b.hidden = false; });
+      await ladeAlles();
+
+      /* Nur wer im Adressbuch steht, sieht den Feed. Das steht auch in der
+         Policy; hier soll niemand vor einer leeren Seite ohne Erklärung
+         stehen. */
+      if (!leute.some(l => l.user_id === ich)) {
+        $('#liste').innerHTML = '<div class="br-leer">Ihr Konto ist mit keinem Eintrag im Bereich Mitarbeiter verknüpft. Der Feed ist dem TRIGA-Team vorbehalten.</div>';
+        $$('[data-neu]').forEach(b => { b.hidden = true; });
+        return false;
+      }
+
+      zeichneListe();
+      horche();
+      return true;
+    }
+
+    $$('[data-neu]').forEach(b => b.addEventListener('click', neuerBeitrag));
+
     if (!istOnline()) {
       $('#liste').innerHTML = '<div class="br-leer">Ohne Verbindung lässt sich der Feed nicht laden. Sobald das Gerät wieder online ist, steht hier alles.</div>';
-      $$('[data-neu]').forEach(b => b.hidden = true);
-      beiStatuswechsel(() => { if (istOnline()) location.reload(); });
+      $$('[data-neu]').forEach(b => { b.hidden = true; });
+      /* Früher lud die Seite sich hier selbst neu. Das ganze Dokument
+         noch einmal zu holen, nur um eine Liste zu füllen, ist das
+         gröbste Mittel für die einfachste Aufgabe. */
+      beiRueckkehr(alles);
       return;
     }
 
-    await ladeAlles();
-
-    /* Nur wer im Adressbuch steht, sieht den Feed. Das steht auch in der
-       Policy; hier soll niemand vor einer leeren Seite ohne Erklärung
-       stehen. */
-    if (!leute.some(l => l.user_id === ich)) {
-      $('#liste').innerHTML = '<div class="br-leer">Ihr Konto ist mit keinem Eintrag im Bereich Mitarbeiter verknüpft. Der Feed ist dem TRIGA-Team vorbehalten.</div>';
-      $$('[data-neu]').forEach(b => b.hidden = true);
-      return;
-    }
-
-    zeichneListe();
-    horche();
-    $$('[data-neu]').forEach(b => b.addEventListener('click', neuerBeitrag));
+    if (!await alles()) return;
 
     /* Einmal nach der Erlaubnis fragen, mit Begründung. Die Frage wird
        nur ein einziges Mal gestellt, bereichsübergreifend — wer sie hier

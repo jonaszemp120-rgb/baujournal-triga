@@ -23,15 +23,10 @@
   };
   const svg = (d, g = 17) => `<svg viewBox="0 0 24 24" width="${g}" height="${g}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 
-  /* Komma trennt in PostgREST die Bedingungen einer or-Gruppe, Prozent
-     und Unterstrich sind Platzhalter in ilike, Klammern strukturieren den
-     Ausdruck. Wer "Bau, Holz (50%)" eintippt, soll damit keine kaputte
-     Abfrage bauen, sondern schlicht danach suchen. */
-  const sauber = q => q.replace(/[,%_()\\]/g, ' ').trim();
-
-  function oder(spalten, q) {
-    return spalten.map(sp => `${sp}.ilike.%${q}%`).join(',');
-  }
+  /* Maskierung und or-Gruppe stehen in js/app.js: die Suche über die
+     Protokolle eines Projekts braucht beides genauso. */
+  const sauber = suchSauber;
+  const oder = suchOder;
 
   async function suche(roh) {
     const q = sauber(roh);
@@ -53,10 +48,14 @@
         .select('id, name, projekt_id')
         .is('geloescht_am', null)
         .or(oder(['name'], q)).limit(GRENZE),
+      /* Neu auch im Text der PDF. "Offerte_2026_final.pdf" verrät nicht,
+         um welche Firma es geht — der Text darin schon. Er steht in
+         dateien.volltext und wird beim Hochladen und beim ersten Öffnen
+         im Browser mit pdf.js herausgezogen; siehe js/dokumente.js. */
       sb.from('dateien')
-        .select('id, name, ordner_id')
+        .select('id, name, ordner_id, volltext')
         .is('geloescht_am', null)
-        .or(oder(['name'], q)).limit(GRENZE)
+        .or(oder(['name', 'volltext'], q)).limit(GRENZE)
     ]);
 
     [['Projekte', projekte], ['Firmen', firmen], ['Mitarbeiter', mitarbeiter],
@@ -69,6 +68,16 @@
       ordner: ordner.data || [],
       dateien: dateien.data || []
     };
+  }
+
+  /* Ein Stück Text um die Fundstelle herum. Nur wenn der Name selbst
+     nichts hergibt — sonst wäre die Zeile doppelt. */
+  function stelleImText(d, roh) {
+    const q = String(roh || '').trim().toLowerCase();
+    if (!q || !d.volltext) return null;
+    if (String(d.name).toLowerCase().includes(q)) return null;
+    if (!String(d.volltext).toLowerCase().includes(q)) return null;
+    return textStelle(d.volltext, q);
   }
 
   /* --- Anzeige -------------------------------------------------------------- */
@@ -130,7 +139,10 @@
           IKON.datei,
           `dokumente.html?ordner=${encodeURIComponent(d.ordner_id)}`,
           d.name,
-          ordnerNamen[d.ordner_id] || 'Datei'))
+          /* Steht das Gesuchte nicht im Namen, sondern im Text, wird die
+             Stelle gezeigt. Sonst stünde eine Datei im Ergebnis, ohne
+             dass erkennbar wäre, warum. */
+          stelleImText(d, roh) || ordnerNamen[d.ordner_id] || 'Datei'))
       ])
     ].filter(Boolean);
 

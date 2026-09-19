@@ -486,3 +486,37 @@ button[disabled], .btn-primary[aria-disabled="true"]{ opacity:.55; pointer-event
   .br-liste .inhalt{ padding:0 8px 24px; }
   .br-suche .br-knopf.voll{ display:none; }
 }
+
+/* === Bereich Mitarbeiter: Kontakt und Abwesenheit ========================= */
+
+/* Derselbe Umriss-Knopf wie beim Firmenpool. Er steht unter der
+   Kontaktkarte und nicht darin: was in der Karte steht, sind Angaben,
+   was darunter, ist eine Handlung. */
+.ma-kontakt{
+  height:42px; border-radius:10px; border:1px solid var(--navy); background:transparent;
+  color:var(--navy); font-weight:700; font-size:13px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  width:100%; max-width:480px; margin-top:14px; cursor:pointer;
+}
+.ma-kontakt:hover{ background:var(--bg); }
+
+/* Der Hinweis auf eine laufende Abwesenheit. Bewusst gelb und nicht rot:
+   jemand ist in den Ferien, das ist kein Fehler. Und bewusst mit Datum —
+   "abwesend" allein lässt offen, ob man morgen anrufen kann. */
+.ma-abwesend{
+  display:inline-flex; align-items:center; gap:5px; margin-top:4px;
+  padding:2px 8px; border-radius:999px;
+  background:#fdf3d7; color:#7a5800;
+  font-size:11.5px; font-weight:700; line-height:1.5; white-space:nowrap;
+}
+
+/* Die Frist an einer roten Notiz. Drei Zustände, weil "Frist 12.09."
+   allein nichts darüber sagt, ob sie noch kommt oder längst vorbei ist. */
+.fp-frist{
+  display:inline-flex; align-items:center; gap:5px; margin-top:5px;
+  padding:2px 8px; border-radius:999px;
+  background:var(--bg); color:var(--text-dim);
+  font-size:11.5px; font-weight:700; line-height:1.5;
+}
+.fp-frist.bald{ background:#fdf3d7; color:#7a5800; }
+.fp-frist.vorbei{ background:#fbe3e3; color:var(--red); }

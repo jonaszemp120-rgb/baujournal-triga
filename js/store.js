@@ -150,18 +150,34 @@ function meckern(wo, error) {
 
 let namenKarte = null;
 
-async function namen() {
-  if (namenKarte) return namenKarte;
-  if (navigator.onLine) {
-    const { data, error } = await sb.from('profile').select('id,name');
-    if (!meckern('Profile laden', error) && data) {
-      namenKarte = Object.fromEntries(data.map(p => [p.id, p.name]));
-      schreib(CACHE_NAMEN, namenKarte);
-      return namenKarte;
+/* Gemerkt wird das Versprechen und nicht erst das Ergebnis. Der
+   Unterschied zeigt sich, sobald zwei Ladevorgaenge nebeneinander
+   laufen: in den Dokumenten holen die Dateiliste und "Zuletzt
+   angesehen" gleichzeitig die Namen, und beide saehen die noch leere
+   Karte. Das waeren zwei Anfragen fuer dieselbe Auskunft. */
+let namenLauf = null;
+
+function namen() {
+  if (namenKarte) return Promise.resolve(namenKarte);
+  if (namenLauf) return namenLauf;
+
+  namenLauf = (async () => {
+    if (navigator.onLine) {
+      const { data, error } = await sb.from('profile').select('id,name');
+      if (!meckern('Profile laden', error) && data) {
+        namenKarte = Object.fromEntries(data.map(p => [p.id, p.name]));
+        schreib(CACHE_NAMEN, namenKarte);
+        return namenKarte;
+      }
     }
-  }
-  namenKarte = lies(CACHE_NAMEN, {});
-  return namenKarte;
+    namenKarte = lies(CACHE_NAMEN, {});
+    return namenKarte;
+  })();
+
+  /* Danach wieder frei: scheitert der Abruf offline, soll der naechste
+     Versuch nicht auf dem gescheiterten sitzen bleiben. */
+  namenLauf.finally(() => { namenLauf = null; });
+  return namenLauf;
 }
 
 /* --- Warteschlange ------------------------------------------------------ */

@@ -1,6 +1,6 @@
 # Die Testsuiten
 
-22 Suiten mit zusammen rund 2300 Prüfungen, gefahren mit Playwright gegen
+22 Suiten mit zusammen rund 2400 Prüfungen, gefahren mit Playwright gegen
 Chromium. Sie laufen nicht gegen die echte Datenbank, sondern gegen einen
 handgeschriebenen Supabase-Ersatz.
 
@@ -67,6 +67,9 @@ umgebung.mjs         wo alles liegt: Playwright, die Server, der Stub.
 stub.js              der Supabase-Ersatz: Abfragen, Policies, Trigger,
                      Storage, Echtzeit
 saat.json            der gemeinsame Anfangsbestand
+pdf-bauen.mjs        baut ein winziges, gültiges PDF mit lesbarem Text.
+                     Gebraucht seit der Volltextsuche: aus einer
+                     Attrappe zieht pdf.js nichts heraus
 import-test.csv      Testdaten für den Import im Bereich Mitarbeiter
 lauf-alles.sh        fährt alle Suiten, startet die Server dafür selbst
 neustart8124.sh      baut die Kopie für die Offline-Suite

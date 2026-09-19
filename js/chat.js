@@ -298,10 +298,64 @@
     }
   }
 
+  /* --- Wer gelesen hat ------------------------------------------------------- */
+
+  /* Wer die Nachricht schon gelesen hat und wer noch nicht.
+     Dafür braucht es nichts Neues in der Datenbank: chat_mitglieder.
+     zuletzt_gelesen steht seit dem Ungelesen-Zähler dort, wird beim
+     Öffnen eines Gesprächs gesetzt und kommt über Realtime herein. Eine
+     Nachricht gilt bei einer Person als gelesen, sobald deren Lesestand
+     nicht vor dem Sendezeitpunkt liegt — dieselbe Rechnung wie beim
+     zweiten Haken, nur einzeln statt für alle zusammen.
+
+     Was dabei nicht geht, und zwar grundsätzlich: der genaue Moment, in
+     dem jemand diese eine Nachricht gelesen hat. Gespeichert ist nur,
+     wann die Person das Gespräch zuletzt geöffnet hat. Deshalb steht bei
+     "Gelesen" dieser Zeitpunkt und nichts, was so tut, als wäre es der
+     Moment für genau diese Zeile. */
+  function lesestandVon(n) {
+    if (!offen || offen.art !== 'gruppe' || n.absender !== ich || n.geloescht_am) return null;
+    const gesendet = new Date(n.erstellt_am);
+    const andere = offen.mitglieder.filter(u => u !== ich);
+    if (!andere.length) return null;
+
+    const gelesen = [], offene = [];
+    for (const u of andere) {
+      const stand = lesestand[u];
+      (stand && new Date(stand) >= gesendet ? gelesen : offene).push({ u, stand });
+    }
+    /* Die zuletzt Eingetroffenen zuoberst: wer noch fehlt, steht in der
+       zweiten Liste und ist ohnehin der interessantere Teil. */
+    gelesen.sort((a, b) => String(b.stand).localeCompare(String(a.stand)));
+    return { gelesen, offene };
+  }
+
+  function lesestandBlock(n) {
+    const st = lesestandVon(n);
+    if (!st) return '';
+    const zeile = (x, wann) => `
+      <div class="ch-lesezeile">
+        <span class="wer">${esc(nameVon(x.u))}</span>
+        ${wann ? `<span class="wann">${esc(nachrichtZeit(x.stand))}</span>` : ''}
+      </div>`;
+    return `
+      <div class="ch-lesestand">
+        <div class="titel">Gelesen von ${st.gelesen.length} von ${st.gelesen.length + st.offene.length}</div>
+        ${st.gelesen.length
+          ? `<div class="gruppe gelesen">${st.gelesen.map(x => zeile(x, true)).join('')}</div>`
+          : ''}
+        ${st.offene.length
+          ? `<div class="marke">Noch nicht gelesen</div>
+             <div class="gruppe">${st.offene.map(x => zeile(x, false)).join('')}</div>`
+          : ''}
+      </div>`;
+  }
+
   /* Die Auswahl beim langen Drücken. Fünf Zeichen, gross genug für einen
      Daumen — auf einer Baustelle mit Handschuhen zielt niemand auf
      zwanzig Pixel. Was schon gesetzt ist, steht hervorgehoben da und ein
-     Tipp nimmt es zurück. */
+     Tipp nimmt es zurück. Darunter, bei einer eigenen Nachricht in einer
+     Gruppe, der Lesestand. */
   function reaktionWaehlen(nachrichtId) {
     const n = nachrichten.find(x => x.id === nachrichtId);
     if (!n || n.geloescht_am) return;
@@ -314,7 +368,10 @@
                   aria-pressed="${meineReaktion(nachrichtId, e)}"
                   aria-label="${esc(e)}">${e}</button>`).join('')}
       </div>
+      ${lesestandBlock(n)}
     `);
+    s.el.style.maxHeight = '80dvh';
+    s.el.style.overflowY = 'auto';
     $$('[data-waehle]', s.el).forEach(el => el.addEventListener('click', async () => {
       s.schliessen();
       await reagiere(nachrichtId, el.dataset.waehle);
@@ -674,14 +731,42 @@
 
   /* Die Bilder liegen in einem geschlossenen Bucket. Jedes braucht eine
      eigene, zeitlich begrenzte Adresse — deshalb erst nach dem Zeichnen
-     und nur für das, was wirklich am Bildschirm steht. */
+     und nur für das, was wirklich am Bildschirm steht.
+
+     Die Adressen werden gemerkt, und zwar aus einem handfesten Grund:
+     der Verlauf wird bei jeder eintreffenden Nachricht, jeder Reaktion
+     und jedem fremden Lesestand neu gezeichnet. In einer Gruppe, in der
+     sieben Leute gleichzeitig mitlesen, käme sonst für jedes Bild im
+     Gespräch bei jedem dieser Anlässe eine neue Anfrage — bei zwanzig
+     Bildern und sieben Leuten, die das Gespräch öffnen, sind das
+     hundertvierzig Anfragen für dieselben zwanzig Adressen.
+
+     Eine Stunde gilt die Unterschrift, gemerkt wird sie fünfzig
+     Minuten. Der Abstand ist Absicht: eine Adresse, die kurz vor dem
+     Ablauf herausgegeben wird, soll nicht auf halbem Weg ungültig
+     werden. */
+  const bildAdressen = new Map();
+  const ADRESSE_GILT = 3600;            // Sekunden, so lange unterschreibt Supabase
+  const ADRESSE_MERKEN = 50 * 60 * 1000; // Millisekunden, so lange verlassen wir uns darauf
+
+  async function signierteAdresse(pfad) {
+    const bekannt = bildAdressen.get(pfad);
+    if (bekannt && bekannt.bis > Date.now()) return bekannt.url;
+
+    const { data, error } = await sb.storage.from('chat-bilder')
+      .createSignedUrl(pfad, ADRESSE_GILT);
+    if (error || !data?.signedUrl) return null;
+
+    bildAdressen.set(pfad, { url: data.signedUrl, bis: Date.now() + ADRESSE_MERKEN });
+    return data.signedUrl;
+  }
+
   async function bilderNachladen() {
     const offeneBilder = $$('#verlauf [data-pfad]').filter(el => el.dataset.pfad);
     await Promise.all(offeneBilder.map(async el => {
-      const { data, error } = await sb.storage.from('chat-bilder')
-        .createSignedUrl(el.dataset.pfad, 3600);
+      const adresse = await signierteAdresse(el.dataset.pfad);
       const platz = el.querySelector('.platzhalter');
-      if (error || !data?.signedUrl) {
+      if (!adresse) {
         if (platz) platz.textContent = 'Bild lässt sich gerade nicht laden.';
         return;
       }
@@ -690,9 +775,9 @@
          zur Nachricht — dort ist die Kachel schon ein Knopf, und ein
          Link darin wäre keiner mehr. */
       platz.outerHTML = el.classList.contains('ch-kachel')
-        ? `<img src="${esc(data.signedUrl)}" alt="Gesendetes Bild" loading="lazy">`
-        : `<a href="${esc(data.signedUrl)}" download target="_blank" rel="noopener">
-            <img src="${esc(data.signedUrl)}" alt="Gesendetes Bild" loading="lazy"></a>`;
+        ? `<img src="${esc(adresse)}" alt="Gesendetes Bild" loading="lazy">`
+        : `<a href="${esc(adresse)}" download target="_blank" rel="noopener">
+            <img src="${esc(adresse)}" alt="Gesendetes Bild" loading="lazy"></a>`;
     }));
   }
 

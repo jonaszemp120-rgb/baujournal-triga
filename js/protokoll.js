@@ -810,22 +810,31 @@
     }
     beiStatuswechsel(hinweisZeigen);
 
+    /* Der Knopf wird einmal gebunden und nicht bei jedem Laden neu —
+       sonst hinge nach einer Rückkehr ins Netz zweimal derselbe
+       Zuhörer daran und die Frage käme doppelt. */
+    $('#m-abschluss').addEventListener('click', abschlussFragen);
+
+    async function alles() {
+      $('#rechts').innerHTML = '<div class="br-leer">Wird geladen…</div>';
+      if (!await ladeAlles()) {
+        $('#rechts').innerHTML = '<div class="br-leer">Dieses Protokoll gibt es nicht mehr.</div>';
+        return;
+      }
+      zeichneKopf();
+      zeichneTabs();
+      zeichneLinks();
+      zeichneRechts();
+    }
+
     if (!istOnline()) {
       $('#rechts').innerHTML = '<div class="br-leer">Ohne Verbindung lässt sich das Protokoll nicht laden.</div>';
-      beiStatuswechsel(() => { if (istOnline()) location.reload(); });
+      /* Früher lud die Seite sich hier selbst neu. Sie kann das Protokoll
+         auch so holen und zeichnen. */
+      beiRueckkehr(alles);
       return;
     }
 
-    $('#rechts').innerHTML = '<div class="br-leer">Wird geladen…</div>';
-    if (!await ladeAlles()) {
-      $('#rechts').innerHTML = '<div class="br-leer">Dieses Protokoll gibt es nicht mehr.</div>';
-      return;
-    }
-
-    $('#m-abschluss').addEventListener('click', abschlussFragen);
-    zeichneKopf();
-    zeichneTabs();
-    zeichneLinks();
-    zeichneRechts();
+    await alles();
   })();
 })();

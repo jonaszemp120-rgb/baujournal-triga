@@ -4,18 +4,8 @@
    werden. Der Service Worker legt sie trotzdem vorab in den Cache,
    damit der Export auch ohne Empfang funktioniert. */
 
-const _geladen = {};
-function ladeSkript(pfad) {
-  if (_geladen[pfad]) return _geladen[pfad];
-  _geladen[pfad] = new Promise((ok, fehler) => {
-    const s = document.createElement('script');
-    s.src = pfad;
-    s.onload = ok;
-    s.onerror = () => fehler(new Error('Bibliothek nicht verfügbar: ' + pfad));
-    document.head.appendChild(s);
-  });
-  return _geladen[pfad];
-}
+/* ladeSkript() steht in js/app.js: die Bauabnahme und die Dokumente
+   brauchen dasselbe für pdf.js, und die laden diese Datei hier nicht. */
 
 /* Das Logo ins PDF, dieselbe Datei wie am Bildschirm. Wird einmal
    geladen und als Datenstrom eingebettet. Der Service Worker hat sie im

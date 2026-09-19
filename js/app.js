@@ -86,7 +86,16 @@ async function verlangeLogin() {
 }
 
 async function ladeProfil(s) {
-  const { data } = await sb.from('profile').select('id,name').eq('id', s.user.id).maybeSingle();
+  /* Die Namensliste in js/store.js holt ohnehin die ganze Tabelle, und
+     fast jede Seite braucht sie. Denselben Namen zusätzlich einzeln zu
+     erfragen wäre bei jedem Seitenwechsel eine Rundreise für nichts —
+     und dieselbe Auskunft aus zwei Quellen kann auseinanderlaufen.
+     Die Anmeldeseite lädt store.js nicht, dort bleibt es beim eigenen
+     Abruf. */
+  const wer = typeof namen === 'function' ? await namen() : null;
+  const { data } = wer
+    ? { data: { name: wer[s.user.id] } }
+    : await sb.from('profile').select('id,name').eq('id', s.user.id).maybeSingle();
   const p = { id: s.user.id, email: s.user.email, name: data?.name || s.user.email };
   localStorage.setItem(PROFIL_KEY, JSON.stringify(p));
   document.dispatchEvent(new CustomEvent('profil', { detail: p }));
@@ -158,21 +167,32 @@ function istBerechtigt(wert) {
    mitarbeiter_schutz() lassen einen Schreibversuch scheitern, auch wenn
    hier jemand von Hand true hineinschreibt. */
 let STUFE_GEHOLT = null;
+/* Gemerkt wird auch der laufende Abruf. Eine Seite, die darfVerwalten()
+   an zwei Stellen nebeneinander fragt, bekaeme sonst zwei Anfragen fuer
+   dieselbe Zahl. */
+let STUFE_LAUF = null;
 
-async function meineStufe() {
-  if (STUFE_GEHOLT) return STUFE_GEHOLT;
-  const gemerkt = (() => { try { return localStorage.getItem('bj_meine_stufe'); } catch { return null; } })();
+function meineStufe() {
+  if (STUFE_GEHOLT) return Promise.resolve(STUFE_GEHOLT);
+  if (STUFE_LAUF) return STUFE_LAUF;
 
-  const s = await session();
-  if (!s) return STUFE_STANDARD;
-  if (!istOnline()) return gemerkt || STUFE_STANDARD;
+  STUFE_LAUF = (async () => {
+    const gemerkt = (() => { try { return localStorage.getItem('bj_meine_stufe'); } catch { return null; } })();
 
-  const { data } = await sb.from('mitarbeiter')
-    .select('berechtigung').eq('user_id', s.user.id).is('geloescht_am', null).maybeSingle();
+    const s = await session();
+    if (!s) return STUFE_STANDARD;
+    if (!istOnline()) return gemerkt || STUFE_STANDARD;
 
-  STUFE_GEHOLT = data?.berechtigung || STUFE_STANDARD;
-  try { localStorage.setItem('bj_meine_stufe', STUFE_GEHOLT); } catch { /* privates Fenster */ }
-  return STUFE_GEHOLT;
+    const { data } = await sb.from('mitarbeiter')
+      .select('berechtigung').eq('user_id', s.user.id).is('geloescht_am', null).maybeSingle();
+
+    STUFE_GEHOLT = data?.berechtigung || STUFE_STANDARD;
+    try { localStorage.setItem('bj_meine_stufe', STUFE_GEHOLT); } catch { /* privates Fenster */ }
+    return STUFE_GEHOLT;
+  })();
+
+  STUFE_LAUF.finally(() => { STUFE_LAUF = null; });
+  return STUFE_LAUF;
 }
 
 /* Darf diese Person den Bereich Mitarbeiter verwalten: anlegen, Name und
@@ -367,6 +387,23 @@ function beiStatuswechsel(fn) {
   addEventListener('online', fn);
   addEventListener('offline', fn);
   fn();
+}
+
+/* Einmal, sobald die Verbindung wieder da ist.
+   Fünf Bereiche haben an dieser Stelle die ganze Seite neu geladen. Das
+   funktioniert, ist aber das gröbste verfügbare Mittel: der Browser holt
+   HTML, CSS und alle Skripte erneut, die Seite blitzt weiss auf, und wer
+   in einem Formular etwas stehen hatte, hat es verloren. Gebraucht wird
+   nur, was ohnehin jede Seite kann — ihre Daten laden und zeichnen.
+   Deshalb hier ein Haken, den die Bereiche mit ihrer eigenen
+   Ladefunktion füllen. */
+function beiRueckkehr(fn) {
+  const einmal = () => {
+    if (!istOnline()) return;
+    removeEventListener('online', einmal);
+    fn();
+  };
+  addEventListener('online', einmal);
 }
 
 /* --- Hinweiszeile ------------------------------------------------------- */
@@ -652,6 +689,110 @@ function macheErwaehnungen({ leute, ich, marke = 'fd-erwaehnt',
   }
 
   return { markiere, mitErwaehnungen, helfer, schliessen, merkeFuer, vergiss };
+}
+
+/* --- Bibliotheken bei Bedarf --------------------------------------------- */
+
+/* Nachladen, was nicht jede Seite braucht: jsPDF für den Export, docx für
+   Word, pdf.js für Pläne und den Text in PDF. Sie liegen lokal unter
+   vendor/ und wiegen zusammen mehr als die ganze App — beim Öffnen einer
+   Seite mitzuliefern, die sie nie benutzt, wäre verschwendete Ladezeit.
+
+   Zweimal dasselbe Skript anzufordern ergibt eine Anfrage und nicht
+   zwei: das Versprechen wird gemerkt. Steht hier und nicht in
+   js/export.js, weil drei Module es brauchen und nur zwei Seiten jene
+   Datei laden. */
+const _geladen = {};
+function ladeSkript(pfad) {
+  if (_geladen[pfad]) return _geladen[pfad];
+  _geladen[pfad] = new Promise((ok, fehler) => {
+    const s = document.createElement('script');
+    s.src = pfad;
+    s.onload = ok;
+    s.onerror = () => fehler(new Error('Bibliothek nicht verfügbar: ' + pfad));
+    document.head.appendChild(s);
+  });
+  return _geladen[pfad];
+}
+
+/* --- Kontakte ------------------------------------------------------------ */
+
+/* Eine vCard bauen und herunterladen. Steht hier, weil zwei Bereiche
+   dasselbe brauchen: der Firmenpool exportiert Firmen samt
+   Ansprechpersonen, der Bereich Mitarbeiter einzelne Leute. Zwei
+   Fassungen liefen auseinander, und zwar an genau der Stelle, an der
+   man es am spätesten merkt — der Maskierung.
+
+   Nach RFC 6350 sind Komma, Semikolon, Backslash und Zeilenumbruch in
+   einem Wert zu maskieren. Ohne das zerfällt der Kontakt beim Import,
+   und eine Adresse wie "Musterweg 3, 6060 Sarnen" wird zu zwei Feldern. */
+const vcardWert = s => String(s || '')
+  .replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+
+/* Eine einzelne Karte. zeilen ist eine Liste fertiger VCARD-Zeilen;
+   was null ist, fällt weg — ein leeres TEL-Feld ist schlimmer als
+   keines. */
+const vcardKarte = zeilen =>
+  ['BEGIN:VCARD', 'VERSION:3.0', ...zeilen.filter(Boolean), 'END:VCARD'].join('\r\n');
+
+/* Der Dateiname, und zwar ohne Umlaute.
+   Das war nicht die erste Fassung: zuerst standen ÄÖÜäöü ausdrücklich
+   in der erlaubten Menge, weil "Thomas Zürcher.vcf" richtiger aussieht
+   als "Thomas Zuercher.vcf". Nur macht Chromium daraus nichts
+   dergleichen — es verwirft das download-Attribut mit einem Zeichen
+   ausserhalb von ASCII und legt die Datei als "download" ab, ohne
+   Endung. Aufgefallen beim ersten Test des Kontakt-Exports.
+   Also umgeschrieben statt weggeworfen: der Name bleibt lesbar, und im
+   Inhalt der Karte steht der Umlaut ohnehin unverändert. */
+const UMSCHRIFT = { 'ä': 'ae', 'ö': 'oe', 'ü': 'ue', 'Ä': 'Ae', 'Ö': 'Oe', 'Ü': 'Ue', 'ß': 'ss' };
+
+const vcardName = s => String(s)
+  .replace(/[äöüÄÖÜß]/g, z => UMSCHRIFT[z])
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')   // é → e, à → a
+  .replace(/[^\w\d .-]/g, '_')
+  .trim() || 'Kontakt';
+
+/* Mehrere Karten in einer Datei. Genau so erwartet es das Adressbuch
+   von iOS und Android: eine .vcf mit mehreren VCARD-Blöcken darin. */
+function vcardDatei(karten, dateiname) {
+  const blob = new Blob([karten.join('\r\n') + '\r\n'], { type: 'text/vcard;charset=utf-8' });
+  const adresse = URL.createObjectURL(blob);
+  const auf = document.createElement('a');
+  auf.href = adresse;
+  auf.download = `${vcardName(dateiname)}.vcf`;
+  document.body.appendChild(auf);
+  auf.click();
+  auf.remove();
+  setTimeout(() => URL.revokeObjectURL(adresse), 10000);
+}
+
+/* --- Suchen -------------------------------------------------------------- */
+
+/* Komma trennt in PostgREST die Bedingungen einer or-Gruppe, Prozent und
+   Unterstrich sind Platzhalter in ilike, Klammern strukturieren den
+   Ausdruck. Wer "Bau, Holz (50%)" eintippt, soll damit keine kaputte
+   Abfrage bauen, sondern schlicht danach suchen.
+
+   Steht hier und nicht mehr in js/suche.js: die globale Suche und die
+   Suche über die Protokolle eines Projekts müssen dieselbe Eingabe gleich
+   behandeln. Zwei Fassungen liefen genau an der Stelle auseinander, an
+   der man es am spätesten merkt. */
+const suchSauber = q => String(q || '').replace(/[,%_()\\]/g, ' ').trim();
+
+const suchOder = (spalten, q) => spalten.map(sp => `${sp}.ilike.%${q}%`).join(',');
+
+/* Ein Ausschnitt um den Treffer herum. Ohne das stünde bei einem
+   Traktandum von zwanzig Zeilen der Anfang da, und das gesuchte Wort
+   vielleicht ganz unten. */
+function textStelle(text, q, vor = 30, nach = 40) {
+  /* Erst die Zeilenumbrüche weg, dann suchen: in einer Zeile Text stimmt
+     die gefundene Stelle auch mit dem überein, was danach angezeigt wird. */
+  const roh = String(text || '').replace(/\s+/g, ' ').trim();
+  const i = roh.toLowerCase().indexOf(String(q).toLowerCase());
+  if (i < 0) return roh.slice(0, vor + nach).trim();
+  const von = Math.max(0, i - vor);
+  const bis = Math.min(roh.length, i + q.length + nach);
+  return (von > 0 ? '… ' : '') + roh.slice(von, bis).trim() + (bis < roh.length ? ' …' : '');
 }
 
 /* --- Service Worker ----------------------------------------------------- */

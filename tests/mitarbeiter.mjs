@@ -5,10 +5,10 @@ fs.rmSync(OUT, { recursive:true, force:true }); fs.mkdirSync(OUT, { recursive:tr
 const STUB = fs.readFileSync('./stub.js','utf8');
 const browser = await chromium.launch();
 const fehler = [];
-const ok = (n, b) => console.log(`  ${b ? '✓' : '✗ FEHLER'}  ${n}`);
+const ok = (n, b, zusatz = "") => console.log(`  ${b ? "✓" : "✗ FEHLER"}  ${n}${b || !zusatz ? "" : "  → " + zusatz}`);
 
 async function lauf(name, breite) {
-  const ctx = await browser.newContext({ viewport:{width:breite,height:breite>=1024?900:844}, deviceScaleFactor:1, locale:'de-CH', serviceWorkers:'block' });
+  const ctx = await browser.newContext({ viewport:{width:breite,height:breite>=1024?900:844}, deviceScaleFactor:1, locale:'de-CH', serviceWorkers:'block', acceptDownloads:true });
   await ctx.route('**/vendor/supabase-js-2.58.0.js', r => r.fulfill({status:200,contentType:'application/javascript',body:STUB}));
   /* Die eigene Zeile mit erweiterter Stufe, so wie es in der echten
      Datenbank aussieht: das angemeldete Konto gehoert zu einer Person, und
@@ -107,6 +107,116 @@ async function lauf(name, breite) {
   ok('Leeres Feld heisst wieder die Stufe',
      (await p.$$eval('#liste .stufe', e => e.map(x => x.textContent.trim())))
        .filter(t => t === 'Mitarbeiter:in').length === 3);
+
+  /* --- In Kontakte speichern --------------------------------------------
+     Derselbe Knopf wie im Firmenpool, nur mit einer Karte statt einer
+     Firma samt Ansprechpersonen. Gelesen wird die Datei wirklich: eine
+     vCard, die das Adressbuch nicht versteht, sieht beim Herunterladen
+     genauso aus wie eine, die es versteht. */
+  await p.locator('#liste .br-zeile', { hasText: 'Thomas Zürcher' }).click();
+  await p.waitForTimeout(600);
+  ok('Der Knopf steht in der Detailansicht', await p.locator('#ma-vcard').isVisible());
+
+  const [vcf] = await Promise.all([
+    p.waitForEvent('download', { timeout: 15000 }),
+    p.click('#ma-vcard')
+  ]);
+  const karte = fs.readFileSync(await vcf.path(), 'utf8');
+  /* Ohne Umlaut im Dateinamen, und das ist kein Schönheitsfehler:
+     Chromium verwirft das download-Attribut, sobald ein Zeichen
+     ausserhalb von ASCII darin steht, und legt die Datei als "download"
+     ohne Endung ab. Im Inhalt der Karte steht der Umlaut unverändert. */
+  ok('Datei heisst nach der Person, ohne Umlaut',
+     vcf.suggestedFilename() === 'Thomas Zuercher.vcf', vcf.suggestedFilename());
+  ok('Eine einzelne Karte', (karte.match(/BEGIN:VCARD/g) || []).length === 1);
+  ok('Name aufgeteilt in Vor- und Nachname', karte.includes('N:Zürcher;Thomas;;;'));
+  ok('Anzeigename steht drin', karte.includes('FN:Thomas Zürcher'));
+  ok('Firma steht fest auf TRIGA', karte.includes('ORG:TRIGA Baumanagement AG'));
+  ok('Funktion als TITLE', karte.includes('TITLE:Stv. Geschäftsleitung'));
+  ok('Telefon mit erhalten', karte.includes('TEL;TYPE=WORK,VOICE:+41 (41) 660 12 34'));
+  ok('Mail mit erhalten', karte.includes('EMAIL;TYPE=INTERNET,WORK:thomas.zuercher@triga.ch'));
+  ok('Zeilen mit CRLF, wie es RFC 6350 verlangt', karte.includes('\r\n'));
+
+  /* Ohne Telefon und Mail gibt es nichts zu exportieren. Marco Delea
+     wurde ohne beides angelegt. Auf dem Handy steht die Detailansicht
+     in einem Blatt über der Liste; ohne es zu schliessen kommt kein
+     Tipp auf die nächste Zeile durch. */
+  const blattZu = async () => {
+    if (await p.locator('.sheet-bg').count()) {
+      await p.locator('.sheet-bg').last().click({ force:true, position:{ x:5, y:5 } });
+      await p.waitForTimeout(400);
+    }
+  };
+  await blattZu();
+  await p.locator('#liste .br-zeile', { hasText: 'Marco Delea' }).click();
+  await p.waitForTimeout(600);
+  await p.click('#ma-vcard'); await p.waitForTimeout(500);
+  ok('Ohne Kontaktangaben ein Hinweis statt einer leeren Datei',
+     (await p.textContent('.toast')).includes('keine Kontaktangaben'));
+  await p.waitForTimeout(2600);
+  await blattZu();
+
+  /* --- Abwesend bis ------------------------------------------------------
+     Der Hinweis hängt an einem genehmigten Ferienantrag, der heute
+     einschliesst — an nichts anderem. Drei Fälle: kein Antrag, ein noch
+     offener, und ein genehmigter. */
+  ok('Ohne Antrag kein Hinweis', (await p.locator('#liste .ma-abwesend').count()) === 0);
+
+  const heute = new Date();
+  const tag = n => new Date(heute.getTime() + n * 86400000).toISOString().slice(0, 10);
+
+  // Ein eingereichter, noch nicht entschiedener Antrag.
+  await p.evaluate(([von, bis]) => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.antraege = [{ id: 'a1', art: 'ferien', status: 'eingereicht',
+                    von, bis, erstellt_von: 'u1' }];
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  }, [tag(-1), tag(2)]);
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1000);
+  ok('Ein offener Antrag macht niemanden abwesend',
+     (await p.locator('#liste .ma-abwesend').count()) === 0);
+
+  // Derselbe Antrag, genehmigt.
+  await p.evaluate(() => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.antraege[0].status = 'genehmigt';
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  });
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1000);
+  ok('Genehmigt heisst abwesend', (await p.locator('#liste .ma-abwesend').count()) === 1);
+
+  const erwartet = (() => {
+    const [, m, t] = tag(2).split('-');
+    return `Abwesend bis ${t}.${m}.`;
+  })();
+  ok('Der Hinweis nennt das Datum ohne Jahr',
+     (await p.textContent('#liste .ma-abwesend')).trim() === erwartet);
+  ok('Nur bei der betroffenen Person',
+     (await p.locator('#liste .br-zeile', { hasText: 'Jonas Zemp' }).locator('.ma-abwesend').count()) === 1);
+
+  await p.locator('#liste .br-zeile', { hasText: 'Jonas Zemp' }).click();
+  await p.waitForTimeout(600);
+  ok('Auch in der Detailansicht', (await p.locator('#ma-ansicht .ma-abwesend').count()) === 1);
+  await blattZu();
+  await p.screenshot({ path:`${OUT}/${name}-abwesend.png`, fullPage:true });
+
+  // Ein Antrag, der vorbei ist, zählt nicht mehr.
+  await p.evaluate(([von, bis]) => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.antraege[0].von = von; d.antraege[0].bis = bis;
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  }, [tag(-9), tag(-2)]);
+  await p.goto(`${SERVER}/mitarbeiter.html`, { waitUntil: 'networkidle' });
+  await p.waitForTimeout(1000);
+  ok('Vorbeier Antrag: kein Hinweis mehr',
+     (await p.locator('#liste .ma-abwesend').count()) === 0);
+  await p.evaluate(() => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.antraege = [];
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  });
 
   // Suche
   await p.fill('#suche','weber'); await p.waitForTimeout(300);

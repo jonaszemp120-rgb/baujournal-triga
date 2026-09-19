@@ -177,6 +177,97 @@ async function lauf(name, breite) {
   ok('Notiz gelöscht', (await p.$$('#notiz-liste .fp-notiz')).length === 1);
   ok('vorherige Notiz bestimmt wieder die Ampel', (await p.textContent('.fp-ampel')).includes('Grün'));
 
+  /* --- Frist an einer roten Notiz ---------------------------------------
+     Das Datum gehört zum roten Punkt und nur zu ihm. Die Datenbank
+     weist eine Frist an einer grünen Notiz ohnehin ab
+     (notizen_frist_nur_bei_rot, auf der echten Datenbank nachgewiesen);
+     in der Oberfläche steht sie deshalb gar nicht erst zur Wahl. */
+  const heute = new Date();
+  const tag = n => new Date(heute.getTime() + n * 86400000).toISOString().slice(0, 10);
+
+  ok('Ohne Rot kein Frist-Feld', await p.locator('#notiz-frist').isHidden());
+  await p.click('#firma-rechts .fp-farbe[data-farbe="rot"]');
+  await p.waitForTimeout(200);
+  ok('Mit Rot erscheint es', await p.locator('#notiz-frist').isVisible());
+  await p.click('#firma-rechts .fp-farbe[data-farbe="gelb"]');
+  await p.waitForTimeout(200);
+  ok('Und verschwindet wieder', await p.locator('#notiz-frist').isHidden());
+
+  await p.click('#firma-rechts .fp-farbe[data-farbe="rot"]');
+  await p.fill('#notiz-text', 'Versicherungsnachweis fehlt noch.');
+  await p.fill('#notiz-frist', tag(10));
+  await p.click('#notiz-speichern'); await p.waitForTimeout(1300);
+
+  const mitFrist = await p.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('__stub_db')).notizen
+      .find(n => n.text.includes('Versicherungsnachweis')));
+  ok('Die Frist steht an der Zeile', String(mitFrist.frist).slice(0, 10) === tag(10));
+  ok('Noch nichts gemeldet', (mitFrist.frist_gemeldet_am ?? null) === null);
+  ok('Die Frist steht in der Notiz', (await p.locator('#notiz-liste .fp-frist').count()) === 1);
+  ok('Mit Datum ausgeschrieben',
+     (await p.textContent('#notiz-liste .fp-frist')).includes(tag(10).split('-').reverse().join('.')));
+  ok('Zehn Tage sind noch nicht knapp',
+     (await p.getAttribute('#notiz-liste .fp-frist', 'class')) === 'fp-frist ');
+
+  // Eine Frist in zwei Tagen sieht anders aus als eine in zehn.
+  await p.click('#notiz-liste .fp-notiz [data-notiz-bearbeiten]'); await p.waitForTimeout(500);
+  ok('Das Formular zeigt die gesetzte Frist', (await p.inputValue('#fs-frist')) === tag(10));
+  await p.fill('#fs-frist', tag(2));
+  await p.click('#fs-ja'); await p.waitForTimeout(1300);
+  ok('Knapp wird hervorgehoben',
+     (await p.getAttribute('#notiz-liste .fp-frist', 'class')).includes('bald'));
+  ok('Und benennt die Tage', (await p.textContent('#notiz-liste .fp-frist')).includes('in 2 Tagen'));
+
+  /* Eine abgelaufene Frist wird nicht freundlich dargestellt: sie ist
+     überfällig, und das soll man sehen. */
+  await p.click('#notiz-liste .fp-notiz [data-notiz-bearbeiten]'); await p.waitForTimeout(500);
+  await p.fill('#fs-frist', tag(-2));
+  await p.click('#fs-ja'); await p.waitForTimeout(1300);
+  ok('Abgelaufen wird als überfällig markiert',
+     (await p.getAttribute('#notiz-liste .fp-frist', 'class')).includes('vorbei'));
+  ok('Und sagt, seit wann',
+     (await p.textContent('#notiz-liste .fp-frist')).includes('seit 2 Tagen überfällig'));
+
+  /* Wer die Frist verschiebt, soll die Erinnerung noch einmal bekommen.
+     Deshalb setzt die App den Vermerk zurück, sobald sich das Datum
+     ändert — sonst bliebe die verschobene Frist für immer als gemeldet
+     stehen. Gesetzt wird er sonst allein vom täglichen Lauf; die
+     Datenbank lässt es von der App aus gar nicht zu
+     (notiz_frist_vermerk(), auf der echten Datenbank nachgewiesen). */
+  await p.evaluate(() => {
+    const d = JSON.parse(sessionStorage.getItem('__stub_db'));
+    d.notizen.find(n => n.text.includes('Versicherungsnachweis'))
+      .frist_gemeldet_am = '2026-09-01T06:05:00.000Z';
+    sessionStorage.setItem('__stub_db', JSON.stringify(d));
+  });
+  await p.click('#notiz-liste .fp-notiz [data-notiz-bearbeiten]'); await p.waitForTimeout(500);
+  await p.fill('#fs-frist', tag(20));
+  await p.click('#fs-ja'); await p.waitForTimeout(1300);
+  const verschoben = await p.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('__stub_db')).notizen
+      .find(n => n.text.includes('Versicherungsnachweis')));
+  ok('Neue Frist gespeichert', String(verschoben.frist).slice(0, 10) === tag(20));
+  ok('Der Vermerk ist zurückgesetzt', (verschoben.frist_gemeldet_am ?? null) === null);
+
+  // Wechselt die Farbe weg von Rot, fällt die Frist weg.
+  await p.click('#notiz-liste .fp-notiz [data-notiz-bearbeiten]'); await p.waitForTimeout(500);
+  await p.click('.sheet .fp-farbe[data-farbe="gelb"]'); await p.waitForTimeout(200);
+  ok('Ohne Rot ist auch im Formular kein Feld mehr da',
+     await p.locator('#fs-fristfeld').isHidden());
+  await p.click('#fs-ja'); await p.waitForTimeout(1300);
+  ok('Die Frist ist weg', (await p.locator('#notiz-liste .fp-frist').count()) === 0);
+
+  const ohneFrist = await p.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('__stub_db')).notizen
+      .find(n => n.text.includes('Versicherungsnachweis')));
+  ok('Auch in der Zeile', (ohneFrist.frist ?? null) === null);
+
+  // Die Notiz wieder weg, damit die Ampel für den Rest der Suite stimmt.
+  await p.click('#notiz-liste .fp-notiz [data-notiz-weg]'); await p.waitForTimeout(500);
+  await p.click('#f-ja'); await p.waitForTimeout(1300);
+  ok('Nach dem Aufräumen wieder eine Notiz', (await p.$$('#notiz-liste .fp-notiz')).length === 1);
+  ok('Und wieder eine grüne Ampel', (await p.textContent('.fp-ampel')).includes('Grün'));
+
   // --- vCard ---------------------------------------------------------------
   const [vcard] = await Promise.all([ p.waitForEvent('download'), p.click('#vcard') ]);
   const vpfad = `${OUT}/${name}.vcf`;

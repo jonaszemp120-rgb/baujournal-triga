@@ -36,6 +36,35 @@
 .pk-reihe .zahl{ color:var(--text-dim); font-size:13px; }
 .pk-reihe .rechts{ text-align:right; }
 
+/* --- Die Suche über alle Protokolle --------------------------------------- */
+
+/* Dieselbe Form wie das Suchfeld in den anderen Bereichen, nur mit dem
+   Rand der Protokollfläche. */
+.pk-suche{ padding:14px 16px 4px; }
+.pk-suche input{
+  width:100%; height:44px; border-radius:11px;
+  background:var(--card); border:1px solid var(--border);
+  padding:0 14px; font-size:14px; color:var(--text); box-sizing:border-box;
+}
+.pk-suche input:focus{ outline:2px solid var(--navy); outline-offset:-2px; }
+
+/* Eine Fundstelle unter dem Protokolltitel: wo der Treffer steht, und
+   das Stück Text darum herum. */
+.pk-fund{
+  display:block; margin-top:10px; padding-top:10px;
+  border-top:1px solid var(--border);
+}
+.pk-fund .was{
+  display:inline-block; font-size:10.5px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--red);
+  margin-right:8px;
+}
+.pk-fund .wo{ font-size:14px; font-weight:600; color:var(--text); overflow-wrap:anywhere; }
+.pk-fund .aus{
+  display:block; margin-top:4px; font-size:13px; color:var(--text-dim);
+  line-height:1.5; overflow-wrap:anywhere;
+}
+
 /* --- Das Protokoll: Umschalter -------------------------------------------- */
 
 .pk-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0 18px; }
@@ -170,6 +199,12 @@ button.pk-status:hover{ filter:brightness(0.96); }
 
 @media (min-width:1024px){
   .pk-flaeche{ padding:26px calc(40px + env(safe-area-inset-right)) 40px calc(40px + env(safe-area-inset-left)); max-width:1400px; }
+  .pk-suche{ padding:22px calc(40px + env(safe-area-inset-right)) 0 calc(40px + env(safe-area-inset-left)); max-width:1400px; }
+  .pk-suche input{ max-width:420px; }
+  /* Steht das Feld darüber, bringt es den Abstand schon mit. Beim ersten
+     Protokoll eines Projekts ist es ausgeblendet, dann bleibt der
+     gewohnte Rand stehen. */
+  .pk-suche:not([hidden]) + .pk-flaeche{ padding-top:14px; }
 
   /* Das Protokoll steht in zwei Spalten: links die Kopfdaten und die
      Teilnehmenden, rechts die Traktanden. Genau die Aufteilung aus dem
